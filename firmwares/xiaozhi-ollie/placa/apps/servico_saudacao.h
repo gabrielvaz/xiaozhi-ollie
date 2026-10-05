@@ -35,8 +35,11 @@ public:
         if (c.gaveta_aberta && c.gaveta_aberta()) {
             return;
         }
-        if (agora - ContextoApps::ultimo_aviso < kTrocaS) {  // não cobre um aviso recente
-            proxima_ = std::max(proxima_, agora + 60);
+        // Não cobre um aviso que ainda está na tela: só os que chegaram depois de entrar na espera
+        // (ao voltar para a espera a tela é limpa, então um aviso anterior já sumiu) e por até 10 min
+        int aviso = ContextoApps::ultimo_aviso;
+        if (aviso >= ocioso_desde_ && agora - aviso < 600) {
+            proxima_ = std::max(proxima_, aviso + 600);
             return;
         }
         if (agora >= proxima_pose_) {

@@ -78,6 +78,36 @@ class AvisosHandler:
             return web.json_response({"erro": "sessão não encontrada"}, status=404)
         return web.json_response(dados)
 
+    async def handle_pergunta(self, request: web.Request) -> web.Response:
+        """Pergunta com opções aberta na tela da sessão (AskUserQuestion ou permissão): {"pergunta": {...} | null}."""
+        if not self._autorizado(request):
+            return web.json_response({"erro": "não autorizado"}, status=401)
+        import asyncio
+        from urllib.parse import unquote
+        from core.utils.vigia import ponte_carregada
+        sessao = unquote(request.match_info.get("id", ""))
+        return web.json_response({"pergunta": await asyncio.to_thread(ponte_carregada().pergunta_tela, sessao)})
+
+    async def handle_responder(self, request: web.Request) -> web.Response:
+        """POST {"escolhas": [1, 3]}: marca as opções na pergunta aberta e confirma (o corpo pode vir como octet-stream)."""
+        if not self._autorizado(request):
+            return web.json_response({"erro": "não autorizado"}, status=401)
+        import asyncio
+        import json
+        from urllib.parse import unquote
+        from core.utils.vigia import ponte_carregada
+        sessao = unquote(request.match_info.get("id", ""))
+        try:
+            corpo = json.loads((await request.read()).decode("utf-8") or "{}")
+            escolhas = corpo.get("escolhas")
+            if isinstance(escolhas, int):
+                escolhas = [escolhas]
+            if not isinstance(escolhas, list):
+                raise ValueError
+        except (ValueError, AttributeError, UnicodeDecodeError):
+            return web.json_response({"ok": False, "mensagem": 'Corpo inválido: use {"escolhas": [1]}.'}, status=400)
+        return web.json_response(await asyncio.to_thread(ponte_carregada().responder_pergunta, sessao, escolhas))
+
     async def handle_uso(self, request: web.Request) -> web.Response:
         """Limites do Claude (5 h e 7 dias) lidos no Mac; o token não vai para o aparelho."""
         if not self._autorizado(request):
@@ -116,6 +146,13 @@ class AvisosHandler:
             return web.json_response(await asyncio.to_thread(dados_tempo, ip))
         except Exception as e:
             return web.json_response({"ok": False, "erro": f"Previsão indisponível: {e}"})
+
+    async def handle_historico(self, request: web.Request) -> web.Response:
+        """GET /watcher/avisos/historico: todos os avisos guardados, mais recentes primeiro."""
+        if not self._autorizado(request):
+            return web.json_response({"erro": "não autorizado"}, status=401)
+        from core.utils.vigia import historico
+        return web.json_response({"avisos": historico()})
 
     async def handle_get(self, request: web.Request) -> web.Response:
         if not self._autorizado(request):

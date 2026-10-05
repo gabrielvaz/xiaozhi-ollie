@@ -7,19 +7,21 @@
 #include <atomic>
 #include <vector>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppReuniao : public AppWatcher {
 public:
-    const char* Nome() const override { return "Reuniões"; }
+    const char* Nome() const override { return TR("Reuniões", "Meetings", "会议", "Reuniones"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_MIC; }
-    std::string Detalhe() const override { return "Transcrição e resumo no Notas"; }
+    std::string Detalhe() const override { return TR("Transcrição e resumo no Notas", "Transcript, summary in Notes", "转写与摘要存入备忘录", "Transcripción y resumen en Notas"); }
     bool PrendeTela() const override { return gravando_; }
 
     void Abrir(ContextoApps& c) override {
         tela_ = Tela::Carregando;
         buscar_em_ = 0;
-        c.painel.MostrarStatus("Reuniões", PainelWatcher::Status::Carregando, "Carregando reuniões…");
+        c.painel.MostrarStatus(TR("Reuniões", "Meetings", "会议", "Reuniones"), PainelWatcher::Status::Carregando,
+                               TR("Carregando reuniões…", "Loading meetings…", "正在加载会议…", "Cargando reuniones…"));
     }
 
     void IniciarGravacao(ContextoApps& c) {
@@ -78,7 +80,7 @@ public:
         }
         if (tela_ == Tela::Lista && i > 1 && i <= (int)lista_.size() + 1) {
             tela_ = Tela::Item;
-            c.painel.MostrarTexto(lista_[i - 2].titulo, lista_[i - 2].detalhe, {"Voltar"});
+            c.painel.MostrarTexto(lista_[i - 2].titulo, lista_[i - 2].detalhe, {TR("Voltar", "Back", "返回", "Volver")});
             return true;
         }
         if (tela_ == Tela::Item) {
@@ -173,13 +175,19 @@ private:
         pausado_ = false;
         if (houve_queda_) {
             int minutos = (segundos + 30) / 60;
-            ContextoApps::Avisar("Reunião salva",
-                                 std::to_string(minutos) + " min no cartão. Envio ao Mac quando houver conexão.", "happy");
+            ContextoApps::Avisar(TR("Reunião salva", "Meeting saved", "会议已保存", "Reunión guardada"),
+                                 std::to_string(minutos) +
+                                     TR(" min no cartão. Envio ao Mac quando houver conexão.",
+                                        " min on the card. Sending to the Mac once online.",
+                                        " 分钟已存到卡上，联网后发送到 Mac。",
+                                        " min en la tarjeta. Se enviará al Mac cuando haya conexión."),
+                                 "happy");
         }
         // Lista das reuniões gravadas (espera o servidor registrar a que acabou de terminar)
         tela_ = Tela::Carregando;
         buscar_em_ = ContextoApps::Agora() + 2;
-        c.painel.MostrarStatus("Reuniões", PainelWatcher::Status::Carregando, "Salvando a reunião…");
+        c.painel.MostrarStatus(TR("Reuniões", "Meetings", "会议", "Reuniones"), PainelWatcher::Status::Carregando,
+                               TR("Salvando a reunião…", "Saving meeting…", "正在保存会议…", "Guardando la reunión…"));
     }
 
     void BuscarLista(ContextoApps& c) {
@@ -202,11 +210,13 @@ private:
 
     void MostrarLista(ContextoApps& c) {
         tela_ = Tela::Lista;
-        std::vector<PainelWatcher::Item> itens = {{"Voltar", "", MATERIAL_SYMBOLS_ARROW_BACK},
-                                                  {"Gravar nova", "Começa a gravar agora", MATERIAL_SYMBOLS_MIC}};
+        std::vector<PainelWatcher::Item> itens = {
+            {TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK},
+            {TR("Gravar nova", "Record new", "新建录音", "Grabar nueva"),
+             TR("Começa a gravar agora", "Start recording now", "立即开始录音", "Empieza a grabar ya"), MATERIAL_SYMBOLS_MIC}};
         for (const auto& r : lista_) {
             itens.push_back({r.titulo, r.detalhe, MATERIAL_SYMBOLS_SCHEDULE});
         }
-        c.painel.MostrarLista("Reuniões", itens, 1);
+        c.painel.MostrarLista(TR("Reuniões", "Meetings", "会议", "Reuniones"), itens, 1);
     }
 };

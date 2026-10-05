@@ -197,6 +197,8 @@ public:
     }
 
     enum class Status { Carregando, Sucesso, Erro };
+    // Ícone especial para Item::icone: sol desenhado em vetor (usado pelo app de previsão do tempo)
+    static constexpr const char* kIconeSol = "\x01sol";
 
     // Status com ícone: spinner girando (carregando), check verde (sucesso) ou X vermelho (erro)
     void MostrarStatus(const std::string& cabecalho, Status status, const std::string& texto,
@@ -240,11 +242,21 @@ public:
                 traco(kX2, 2);
             }
         }
+        // Com botões, ícone e texto sobem um pouco e os botões descem, para não sobrepor a mensagem
+        bool com_botoes = !botoes.empty();
+        if (com_botoes) {
+            lv_obj_set_y(lv_obj_get_child(raiz_, -1), -40);
+        }
         auto r = Rotulo(Fontes::Pequena(), 0xEDEDED, texto);
         lv_obj_set_width(r, 290);
         lv_obj_set_style_text_align(r, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(r, LV_ALIGN_CENTER, 0, 86);
+        lv_obj_align(r, LV_ALIGN_CENTER, 0, com_botoes ? 48 : 86);
+        int y_antes = botoes_y_;
+        if (com_botoes) {
+            botoes_y_ = 316;
+        }
         DesenharBotoes();
+        botoes_y_ = y_antes;
     }
 
     struct DiaTempo {
@@ -761,6 +773,12 @@ private:
             lv_obj_remove_flag(celula, LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_remove_flag(celula, LV_OBJ_FLAG_CLICKABLE);
             // Ícone (filho 0 da célula) ampliado ~1,4x a partir do centro
+            if (item.icone != nullptr && strcmp(item.icone, kIconeSol) == 0) {
+                // Sol desenhado em vetor (a fonte de ícones não tem sol)
+                IconeTempo(celula, "sol", false, 50, 0, (kCelula - 50) / 2);
+                celulas_.push_back(celula);
+                continue;
+            }
             auto ic = Rotulo(&font_material_symbols_30_4, 0xD97757,
                              item.icone != nullptr ? item.icone : MATERIAL_SYMBOLS_ROBOT_2, celula);
             lv_obj_set_style_transform_scale(ic, 358, 0);

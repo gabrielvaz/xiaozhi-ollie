@@ -6,11 +6,12 @@
 #include <ctime>
 #include <vector>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppRelogioMundial : public AppWatcher {
 public:
-    const char* Nome() const override { return "Relógios"; }
+    const char* Nome() const override { return TR("Relógios", "World clock", "世界时钟", "Relojes"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_LANGUAGE; }
     std::string Detalhe() const override { return Cidades()[Indice()].nome; }
 
@@ -47,12 +48,17 @@ private:
 
     static const std::vector<Cidade>& Cidades() {
         static const std::vector<Cidade> c = {
-            {"São Paulo", -180, Verao::Nenhum},     {"Milão", 60, Verao::Europa},
-            {"Lisboa", 0, Verao::Europa},           {"Londres", 0, Verao::Europa},
-            {"Nova York", -300, Verao::EUA},        {"Miami", -300, Verao::EUA},
-            {"San Francisco", -480, Verao::EUA},    {"Dubai", 240, Verao::Nenhum},
-            {"Xangai", 480, Verao::Nenhum},         {"Tóquio", 540, Verao::Nenhum},
-            {"Sydney", 600, Verao::Australia},
+            {TR("São Paulo", "São Paulo", "圣保罗", "São Paulo"), -180, Verao::Nenhum},
+            {TR("Milão", "Milan", "米兰", "Milán"), 60, Verao::Europa},
+            {TR("Lisboa", "Lisbon", "里斯本", "Lisboa"), 0, Verao::Europa},
+            {TR("Londres", "London", "伦敦", "Londres"), 0, Verao::Europa},
+            {TR("Nova York", "New York", "纽约", "Nueva York"), -300, Verao::EUA},
+            {TR("Miami", "Miami", "迈阿密", "Miami"), -300, Verao::EUA},
+            {TR("San Francisco", "San Francisco", "旧金山", "San Francisco"), -480, Verao::EUA},
+            {TR("Dubai", "Dubai", "迪拜", "Dubái"), 240, Verao::Nenhum},
+            {TR("Xangai", "Shanghai", "上海", "Shanghái"), 480, Verao::Nenhum},
+            {TR("Tóquio", "Tokyo", "东京", "Tokio"), 540, Verao::Nenhum},
+            {TR("Sydney", "Sydney", "悉尼", "Sídney"), 600, Verao::Australia},
         };
         return c;
     }
@@ -111,7 +117,12 @@ private:
     }
 
     void Desenhar(ContextoApps& c) {
-        static const char* dias[] = {"domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"};
+        static const char* dias[] = {
+            TR("domingo", "Sunday", "周日", "domingo"),   TR("segunda", "Monday", "周一", "lunes"),
+            TR("terça", "Tuesday", "周二", "martes"),     TR("quarta", "Wednesday", "周三", "miércoles"),
+            TR("quinta", "Thursday", "周四", "jueves"),   TR("sexta", "Friday", "周五", "viernes"),
+            TR("sábado", "Saturday", "周六", "sábado"),
+        };
         const auto& cidade = Cidades()[atual_];
         time_t utc = time(nullptr) + 3 * 3600;  // relógio do aparelho = Brasília
         int deslocamento = cidade.deslocamento_min + (EmVerao(cidade, utc) ? 60 : 0);
@@ -123,11 +134,20 @@ private:
         int dif = deslocamento + 180;  // diferença para Brasília, em minutos
         char dif_txt[48];
         if (dif == 0) {
-            snprintf(dif_txt, sizeof(dif_txt), "mesma hora de Brasília");
+            snprintf(dif_txt, sizeof(dif_txt), TR("mesma hora de Brasília", "same time as Brasília", "与巴西利亚时间相同",
+                                                  "misma hora que Brasilia"));
         } else {
-            snprintf(dif_txt, sizeof(dif_txt), "%+d h de Brasília", dif / 60);
+            snprintf(dif_txt, sizeof(dif_txt),
+                     TR("%+d h de Brasília", "%+d h from Brasília", "与巴西利亚相差 %+d 小时", "%+d h respecto a Brasilia"),
+                     dif / 60);
         }
-        snprintf(legenda, sizeof(legenda), "%s, %02d/%02d\n%s", dias[t.tm_wday], t.tm_mday, t.tm_mon + 1, dif_txt);
+        // data no formato de cada idioma: dd/mm (pt, es), mm/dd (en), m月d日 (zh)
+        char data[24];
+        snprintf(data, sizeof(data), TR("%02d/%02d", "%02d/%02d", "%d月%d日", "%02d/%02d"),
+                 TR(t.tm_mday, t.tm_mon + 1, t.tm_mon + 1, t.tm_mday), TR(t.tm_mon + 1, t.tm_mday, t.tm_mday, t.tm_mon + 1));
+        snprintf(legenda, sizeof(legenda), TR("%s, %s\n%s", "%s, %s\n%s", "%s %s\n%s", "%s, %s\n%s"),
+                 TR(dias[t.tm_wday], dias[t.tm_wday], data, dias[t.tm_wday]),
+                 TR(data, data, dias[t.tm_wday], data), dif_txt);
         c.painel.MostrarValor(cidade.nome, hora, legenda, {});
     }
 };

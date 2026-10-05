@@ -11,13 +11,14 @@
 #include "../abertura_watcher.h"
 #include "../agente_watcher.h"
 #include "../fontes_watcher.h"
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppConfiguracoes : public AppWatcher {
 public:
-    const char* Nome() const override { return "Ajustes"; }
+    const char* Nome() const override { return TR("Ajustes", "Settings", "设置", "Ajustes"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_SETTINGS; }
-    std::string Detalhe() const override { return "Nome, tema, fonte, tela…"; }
+    std::string Detalhe() const override { return TR("Nome, tema, fonte, tela…", "Name, theme, font, screen…", "名称、主题、字体、屏幕…", "Nombre, tema, fuente…"); }
 
     void Abrir(ContextoApps& c) override {
         sobre_ = false;
@@ -132,26 +133,26 @@ private:
 
     static std::string Tempo(int s) {
         if (s < 0) {
-            return "Nunca";
+            return TR("Nunca", "Never", "永不", "Nunca");
         }
-        return s < 60 ? std::to_string(s) + " s" : std::to_string(s / 60) + " min";
+        return s < 60 ? std::to_string(s) + TR(" s", " s", " 秒", " s") : std::to_string(s / 60) + TR(" min", " min", " 分钟", " min");
     }
 
     void Desenhar(ContextoApps& c, int selecionado) {
         auto& board = Board::GetInstance();
         c.painel.MostrarLista(
-            "Configurações",
-            {{"Nome do agente", "Hey " + AgenteWatcher::Nome() +
-                                    (reiniciar_em_ ? " · reinicia em instantes" : "")},
-             {"Tema", ConfigWatcher::Texto("tema", "dark") == "dark" ? "Escuro" : "Claro"},
-             {"Fonte", Fontes::Nome()},
-             {"Tela apaga após", Tempo(ConfigWatcher::Int("tela_s", 60))},
-             {"Brilho", std::to_string(board.GetBacklight()->brightness()) + "%"},
-             {"Volume", std::to_string(board.GetAudioCodec()->output_volume()) + "%"},
-             {"Desliga na bateria após", Tempo(ConfigWatcher::Int("desliga_s", 300))},
-             {"Avisos na tela", ConfigWatcher::Int("avisos", 1) ? "Ligados" : "Desligados"},
-             {"Sobre o Watcher", "Versão, rede e cartão"},
-             {"Voltar", ""}},
+            TR("Configurações", "Settings", "设置", "Ajustes"),
+            {{TR("Nome do agente", "Agent name", "助手名称", "Nombre del agente"), "Hey " + AgenteWatcher::Nome() +
+                                    (reiniciar_em_ ? TR(" · reinicia em instantes", " · restarting soon", " · 即将重启", " · se reinicia pronto") : "")},
+             {TR("Tema", "Theme", "主题", "Tema"), ConfigWatcher::Texto("tema", "dark") == "dark" ? TR("Escuro", "Dark", "深色", "Oscuro") : TR("Claro", "Light", "浅色", "Claro")},
+             {TR("Fonte", "Font", "字体", "Fuente"), Fontes::Nome()},
+             {TR("Tela apaga após", "Screen off after", "熄屏时间", "Apagar pantalla"), Tempo(ConfigWatcher::Int("tela_s", 60))},
+             {TR("Brilho", "Brightness", "亮度", "Brillo"), std::to_string(board.GetBacklight()->brightness()) + "%"},
+             {TR("Volume", "Volume", "音量", "Volumen"), std::to_string(board.GetAudioCodec()->output_volume()) + "%"},
+             {TR("Desliga na bateria após", "Battery off after", "电池关机时间", "Apagar con batería"), Tempo(ConfigWatcher::Int("desliga_s", 300))},
+             {TR("Avisos na tela", "On-screen alerts", "屏幕提醒", "Avisos en pantalla"), ConfigWatcher::Int("avisos", 1) ? TR("Ligados", "On", "开启", "Activados") : TR("Desligados", "Off", "关闭", "Desactivados")},
+             {TR("Sobre o Watcher", "About Watcher", "关于 Watcher", "Acerca de Watcher"), TR("Versão, rede e cartão", "Version, network, SD card", "版本、网络和存储卡", "Versión, red y tarjeta")},
+             {TR("Voltar", "Back", "返回", "Volver"), ""}},
             selecionado);
     }
 
@@ -164,9 +165,10 @@ private:
         reiniciar_em_ = 0;
         std::string corpo;
         RedeWatcher::Pedir("GET", "/watcher/perfil?agente=" + AgenteWatcher::Nome(), "", corpo);
-        c.painel.MostrarStatus("Nome do agente", PainelWatcher::Status::Sucesso,
-                               "Agora é " + AgenteWatcher::Nome() + ". Diga “Hey " + AgenteWatcher::Nome() +
-                                   "”. Reiniciando…");
+        c.painel.MostrarStatus(TR("Nome do agente", "Agent name", "助手名称", "Nombre del agente"), PainelWatcher::Status::Sucesso,
+                               TR("Agora é ", "Now it's ", "现在叫 ", "Ahora es ") + AgenteWatcher::Nome() +
+                                   TR(". Diga “Hey ", ". Say “Hey ", "。请说“Hey ", ". Di “Hey ") + AgenteWatcher::Nome() +
+                                   TR("”. Reiniciando…", "”. Restarting…", "”。正在重启…", "”. Reiniciando…"));
         vTaskDelay(pdMS_TO_TICKS(2500));
         esp_restart();
     }
@@ -177,11 +179,13 @@ private:
         auto pos = servidor.find("://");
         servidor = servidor.substr(pos == std::string::npos ? 0 : pos + 3);
         servidor = servidor.substr(0, servidor.find('/'));
-        std::string texto = "Ollie v" OLLIE_VERSAO " (base XiaoZhi " + std::string(esp_app_get_description()->version) +
-                            ")\nWi-Fi: " + (wifi.IsConnected() ? wifi.GetSsid() : std::string("desconectado")) +
+        std::string texto = std::string("Ollie v" OLLIE_VERSAO) +
+                            TR(" (base XiaoZhi ", " (based on XiaoZhi ", " (基于 XiaoZhi ", " (base XiaoZhi ") +
+                            std::string(esp_app_get_description()->version) +
+                            ")\nWi-Fi: " + (wifi.IsConnected() ? wifi.GetSsid() : std::string(TR("desconectado", "disconnected", "未连接", "desconectado"))) +
                             "\nIP: " + (wifi.IsConnected() ? wifi.GetIpAddress() : std::string("-")) +
-                            "\nMAC: " + SystemInfo::GetMacAddress() + "\nServidor: " + servidor +
-                            "\nmicroSD: " + (CartaoWatcher::Instancia().Montado() ? "montado" : "ausente");
-        c.painel.MostrarTexto("Sobre o Watcher", texto, {"Voltar"});
+                            "\nMAC: " + SystemInfo::GetMacAddress() + TR("\nServidor: ", "\nServer: ", "\n服务器：", "\nServidor: ") + servidor +
+                            "\nmicroSD: " + (CartaoWatcher::Instancia().Montado() ? TR("montado", "mounted", "已挂载", "montada") : TR("ausente", "not inserted", "未插入", "no insertada"));
+        c.painel.MostrarTexto(TR("Sobre o Watcher", "About Watcher", "关于 Watcher", "Acerca de Watcher"), texto, {TR("Voltar", "Back", "返回", "Volver")});
     }
 };

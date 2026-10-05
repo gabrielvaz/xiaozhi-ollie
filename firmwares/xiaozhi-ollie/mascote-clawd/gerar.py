@@ -35,6 +35,8 @@ EMOCOES = [
     "robot_2", "warning", "staticstate",
     # estados da conversa (o firmware troca sozinho): conectando, ouvindo e falando
     "conectando", "ouvindo", "falando",
+    # carregador conectado: o Clawd leva um choque
+    "choque",
     # poses extras (o servidor escolhe pelo emoji da resposta ou pelo que está acontecendo)
     "waving", "nerd", "reading", "working", "running", "coffee", "party", "music",
     "searching", "idea", "rocket", "bug", "sunny", "rainy", "recording", "celebrating",
@@ -298,7 +300,7 @@ def pose(nome, f):
 
 
 POSES = set(EMOCOES[EMOCOES.index("waving"):])
-ESTADOS = {"conectando": 180, "ouvindo": 220, "falando": 140}   # ms por quadro (6 quadros)
+ESTADOS = {"conectando": 180, "ouvindo": 220, "falando": 140, "choque": 90}   # ms por quadro (6 quadros)
 
 
 def quadro(emocao, f):
@@ -397,6 +399,23 @@ def quadro(emocao, f):
                 t.px(9, 10 + abertura - 1, VERMELHO, 2, 1)
         if f % 2:
             t.px(17, 2, BRANCO); t.px(18, 1, BRANCO)
+    elif emocao == "choque":             # treme, pisca em "raio-X" e solta faíscas
+        raio_x = f in (1, 3)
+        t = Tela(dy=(0, -1, 1, -1, 1, 0)[f % 6] * PX // 2)
+        t.ox += (0, 2, -2, 3, -3, 1)[f % 6]
+        if raio_x:                       # corpo apagado com o "esqueleto" claro
+            corpo(t, CINZA_ESCURO)
+            for y in (5, 7, 9, 11):
+                t.px(5, y, BRANCO, 10, 1)
+            t.px(9, 4, BRANCO, 2, 9)
+            t.px(6, 6, BRANCO, 2, 2); t.px(12, 6, BRANCO, 2, 2)
+        else:
+            corpo(t, LARANJA, bracos_y=5 if f % 2 == 0 else 6)
+            olhos(t, "grande"); boca(t, "aberta")
+        for i, (x, y) in enumerate(((0, 1), (18, 0), (19, 9), (0, 11), (17, 14))):
+            if (i + f) % 2 == 0:         # faíscas em zigue-zague
+                t.px(x, y, AMARELO); t.px(x + 1, y + 1, AMARELO); t.px(x, y + 2, AMARELO)
+        return t.img
     elif emocao == "warning":
         olhos(t, "grande"); boca(t, "triste")
         if f % 2 == 0:

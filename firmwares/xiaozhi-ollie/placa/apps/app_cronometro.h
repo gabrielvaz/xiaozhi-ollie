@@ -1,13 +1,18 @@
 // App "Cronômetro": a roda escolhe Iniciar/Pausar, Zerar ou Voltar; continua correndo com a gaveta fechada.
 #pragma once
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppCronometro : public AppWatcher {
 public:
-    const char* Nome() const override { return "Cronômetro"; }
+    const char* Nome() const override { return TR("Cronômetro", "Stopwatch", "秒表", "Cronómetro"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_WATCH; }
-    std::string Detalhe() const override { return correndo_ ? "Correndo: " + Formatar(Decorrido()) : "Iniciar, pausar e zerar"; }
+    std::string Detalhe() const override {
+        return correndo_ ? TR("Correndo: ", "Running: ", "计时中：", "En marcha: ") + Formatar(Decorrido())
+                         : TR("Iniciar, pausar e zerar", "Start, pause, reset", "开始、暂停、清零",
+                              "Iniciar, pausar, reiniciar");
+    }
 
     void Abrir(ContextoApps& c) override { Desenhar(c, 0); }
 
@@ -58,8 +63,12 @@ private:
     }
 
     void Desenhar(ContextoApps& c, int selecionado) {
-        c.painel.MostrarValor("Cronômetro", Formatar(Decorrido()), correndo_ ? "correndo" : "parado",
-                              {correndo_ ? "Pausar" : "Iniciar", "Zerar", "Voltar"}, selecionado);
+        c.painel.MostrarValor(TR("Cronômetro", "Stopwatch", "秒表", "Cronómetro"), Formatar(Decorrido()),
+                              correndo_ ? TR("correndo", "running", "计时中", "en marcha")
+                                        : TR("parado", "stopped", "已停止", "parado"),
+                              {correndo_ ? TR("Pausar", "Pause", "暂停", "Pausar") : TR("Iniciar", "Start", "开始", "Iniciar"),
+                               TR("Zerar", "Reset", "清零", "Reiniciar"), TR("Voltar", "Back", "返回", "Volver")},
+                              selecionado);
         if (correndo_) {  // milissegundos: atualiza a tela a cada ~33 ms
             c.painel.AtualizarRapido([this]() { return Formatar(Decorrido()); }, 33);
         }

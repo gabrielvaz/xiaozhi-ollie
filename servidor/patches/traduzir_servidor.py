@@ -153,16 +153,21 @@ TROCAS: list[tuple[str, str, str]] = [
     ("core/http_server.py", "from core.api.vision_handler import VisionHandler",
      "from core.api.vision_handler import VisionHandler\nfrom core.api.avisos_handler import AvisosHandler\n"
      "from core.api.cartao_handler import CartaoHandler\nfrom core.api.conversas_handler import ConversasHandler\n"
+     "from core.api.codex_handler import CodexHandler\n"
      "from core.api.reunioes_handler import ReunioesHandler\n"
      "from core.utils.vigia import iniciar_vigia"),
     ("core/http_server.py", """                # 添加路由
                 app.add_routes(""", """                avisos = AvisosHandler(self.config)
                 cartao = CartaoHandler(self.config)
                 conversas = ConversasHandler(self.config)
+                codex = CodexHandler(self.config)
                 reunioes = ReunioesHandler(self.config)
                 app.add_routes([web.get("/watcher/avisos", avisos.handle_get),
+                                web.get("/watcher/avisos/historico", avisos.handle_historico),
                                 web.get("/watcher/sessoes", avisos.handle_sessoes),
                                 web.get("/watcher/sessoes/{id}/mensagens", avisos.handle_mensagens),
+                                web.get("/watcher/sessoes/{id}/pergunta", avisos.handle_pergunta),
+                                web.post("/watcher/sessoes/{id}/responder", avisos.handle_responder),
                                 web.get("/watcher/uso", avisos.handle_uso),
                                 web.get("/watcher/qrcodes", avisos.handle_qrcodes),
                                 web.get("/watcher/tempo", avisos.handle_tempo),
@@ -170,6 +175,12 @@ TROCAS: list[tuple[str, str, str]] = [
                                 web.get("/watcher/memoria", cartao.handle_memoria),
                                 web.get("/watcher/memoria/audio/{nome}", cartao.handle_audio),
                                 web.get("/watcher/perfil", conversas.handle_perfil),
+                                web.get("/watcher/codex", codex.handle_resumo),
+                                web.get("/watcher/codex/sessoes/{id}", codex.handle_sessao),
+                                web.post("/watcher/codex/sessoes/{id}/enviar", codex.handle_enviar),
+                                web.post("/watcher/codex/nova", codex.handle_nova),
+                                web.post("/watcher/codex/remoto", codex.handle_remoto),
+                                web.get("/watcher/codex/nuvem/{id}", codex.handle_nuvem),
                                 web.get("/watcher/conversas", conversas.handle_lista),
                                 web.get("/watcher/conversas/{id}", conversas.handle_conversa),
                                 web.get("/watcher/conversas/{id}/audio", conversas.handle_audio),

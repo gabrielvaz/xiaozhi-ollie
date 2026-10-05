@@ -1,6 +1,9 @@
 // Serviço (sem tela na gaveta): busca avisos no Mac a cada 20 s — sessão esperando você,
-// tarefa concluída, reunião pronta — e mostra só na tela. Liga/desliga em Configurações.
+// tarefa concluída, reunião pronta — e mostra na tela com um som curto (histórico no app Avisos). Sessão esperando você ganha o botão
+// "Ir para a sessão" (abre o app Sessões já nela). Liga/desliga em Configurações.
 #pragma once
+
+#include "assets/lang_config.h"
 
 #include "../nucleo_apps.h"
 
@@ -32,7 +35,12 @@ public:
             cJSON* a = cJSON_GetArrayItem(lista, n - 1);  // o mais recente
             std::string titulo = RedeWatcher::Campo(a, "titulo"), texto = RedeWatcher::Campo(a, "texto");
             CartaoWatcher::Instancia().RegistrarConversa("aviso", titulo + ": " + texto);
-            ContextoApps::Avisar(titulo, texto, RedeWatcher::Campo(a, "emocao"));  // só tela, sem som
+            ContextoApps::Avisar(titulo, texto, RedeWatcher::Campo(a, "emocao"), Lang::Sounds::OGG_POPUP);  // "plim" curto
+            // Sessão esperando você: abre a tela do aviso com o botão "Ir para a sessão"
+            std::string sessao = RedeWatcher::Campo(a, "sessao");
+            if (!sessao.empty() && RedeWatcher::Campo(a, "tipo") == "esperando" && c.abrir_app) {
+                c.abrir_app("sessoes", "aviso\n" + sessao + "\n" + titulo + "\n" + texto);
+            }
         }
         ultimo_id_ = RedeWatcher::Numero(raiz, "ultimo", ultimo_id_);
         cJSON_Delete(raiz);

@@ -3,16 +3,18 @@
 
 #include <atomic>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppUsoClaude : public AppWatcher {
 public:
-    const char* Nome() const override { return "Uso Claude"; }
+    const char* Nome() const override { return TR("Uso Claude", "Claude usage", "Claude 用量", "Uso de Claude"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_PROGRESS_ACTIVITY; }
-    std::string Detalhe() const override { return "Limites de 5 h e da semana"; }
+    std::string Detalhe() const override { return TR("Limites de 5 h e da semana", "5-hour and weekly limits", "5 小时和每周限额", "Límites de 5 h y semanal"); }
 
     void Abrir(ContextoApps& c) override {
-        c.painel.MostrarStatus("Uso do Claude", PainelWatcher::Status::Carregando, "Consultando o uso…");
+        c.painel.MostrarStatus(TR("Uso do Claude", "Claude usage", "Claude 用量", "Uso de Claude"), PainelWatcher::Status::Carregando,
+                               TR("Consultando o uso…", "Checking usage…", "正在查询用量…", "Consultando el uso…"));
         buscar_ = true;
     }
 
@@ -24,7 +26,10 @@ public:
         }
         std::string corpo;
         if (!RedeWatcher::Pedir("GET", "/watcher/uso", "", corpo)) {
-            c.painel.MostrarTexto("Uso do Claude", "Não consegui falar com o Mac agora.", {"Voltar"});
+            c.painel.MostrarTexto(TR("Uso do Claude", "Claude usage", "Claude 用量", "Uso de Claude"),
+                                  TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "暂时连不上 Mac。",
+                                     "No he podido conectar con el Mac."),
+                                  {TR("Voltar", "Back", "返回", "Volver")});
             return;
         }
         cJSON* raiz = cJSON_Parse(corpo.c_str());
@@ -33,7 +38,11 @@ public:
                                 RedeWatcher::Numero(raiz, "pct_7d"), RedeWatcher::Numero(raiz, "reinicio_7d_s"));
         } else {
             std::string erro = RedeWatcher::Campo(raiz, "erro");
-            c.painel.MostrarTexto("Uso do Claude", erro.empty() ? "Não consegui ler o uso agora." : erro, {"Voltar"});
+            c.painel.MostrarTexto(TR("Uso do Claude", "Claude usage", "Claude 用量", "Uso de Claude"),
+                                  erro.empty() ? TR("Não consegui ler o uso agora.", "Couldn't read usage right now.",
+                                                    "暂时读不到用量。", "No he podido leer el uso.")
+                                               : erro,
+                                  {TR("Voltar", "Back", "返回", "Volver")});
         }
         cJSON_Delete(raiz);
     }

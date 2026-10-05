@@ -19,6 +19,7 @@ from pathlib import Path
 import requests
 
 from core.utils.icloud import ler_texto
+from core.utils.idioma import IDIOMA, NOME, t
 
 PASTA = Path(os.environ.get(
     "WATCHER_PASTA_CONVERSAS",
@@ -28,9 +29,28 @@ INDICE = PASTA / "indice.json"
 LIMITE_FERRAMENTA = 600
 SILENCIO_NOVA_S = 600        # 10 min sem falas: próxima fala abre outra conversa
 ENCERRADA_S = 300            # 5 min sem falas: a conversa ganha título e resumo
-DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+DIAS = {
+    "pt-BR": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"],
+    "en-US": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "zh-CN": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+    "es-ES": ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"],
+}[IDIOMA]
+MESES_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+# Rótulo do usuário nas falas gravadas; falas() aceita o de qualquer idioma e devolve sempre "Você"
+VOCE = t("Você", "You", "你", "Tú")
+ROTULOS_USUARIO = ("Você", "You", "你", "Tú")
 _trava = threading.RLock()
 _fio = {"iniciado": False}
+
+
+def _data(d: datetime, hora: bool = True) -> str:
+    """Data do cabeçalho no formato natural do idioma (pt: Seg, 05/10/2026 às 14:30)."""
+    dia = DIAS[d.weekday()]
+    texto = t(f"{dia}, {d:%d/%m/%Y}", f"{dia}, {MESES_EN[d.month - 1]} {d.day}, {d.year}",
+              f"{d.year}年{d.month}月{d.day}日 {dia}", f"{dia}, {d.day}/{d.month}/{d.year}")
+    if hora:
+        texto += t(f" às {d:%H:%M}", f" at {d:%H:%M}", f" {d:%H:%M}", f" a las {d:%H:%M}")
+    return texto
 
 
 # ---------------------------------------------------------------- índice
@@ -67,7 +87,7 @@ def falas(c: dict) -> list[tuple[str, str]]:
         if linha.startswith("**") and ":** " in linha:
             cabeca, texto = linha[2:].split(":** ", 1)
             quem = cabeca.split(" · ", 1)[-1]
-            saida.append(("Você" if quem == "Você" else "Ollie", texto.strip()))
+            saida.append(("Você" if quem in ROTULOS_USUARIO else "Ollie", texto.strip()))
     return saida
 
 
@@ -87,7 +107,7 @@ def _linha(message, agora: datetime) -> str | None:
     papel = getattr(message, "role", "")
     texto = (getattr(message, "content", None) or "").strip()
     if papel == "user" and texto:
-        return f"**{hora} · Você:** {_texto_usuario(texto)}"
+        return f"**{hora} · {VOCE}:** {_texto_usuario(texto)}"
     if papel == "assistant":
         chamadas = getattr(message, "tool_calls", None)
         if chamadas:
@@ -112,7 +132,7 @@ def _nova_conversa(agora: datetime) -> dict:
         arquivo = f"{agora:%Y/%m}/{agora:%Y-%m-%d %Hh%Mm%S}.md"
     (PASTA / arquivo).parent.mkdir(parents=True, exist_ok=True)
     with open(PASTA / arquivo, "a", encoding="utf-8") as f:
-        f.write(f"# Conversa · {DIAS[agora.weekday()]}, {agora:%d/%m/%Y} às {agora:%H:%M}\n\n")
+        f.write(f"# {t('Conversa', 'Conversation', '对话', 'Conversación')} · {_data(agora)}\n\n")
     return {"id": cid, "arquivo": arquivo, "inicio": agora.isoformat(timespec="seconds"),
             "fim": agora.isoformat(timespec="seconds"), "falas": 0, "titulo": "", "resumo": ""}
 
@@ -152,7 +172,7 @@ def registrar(message, dono=None) -> None:
 def _resumir(c: dict) -> tuple[str, str]:
     texto = "\n".join(f"{q}: {t}" for q, t in falas(c))[:12000]
     if not texto:
-        return "Conversa sem falas", ""
+        return t("Conversa sem falas", "Conversation without speech", "没有发言的对话", "Conversación sin intervenciones"), ""
     base = os.environ.get("API_BASE_URL", "https://openrouter.ai/api/v1")
     r = requests.post(f"{base}/chat/completions", timeout=60,
                       headers={"Authorization": f"Bearer {os.environ.get('API_KEY', '')}"},
@@ -162,12 +182,13 @@ def _resumir(c: dict) -> tuple[str, str]:
                             "messages": [{"role": "system", "content":
                                           "Você organiza o histórico de conversas do usuário com o assistente de voz Ollie. "
                                           "Responda só com JSON: {\"titulo\": até 6 palavras, sem ponto final, "
-                                          "\"resumo\": 1 ou 2 frases em português do Brasil com o que foi pedido, "
-                                          "respondido ou decidido, incluindo nomes, números e fatos úteis para lembrar depois}."},
+                                          "\"resumo\": 1 ou 2 frases com o que foi pedido, "
+                                          "respondido ou decidido, incluindo nomes, números e fatos úteis para lembrar depois}. "
+                                          f"Escreva o título e o resumo em {NOME}."},
                                          {"role": "user", "content": texto}]})
     r.raise_for_status()
     dados = json.loads(r.json()["choices"][0]["message"]["content"])
-    return str(dados.get("titulo", "")).strip()[:80] or "Conversa", str(dados.get("resumo", "")).strip()[:600]
+    return str(dados.get("titulo", "")).strip()[:80] or t("Conversa", "Conversation", "对话", "Conversación"), str(dados.get("resumo", "")).strip()[:600]
 
 
 def _escrever_resumo_no_arquivo(c: dict) -> None:
@@ -195,7 +216,7 @@ def resumir_pendentes() -> None:
             alvo = next((x for x in itens if x["id"] == c["id"]), None)
             if alvo is None or alvo["fim"] != c["fim"]:
                 continue  # a conversa recebeu falas novas enquanto resumia
-            alvo["titulo"], alvo["resumo"] = titulo, resumo or "Sem conteúdo relevante."
+            alvo["titulo"], alvo["resumo"] = titulo, resumo or t("Sem conteúdo relevante.", "Nothing relevant.", "没有相关内容。", "Sin contenido relevante.")
             _escrever_resumo_no_arquivo(alvo)
             _gravar_indice(itens)
 
@@ -213,7 +234,7 @@ def _migrar_antigos() -> None:
             destino = f"{dia:%Y/%m}/{dia:%Y-%m-%d} (dia inteiro).md"
             (PASTA / destino).parent.mkdir(parents=True, exist_ok=True)
             texto = ler_texto(arq, padrao="").replace("· Jarvis:**", "· Ollie:**")
-            texto = texto.replace(texto.splitlines()[0], f"# Conversas · {DIAS[dia.weekday()]}, {dia:%d/%m/%Y}", 1)
+            texto = texto.replace(texto.splitlines()[0], f"# {t('Conversas', 'Conversations', '对话', 'Conversaciones')} · {_data(dia, hora=False)}", 1)
             (PASTA / destino).write_text(texto, encoding="utf-8")
             arq.unlink()
             itens.append({"id": inicio.strftime("%Y%m%d-%H%M%S"), "arquivo": destino,

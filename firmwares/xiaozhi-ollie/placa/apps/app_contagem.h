@@ -6,14 +6,17 @@
 
 #include "assets/lang_config.h"
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppContagem : public AppWatcher {
 public:
-    const char* Nome() const override { return "Timer"; }
+    const char* Nome() const override { return TR("Timer", "Timer", "倒计时", "Temporizador"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_ALARM; }
     std::string Detalhe() const override {
-        return fim_s_ > 0 ? "Faltam " + Formatar(fim_s_ - ContextoApps::Agora()) : "Timer com alarme";
+        return fim_s_ > 0 ? TR("Faltam ", "", "剩余 ", "Quedan ") + Formatar(fim_s_ - ContextoApps::Agora()) +
+                                TR("", " left", "", "")
+                          : TR("Timer com alarme", "Timer with alarm", "带闹铃的倒计时", "Temporizador con alarma");
     }
 
     void Abrir(ContextoApps& c) override {
@@ -55,7 +58,9 @@ public:
     void Fundo(ContextoApps& c) override {
         if (fim_s_ > 0 && ContextoApps::Agora() >= fim_s_) {
             fim_s_ = 0;
-            ContextoApps::Avisar("Tempo esgotado", "A contagem de " + Formatar(total_s_) + " terminou",
+            ContextoApps::Avisar(TR("Tempo esgotado", "Time's up", "时间到", "Tiempo agotado"),
+                                 TR("A contagem de ", "The ", "", "La cuenta atrás de ") + Formatar(total_s_) +
+                                     TR(" terminou", " timer is done", " 倒计时已结束", " ha terminado"),
                                  "shocked", Lang::Sounds::OGG_VIBRATION);
         }
     }
@@ -77,10 +82,15 @@ private:
 
     void Desenhar(ContextoApps& c) {
         if (fim_s_ > 0) {
-            c.painel.MostrarValor("Contagem regressiva", Formatar(fim_s_ - ContextoApps::Agora()),
-                                  "toca um alarme no fim", {"Cancelar", "Voltar"});
+            c.painel.MostrarValor(TR("Contagem regressiva", "Countdown", "倒计时", "Cuenta atrás"),
+                                  Formatar(fim_s_ - ContextoApps::Agora()),
+                                  TR("toca um alarme no fim", "alarm rings at the end", "结束时响铃",
+                                     "suena una alarma al final"),
+                                  {TR("Cancelar", "Cancel", "取消", "Cancelar"), TR("Voltar", "Back", "返回", "Volver")});
         } else {
-            c.painel.MostrarValor("Contagem regressiva", Formatar(segundos_), "gire ±30 s · clique para iniciar",
+            c.painel.MostrarValor(TR("Contagem regressiva", "Countdown", "倒计时", "Cuenta atrás"), Formatar(segundos_),
+                                  TR("gire ±30 s · clique para iniciar", "turn ±30 s · click to start",
+                                     "旋转 ±30 秒 · 按下开始", "gira ±30 s · pulsa para iniciar"),
                                   {});
         }
     }

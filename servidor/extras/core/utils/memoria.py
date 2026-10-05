@@ -16,11 +16,19 @@ from pathlib import Path
 import requests
 
 from core.utils.icloud import ler_texto
+from core.utils.idioma import NOME, t
 
 ICLOUD = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Watcher"
 CACHE = Path(os.environ.get("WATCHER_CACHE_MEMORIA", Path(__file__).resolve().parents[2] / "data/memoria"))
 FFMPEG = "/opt/homebrew/bin/ffmpeg"
 _ultimo = {"quando": 0.0, "itens": []}
+MESES_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _data_hora_curta(d: datetime) -> str:
+    """Dia, mês e hora no formato natural do idioma (pt: 05/10 14:30)."""
+    return t(f"{d:%d/%m %H:%M}", f"{MESES_EN[d.month - 1]} {d.day} {d:%H:%M}",
+             f"{d.month}月{d.day}日 {d:%H:%M}", f"{d.day}/{d.month} {d:%H:%M}")
 
 
 def _api(caminho: str, **kwargs):
@@ -32,18 +40,20 @@ def _api(caminho: str, **kwargs):
 def _resumo_sessoes(ponte) -> str:
     ativas = [a for a in ponte._agentes() if a["situacao"] != "parada"]
     if not ativas:
-        return "Nenhuma sessão ativa ou concluída nas últimas horas."
+        return t("Nenhuma sessão ativa ou concluída nas últimas horas.", "No active or finished sessions in the last few hours.",
+                 "最近几小时没有进行中或已完成的会话。", "Ninguna sesión activa o terminada en las últimas horas.")
     linhas = []
     for a in ativas[:8]:
         quando = a.get("minutos_desde_ultima_atividade")
         linhas.append(f"{a.get('titulo') or a.get('pasta')} — {a['situacao']}"
-                      + (f", há {quando} min" if quando is not None else "")
+                      + (", " + t(f"há {quando} min", f"{quando} min ago", f"{quando} 分钟前", f"hace {quando} min")
+                         if quando is not None else "")
                       + (f": {a.get('ultima_fala', '')[:300]}" if a.get("ultima_fala") else ""))
     try:
         r = _api("/chat/completions", json={
             "model": os.environ.get("MODELO_LLM", "openai/gpt-6-luna"), "max_tokens": 600,
             "reasoning": {"effort": "minimal"},
-            "messages": [{"role": "system", "content": "Resuma para ser lido em voz alta, em português do Brasil, "
+            "messages": [{"role": "system", "content": f"Resuma para ser lido em voz alta, em {NOME}, "
                           "em até 6 frases curtas, o estado destas sessões de agentes de código. Sem markdown."},
                          {"role": "user", "content": "\n".join(linhas)}]})
         r.raise_for_status()
@@ -94,14 +104,17 @@ def gerar(ponte, idade_max_s: int = 600) -> list[dict]:
     """Lista de itens {id, titulo, detalhe, texto, audio}. Reaproveita o resultado por até 10 min."""
     if time.time() - _ultimo["quando"] < idade_max_s and _ultimo["itens"]:
         return _ultimo["itens"]
-    agora = datetime.now().strftime("%d/%m %H:%M")
-    brutos = [{"id": "sessoes", "titulo": "Sessões do Claude Code", "detalhe": f"Atualizado {agora}",
+    agora = _data_hora_curta(datetime.now())
+    atualizado = t(f"Atualizado {agora}", f"Updated {agora}", f"更新于 {agora}", f"Actualizado {agora}")
+    brutos = [{"id": "sessoes", "titulo": t("Sessões do Claude Code", "Claude Code sessions", "Claude Code 会话", "Sesiones de Claude Code"),
+               "detalhe": atualizado,
                "texto": _resumo_sessoes(ponte)}]
     for n, r in enumerate(_reunioes(), 1):
-        brutos.append({"id": f"reuniao{n}", "titulo": r["titulo"], "detalhe": "Resumo da reunião", "texto": r["texto"]})
+        brutos.append({"id": f"reuniao{n}", "titulo": r["titulo"], "detalhe": t("Resumo da reunião", "Meeting summary", "会议摘要", "Resumen de la reunión"), "texto": r["texto"]})
     lembretes = _lembretes()
     if lembretes:
-        brutos.append({"id": "lembretes", "titulo": "Lembretes e notas", "detalhe": f"Atualizado {agora}",
+        brutos.append({"id": "lembretes", "titulo": t("Lembretes e notas", "Reminders and notes", "提醒和笔记", "Recordatorios y notas"),
+                       "detalhe": atualizado,
                        "texto": lembretes})
     itens = []
     for item in brutos:

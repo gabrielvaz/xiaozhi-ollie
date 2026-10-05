@@ -123,6 +123,8 @@ struct ContextoApps {
     std::function<void(int)> definir_tela_apaga_s;
     std::function<void(int)> definir_desliga_s;
     std::function<bool()> gaveta_aberta;  // serviços evitam mexer na tela com a gaveta aberta
+    // Abre a gaveta direto num app (pelo Id()) com um argumento, ex.: um aviso abrindo uma sessão
+    std::function<void(const std::string& app, const std::string& argumento)> abrir_app;
 
     static int Agora() { return (int)(esp_timer_get_time() / 1000000); }
     static Application& App() { return Application::GetInstance(); }
@@ -151,10 +153,12 @@ class AppWatcher {
 public:
     virtual ~AppWatcher() = default;
     virtual const char* Nome() const = 0;
+    virtual const char* Id() const { return Nome(); }    // identificador fixo (não traduzido) para abrir_app
     virtual std::string Detalhe() const { return ""; }   // linha de baixo na gaveta
     virtual const char* Icone() const { return nullptr; } // MATERIAL_SYMBOLS_* (material_symbols.h)
     virtual bool Visivel() const { return true; }        // false = só serviço de fundo
     virtual void Abrir(ContextoApps& c) = 0;
+    virtual void AbrirCom(ContextoApps& c, const std::string& argumento) { Abrir(c); }  // aberto por outro app/aviso
     virtual void Girar(ContextoApps& c, int passo) {}
     virtual bool Clicar(ContextoApps& c) = 0;            // false = volta para a gaveta
     virtual bool Voltar(ContextoApps& c) { return false; }  // dois cliques; true = tratou (tela anterior do app)

@@ -18,8 +18,14 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/us
 SRV="$DIR/xiaozhi-server"
 mkdir -p "$SRV/data"
 
-"$SRV/.venv/bin/python" - "$DIR/config.template.yaml" "$SRV/data/.config.yaml" <<'PY'
+"$SRV/.venv/bin/python" - "$DIR/config.template.yaml" "$SRV/data/.config.yaml" "$DIR" <<'PY'
 import os, re, sys
+sys.path.insert(0, os.path.join(sys.argv[3], "extras/core/utils"))
+import idioma  # IDIOMA do .env: nome para os prompts e voz padrão
+os.environ["IDIOMA"] = idioma.IDIOMA
+os.environ["IDIOMA_NOME"] = idioma.NOME
+if not os.environ.get("VOZ"):
+    os.environ["VOZ"] = idioma.VOZES[idioma.IDIOMA]
 texto = open(sys.argv[1], encoding="utf-8").read()
 faltando = set()
 def troca(m):

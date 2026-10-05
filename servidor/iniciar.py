@@ -31,6 +31,15 @@ os.environ.update({
     "PATH": ":".join([str(Path.home() / ".local/bin"), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]),
 })
 
+# Idioma (IDIOMA no .env): nome para os prompts e voz padrão, se VOZ estiver vazia
+sys.path.insert(0, str(DIR / "extras/core/utils"))
+import idioma  # noqa: E402
+
+os.environ["IDIOMA"] = idioma.IDIOMA
+os.environ["IDIOMA_NOME"] = idioma.NOME
+if not os.environ.get("VOZ"):
+    os.environ["VOZ"] = idioma.VOZES[idioma.IDIOMA]
+
 faltando = set()
 
 

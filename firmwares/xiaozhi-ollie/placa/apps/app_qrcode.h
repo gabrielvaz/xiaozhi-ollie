@@ -6,14 +6,15 @@
 #include <atomic>
 #include <vector>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 #include "ssid_manager.h"
 
 class AppQrCode : public AppWatcher {
 public:
-    const char* Nome() const override { return "QR code"; }
+    const char* Nome() const override { return TR("QR code", "QR code", "二维码", "Código QR"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_LINK; }
-    std::string Detalhe() const override { return "Wi-Fi, links e contatos"; }
+    std::string Detalhe() const override { return TR("Wi-Fi, links e contatos", "Wi-Fi, links and contacts", "Wi-Fi、链接和联系人", "Wi-Fi, enlaces y contactos"); }
 
     void Abrir(ContextoApps& c) override {
         MontarLista();
@@ -79,7 +80,8 @@ private:
                 itens_.push_back({"Wi-Fi " + ssid,
                                   "WIFI:T:" + std::string(rede.password.empty() ? "nopass" : "WPA") + ";S:" + Escapar(rede.ssid) +
                                       ";P:" + Escapar(rede.password) + ";;",
-                                  "aponte a câmera do celular para entrar"});
+                                  TR("aponte a câmera do celular para entrar", "point your phone camera to join",
+                                     "用手机相机扫码连接", "apunta la cámara del móvil para entrar")});
             }
         }
         cJSON* raiz = cJSON_Parse(ConfigWatcher::Texto("qrcodes", "{}").c_str());
@@ -94,7 +96,12 @@ private:
 
     void Desenhar(ContextoApps& c) {
         if (itens_.empty()) {
-            c.painel.MostrarTexto("Mostrar QR code", "Nenhum QR ainda. Edite iCloud Drive/Watcher/QR.md no Mac.", {"Voltar"});
+            c.painel.MostrarTexto(TR("Mostrar QR code", "Show QR code", "显示二维码", "Mostrar código QR"),
+                                  TR("Nenhum QR ainda. Edite iCloud Drive/Watcher/QR.md no Mac.",
+                                     "No QR codes yet. Edit iCloud Drive/Watcher/QR.md on the Mac.",
+                                     "还没有二维码。请在 Mac 上编辑 iCloud Drive/Watcher/QR.md。",
+                                     "Aún no hay códigos QR. Edita iCloud Drive/Watcher/QR.md en el Mac."),
+                                  {TR("Voltar", "Back", "返回", "Volver")});
             return;
         }
         const auto& q = itens_[atual_];

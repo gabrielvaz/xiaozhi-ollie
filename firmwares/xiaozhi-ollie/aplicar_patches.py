@@ -326,14 +326,31 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
         }
 };""")
 
-# 8. Tela inicial: dia da semana e data junto com a hora ("Seg, 05/10 · 16:20") ----
+# 8. Tela inicial: dia da semana e data junto com a hora, no formato do idioma ("Seg, 05/10 · 16:20") ----
 trocar(XZ / "main/display/lvgl_display/lvgl_display.cc", """                char time_str[16];
                 strftime(time_str, sizeof(time_str), "%H:%M", tm_now);
-                SetStatus(time_str);""", """                static const char* const kDiasSemana[] = {"Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"};
-                char time_str[40];
-                snprintf(time_str, sizeof(time_str), "%s, %02d/%02d · %02d:%02d",
-                         kDiasSemana[tm_now->tm_wday % 7], tm_now->tm_mday, tm_now->tm_mon + 1,
-                         tm_now->tm_hour, tm_now->tm_min);
+                SetStatus(time_str);""", """                // Data no formato do idioma do build: "Seg, 05/10 · 16:20", "Mon, Oct 5 · 16:20", "10月5日 周一 16:20"
+                char time_str[48];
+                int dia_semana = tm_now->tm_wday % 7;
+#if defined(CONFIG_LANGUAGE_EN_US)
+                static const char* const kDiasSemana[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+                static const char* const kMeses[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+                snprintf(time_str, sizeof(time_str), "%s, %s %d · %02d:%02d", kDiasSemana[dia_semana],
+                         kMeses[tm_now->tm_mon % 12], tm_now->tm_mday, tm_now->tm_hour, tm_now->tm_min);
+#elif defined(CONFIG_LANGUAGE_ZH_CN)
+                static const char* const kDiasSemana[] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
+                snprintf(time_str, sizeof(time_str), "%d月%d日 %s %02d:%02d", tm_now->tm_mon + 1, tm_now->tm_mday,
+                         kDiasSemana[dia_semana], tm_now->tm_hour, tm_now->tm_min);
+#else
+#if defined(CONFIG_LANGUAGE_ES_ES)
+                static const char* const kDiasSemana[] = {"Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"};
+#else
+                static const char* const kDiasSemana[] = {"Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"};
+#endif
+                snprintf(time_str, sizeof(time_str), "%s, %02d/%02d · %02d:%02d", kDiasSemana[dia_semana],
+                         tm_now->tm_mday, tm_now->tm_mon + 1, tm_now->tm_hour, tm_now->tm_min);
+#endif
                 SetStatus(time_str);""")
 
 # 9. Reset de fábrica só depois de 20 s segurando a roda (original: 10 s) ---------

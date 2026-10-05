@@ -17,9 +17,29 @@ public:
     explicit GavetaWatcher(Display* display)
         : painel_(display),
           contexto_{painel_, [this]() { VoltarGaveta(); }, [this]() { FecharTudo(); }, nullptr, nullptr,
-                    [this]() { return aberta_.load(); }} {}
+                    [this]() { return aberta_.load(); }} {
+        contexto_.abrir_app = [this](const std::string& nome, const std::string& argumento) { AbrirApp(nome, argumento); };
+    }
 
     ContextoApps& Contexto() { return contexto_; }
+
+    // Abre a gaveta direto num app (ex.: aviso de sessão esperando você -> app Sessões)
+    void AbrirApp(const std::string& nome, const std::string& argumento) {
+        std::lock_guard<std::recursive_mutex> trava(trava_);
+        if (ativo_ != nullptr && ativo_->PrendeTela()) {
+            return;
+        }
+        auto visiveis = Visiveis();
+        for (int i = 0; i < (int)visiveis.size(); i++) {
+            if (nome == visiveis[i]->Id()) {
+                aberta_ = true;
+                ativo_ = visiveis[i];
+                ultimo_indice_ = i + 1;  // índice no mosaico (o 0 é o Voltar)
+                ativo_->AbrirCom(contexto_, argumento);
+                return;
+            }
+        }
+    }
 
     void Registrar(std::unique_ptr<AppWatcher> app) { apps_.push_back(std::move(app)); }
 
@@ -100,11 +120,11 @@ public:
         }
         int i = painel_.Selecionado();
         auto visiveis = Visiveis();
-        if (i < 0 || i >= (int)visiveis.size()) {  // "Fechar"
+        if (i <= 0 || i > (int)visiveis.size()) {  // 0 = "Voltar" (fecha a gaveta)
             FecharTudo();
             return true;
         }
-        ativo_ = visiveis[i];
+        ativo_ = visiveis[i - 1];
         ultimo_indice_ = i;
         ativo_->Abrir(contexto_);
         return true;
@@ -116,7 +136,7 @@ private:
     std::vector<std::unique_ptr<AppWatcher>> apps_;
     AppWatcher* ativo_ = nullptr;
     std::atomic<bool> aberta_{false};
-    int ultimo_indice_ = 0;
+    int ultimo_indice_ = 1;  // abre no primeiro app (o 0 é o Voltar)
     std::recursive_mutex trava_;
 
     std::vector<AppWatcher*> Visiveis() {
@@ -133,11 +153,10 @@ private:
         std::lock_guard<std::recursive_mutex> trava(trava_);
         ativo_ = nullptr;
         aberta_ = true;
-        std::vector<PainelWatcher::Item> itens;
+        std::vector<PainelWatcher::Item> itens = {{"Voltar", "", MATERIAL_SYMBOLS_ARROW_BACK}};  // primeira célula
         for (auto* a : Visiveis()) {
             itens.push_back({a->Nome(), a->Detalhe(), a->Icone()});
         }
-        itens.push_back({"Fechar", "", MATERIAL_SYMBOLS_CLOSE});
         painel_.MostrarGrade("Apps", itens, ultimo_indice_);
     }
 

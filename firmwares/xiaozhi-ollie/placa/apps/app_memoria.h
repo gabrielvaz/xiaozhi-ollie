@@ -6,23 +6,24 @@
 #include <atomic>
 #include <vector>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppMemoria : public AppWatcher {
 public:
-    const char* Nome() const override { return "Memória"; }
+    const char* Nome() const override { return TR("Memória", "Memory", "记忆", "Memoria"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_MEMORY; }
-    std::string Detalhe() const override { return "Funciona sem internet"; }
+    std::string Detalhe() const override { return TR("Funciona sem internet", "Works offline", "离线可用", "Funciona sin internet"); }
 
     void Abrir(ContextoApps& c) override {
         Carregar();
         if (itens_.empty()) {
             tela_ = Tela::Vazia;
-            c.painel.MostrarTexto("Memória offline",
+            c.painel.MostrarTexto(TR("Memória offline", "Offline memory", "离线记忆", "Memoria offline"),
                                   CartaoWatcher::Instancia().Montado()
-                                      ? "Ainda vazia. Ela se enche sozinha enquanto houver internet."
-                                      : "Sem microSD. Coloque um cartão para usar a memória offline.",
-                                  {"Voltar"});
+                                      ? TR("Ainda vazia. Ela se enche sozinha enquanto houver internet.", "Still empty. It fills up on its own while online.", "还是空的。联网时会自动填充。", "Aún vacía. Se llena sola mientras haya internet.")
+                                      : TR("Sem microSD. Coloque um cartão para usar a memória offline.", "No microSD. Insert a card to use offline memory.", "没有 microSD 卡。插入存储卡即可使用离线记忆。", "Sin microSD. Inserta una tarjeta para usar la memoria offline."),
+                                  {TR("Voltar", "Back", "返回", "Volver")});
             return;
         }
         MostrarLista(c, 0);
@@ -43,8 +44,8 @@ public:
             tela_ = Tela::Item;
             const auto& m = itens_[atual_];  // item 0 da lista é o Voltar
             c.painel.MostrarTexto(m.titulo, m.texto.size() > 600 ? m.texto.substr(0, 597) + "…" : m.texto,
-                                  m.audio.empty() ? std::vector<std::string>{"Voltar"}
-                                                  : std::vector<std::string>{"Ouvir", "Voltar"});
+                                  m.audio.empty() ? std::vector<std::string>{TR("Voltar", "Back", "返回", "Volver")}
+                                                  : std::vector<std::string>{TR("Ouvir", "Listen", "收听", "Escuchar"), TR("Voltar", "Back", "返回", "Volver")});
             return true;
         }
         if (i == 0 && !itens_[atual_].audio.empty()) {
@@ -118,11 +119,11 @@ private:
 
     void MostrarLista(ContextoApps& c, int selecionar) {
         tela_ = Tela::Lista;
-        std::vector<PainelWatcher::Item> lista = {{"Voltar", "", MATERIAL_SYMBOLS_ARROW_BACK}};
+        std::vector<PainelWatcher::Item> lista = {{TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK}};
         for (const auto& m : itens_) {
             lista.push_back({m.titulo, m.detalhe, MATERIAL_SYMBOLS_CHAT_BUBBLE});
         }
-        c.painel.MostrarLista("Memória offline", lista, selecionar + 1);
+        c.painel.MostrarLista(TR("Memória offline", "Offline memory", "离线记忆", "Memoria offline"), lista, selecionar + 1);
     }
 
     void Sincronizar() {

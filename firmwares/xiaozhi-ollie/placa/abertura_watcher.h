@@ -5,6 +5,7 @@
 #include <lvgl.h>
 
 #include "fontes_watcher.h"
+#include "idioma_watcher.h"
 
 LV_FONT_DECLARE(font_ollie_logo_88);  // fonte/font_ollie_logo_88.c: Inter Black, só as letras de "Ollie"
 
@@ -57,7 +58,8 @@ public:
 
         auto logo = Texto(tela, &font_ollie_logo_88, kLaranja, "Ollie");
         lv_obj_align(logo, LV_ALIGN_TOP_MID, 0, 196);
-        auto frase = Texto(tela, Fontes::Pequena(), 0xC8C8C8, "de olho nos seus agentes");
+        auto frase = Texto(tela, Fontes::Pequena(), 0xC8C8C8, TR("de olho nos seus agentes", "keeps an eye on your agents",
+                                                                    "keeps an eye on your agents", "vigila a tus agentes"));
         lv_obj_align(frase, LV_ALIGN_TOP_MID, 0, 284);
         auto versao = Texto(tela, Fontes::Pequena(), 0x6E6E6E, "v" OLLIE_VERSAO);
         lv_obj_align(versao, LV_ALIGN_TOP_MID, 0, 316);

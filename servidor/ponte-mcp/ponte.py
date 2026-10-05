@@ -391,6 +391,210 @@ def sessao_responder(sessao: str, teclas: list[str], confirmado: bool = False) -
     return "Teclas enviadas." if code == 0 else f"erro: {out[:500]}"
 
 
+# ---------------------------------------------------------------- perguntas na tela (AskUserQuestion, permissão)
+
+_RODAPE_PERGUNTA = re.compile(r"esc to cancel|enter to (select|confirm)|to navigate|press enter|esc para cancelar", re.I)
+_OPCAO = re.compile(r"^(\s*)(?:[❯›>]\s*)?(\d{1,2})[.)]\s+(.*\S)\s*$")
+_CAIXA = re.compile(r"^\[([ ✔✓xX×])\]\s*(.*)$")
+_SEPARADOR = re.compile(r"^\s*[─━╌┄═\-]{8,}\s*$")
+_ABAS = re.compile(r"[☐☒✔]\s*Submit|^\s*←?\s*[☐☒]\s+\S")
+_LIVRE = re.compile(r"^(type something|other|outro|digite algo)\.?$", re.I)
+_IGNORAR = re.compile(r"^(chat about this)\.?$", re.I)
+
+
+def _parse_pergunta(tela: str) -> dict | None:
+    """Acha uma pergunta com opções numeradas no texto visível de um painel (AskUserQuestion do Claude Code,
+    pedido de permissão "Do you want to proceed?", aprovação do Codex). Devolve
+    {"texto", "multipla", "opcoes": [{"n", "texto", "descricao"?, "marcada"?, "livre"?}], "contexto"?, "abas"?} ou None."""
+    linhas = [re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", l).rstrip() for l in (tela or "").splitlines()]
+    while linhas and not linhas[-1].strip():
+        linhas.pop()
+    if not linhas:
+        return None
+    # Rodapé de diálogo ("Esc to cancel", "Enter to select"...) nas últimas linhas: sem ele não é pergunta aberta
+    nao_vazias = [i for i, l in enumerate(linhas) if l.strip()]
+    rodape = next((i for i in reversed(nao_vazias[-6:]) if _RODAPE_PERGUNTA.search(linhas[i])), None)
+    if rodape is None:
+        # Às vezes o rodapé ainda não foi desenhado: aceita se a tela termina nas opções (o caso de "1." logo abaixo de "...?")
+        if not _OPCAO.match(linhas[-1]):
+            return None
+        rodape = len(linhas)
+    # Última opção "1." antes do rodapé seguida de 2, 3... em sequência
+    inicio = None
+    for i in range(rodape - 1, -1, -1):
+        m = _OPCAO.match(linhas[i])
+        if m and m.group(2) == "1":
+            inicio = i
+            break
+    if inicio is None or rodape - inicio > 60:
+        return None
+    opcoes: list[dict] = []
+    atual = None
+    for l in linhas[inicio:rodape]:
+        m = _OPCAO.match(l)
+        if m and int(m.group(2)) == len(opcoes) + 1:
+            atual = {"n": int(m.group(2)), "texto": m.group(3).strip()}
+            opcoes.append(atual)
+        elif atual is not None and l.strip() and not _SEPARADOR.match(l):
+            extra = l.strip()
+            if extra.lower() not in ("next", "submit"):
+                atual["descricao"] = (atual.get("descricao", "") + " " + extra).strip()
+        elif _SEPARADOR.match(l):
+            atual = None
+    if len(opcoes) < 2:
+        return None
+    multipla = any(_CAIXA.match(o["texto"]) for o in opcoes)
+    finais = []
+    for o in opcoes:
+        cx = _CAIXA.match(o["texto"])
+        if cx:
+            o["texto"] = cx.group(2).strip()
+            if multipla:
+                o["marcada"] = cx.group(1) != " "
+        if _IGNORAR.match(o["texto"]):
+            continue
+        if o.get("descricao") == o["texto"]:
+            o.pop("descricao")
+        if _LIVRE.match(o["texto"]):
+            o["livre"] = True
+            o.pop("descricao", None)
+        o["texto"] = o["texto"].replace("’", "'")
+        finais.append(o)
+    # Pergunta: linhas não vazias logo acima da opção 1; contexto: o que vem acima até o separador ─ (comando, revisão...)
+    acima = []
+    j = inicio - 1
+    while j >= 0 and not linhas[j].strip():
+        j -= 1
+    while j >= 0 and linhas[j].strip() and not _SEPARADOR.match(linhas[j]) and not _ABAS.search(linhas[j]):
+        acima.insert(0, linhas[j].strip())
+        j -= 1
+    contexto, abas = [], []
+    while j >= 0 and not re.match(r"^\s*─{8,}", linhas[j]) and inicio - j < 40:
+        l = linhas[j].strip()
+        if _ABAS.search(linhas[j]):
+            abas = [{"nome": n.strip(), "respondida": s == "☒"} for s, n in re.findall(r"([☐☒])\s+([^☐☒✔→]+)", l)]
+        elif l and not _SEPARADOR.match(linhas[j]) and not l.lower().startswith("tip:"):
+            contexto.insert(0, l)
+        j -= 1
+    texto = " ".join(acima) or "Pergunta da sessão"
+    if rodape == len(linhas) and not texto.endswith("?"):
+        return None
+    r: dict = {"texto": texto[:400], "multipla": multipla, "opcoes": finais}
+    if contexto:
+        r["contexto"] = " · ".join(contexto)[:400]
+    if abas:
+        r["abas"] = abas
+    return r
+
+
+def pergunta_tela(sessao: str) -> dict | None:
+    """Pergunta aberta na tela da sessão (None se não houver ou se a sessão não existir)."""
+    code, visivel = _run(["herdr", "agent", "read", sessao, "--source", "visible"])
+    return _parse_pergunta(visivel) if code == 0 else None
+
+
+def _teclas(sessao: str, *teclas: str) -> bool:
+    code, _ = _run(["herdr", "agent", "send-keys", sessao, *teclas], timeout=15)
+    return code == 0
+
+
+def _ir_para(sessao: str, n: int) -> bool:
+    """Opção com número de 2 dígitos: navega com setas a partir da primeira e aperta enter."""
+    return _teclas(sessao, *(["up"] * 30), *(["down"] * (n - 1)), "enter")
+
+
+def _espera_mudar(sessao: str, antes: dict | None, segundos: float = 4.0) -> dict | None:
+    """Relê a tela até a pergunta sumir ou mudar. Devolve a pergunta atual (None = sumiu)."""
+    fim = time.time() + segundos
+    agora = antes
+    while time.time() < fim:
+        time.sleep(0.6)
+        agora = pergunta_tela(sessao)
+        if agora is None or antes is None or agora.get("texto") != antes.get("texto") or agora.get("opcoes") != antes.get("opcoes"):
+            return agora
+    return agora
+
+
+def _revisao(p: dict | None) -> bool:
+    """Tela final do AskUserQuestion com várias abas ("Ready to submit your answers?"), com todas respondidas."""
+    return bool(p and re.search(r"submit your answers", p["texto"], re.I)
+                and all(a.get("respondida") for a in p.get("abas", [])))
+
+
+def responder_pergunta(sessao: str, escolhas: list[int]) -> dict:
+    """Seleciona as opções na pergunta aberta e confirma. Devolve {"ok", "mensagem", "proxima"?}."""
+    p = pergunta_tela(sessao)
+    if p is None:
+        return {"ok": False, "mensagem": "Não há pergunta aberta nessa sessão."}
+    try:
+        escolhas = sorted({int(e) for e in escolhas})
+    except (TypeError, ValueError):
+        return {"ok": False, "mensagem": "Escolhas inválidas (use números)."}
+    por_n = {o["n"]: o for o in p["opcoes"]}
+    if not escolhas:
+        return {"ok": False, "mensagem": "Nenhuma opção escolhida."}
+    fora = [e for e in escolhas if e not in por_n]
+    if fora:
+        return {"ok": False, "mensagem": f"Opção inexistente: {', '.join(map(str, fora))}."}
+    if any(por_n[e].get("livre") for e in escolhas):
+        return {"ok": False, "mensagem": "Resposta livre só pela própria sessão (digitando)."}
+    if not p["multipla"] and len(escolhas) > 1:
+        return {"ok": False, "mensagem": "Essa pergunta aceita uma opção só."}
+    nomes = ", ".join(por_n[e]["texto"] for e in escolhas)
+    if p["multipla"]:
+        # Número alterna a caixa sem mover o cursor; só alterna o que difere do desejado. Depois tab = Next/confirmar.
+        for o in p["opcoes"]:
+            if o.get("livre"):
+                continue
+            if (o["n"] in escolhas) != bool(o.get("marcada")):
+                if o["n"] > 9 or not _teclas(sessao, str(o["n"])):
+                    return {"ok": False, "mensagem": "Não consegui marcar as opções."}
+                time.sleep(0.15)
+        ok = _teclas(sessao, "tab")
+    else:
+        n = escolhas[0]
+        ok = _teclas(sessao, str(n)) if n <= 9 else _ir_para(sessao, n)
+    if not ok:
+        return {"ok": False, "mensagem": "Não consegui enviar as teclas à sessão."}
+    depois = _espera_mudar(sessao, p)
+    if _revisao(depois):  # várias perguntas: última respondida, envia a revisão
+        _teclas(sessao, "1")
+        depois = _espera_mudar(sessao, depois)
+    if depois is not None and depois.get("texto") == p.get("texto") and depois.get("opcoes") == p.get("opcoes"):
+        return {"ok": False, "mensagem": f"Enviei {nomes}, mas a pergunta continua na tela."}
+    r = {"ok": True, "mensagem": f"Respondido: {nomes}"}
+    if depois is not None:
+        r["proxima"] = depois
+        r["mensagem"] += f". Próxima pergunta: {depois['texto']}"
+    return r
+
+
+@mcp.tool()
+def sessao_pergunta(sessao: str) -> str:
+    """Pergunta com opções que a sessão do herdr está mostrando (AskUserQuestion do Claude Code ou pedido de permissão).
+    Leia ao usuário a pergunta e as opções pelo número; multipla=true aceita várias. Depois use sessao_escolher."""
+    p = pergunta_tela(sessao)
+    if p is None:
+        return "Nenhuma pergunta com opções aberta nessa sessão. Use sessao_ler para ver a tela."
+    return json.dumps({"como_relatar": "Leia a pergunta e cada opção com o número. Opções livre=true só digitando na sessão.",
+                       "pergunta": p}, ensure_ascii=False)
+
+
+@mcp.tool()
+def sessao_escolher(sessao: str, escolhas: list[int], confirmado: bool = False) -> str:
+    """Responde à pergunta aberta na sessão escolhendo as opções pelo número (ex.: [2] ou [1, 3] se for múltipla).
+    Use sessao_pergunta antes. Exige confirmado=true depois que o usuário confirmar."""
+    p = pergunta_tela(sessao)
+    if p is None:
+        return "Nenhuma pergunta com opções aberta nessa sessão."
+    nomes = {o["n"]: o["texto"] for o in p["opcoes"]}
+    resumo = ", ".join(f"{e} ({nomes.get(e, '?')})" for e in escolhas) if escolhas else "nada"
+    pend = _confirmar(confirmado, f"responder “{p['texto']}” na sessão {sessao} com {resumo}")
+    if pend:
+        return pend
+    return json.dumps(responder_pergunta(sessao, escolhas), ensure_ascii=False)
+
+
 def _nova_sessao(tipo: str, projeto: str, instrucao: str) -> str:
     pasta = _resolve_projeto(projeto)
     if not pasta:
@@ -423,6 +627,28 @@ def codex_nova_sessao(projeto: str, instrucao: str, confirmado: bool = False) ->
     """Abre uma sessão NOVA do Codex no herdr, na pasta do projeto, e manda a instrução. Exige confirmado=true."""
     pend = _confirmar(confirmado, f"abrir Codex em '{projeto}' com a tarefa “{instrucao}”")
     return pend or _nova_sessao("codex", projeto, instrucao)
+
+
+@mcp.tool()
+def codex_enviar(sessao: str, texto: str, confirmado: bool = False) -> str:
+    """Manda uma mensagem para uma sessão do Codex do Mac (id mostrado no app Codex do Watcher, não é painel
+    do herdr). Se ela estiver trabalhando, entra na fila; se estiver parada, o Codex retoma em modo só leitura.
+    Exige confirmado=true."""
+    pend = _confirmar(confirmado, f"mandar ao Codex “{texto}”")
+    if pend:
+        return pend
+    r = _codex_remoto().enviar(sessao, texto)
+    return r.get("mensagem") or ("Enviado." if r.get("ok") else "Não consegui enviar.")
+
+
+def _codex_remoto():
+    """Módulo extras/core/utils/codex_remoto.py (só biblioteca padrão), carregado pelo caminho."""
+    import importlib.util
+    caminho = Path(__file__).resolve().parents[1] / "extras/core/utils/codex_remoto.py"
+    spec = importlib.util.spec_from_file_location("codex_remoto", caminho)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
 
 
 # ---------------------------------------------------------------- perguntas só de leitura

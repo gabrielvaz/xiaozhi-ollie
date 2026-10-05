@@ -21,6 +21,8 @@ from pathlib import Path
 
 import requests
 
+from core.utils.idioma import CODIGO, NOME, t
+
 PASTA = Path(os.environ.get(
     "WATCHER_PASTA_REUNIOES",
     Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Watcher/Reuniões",
@@ -31,17 +33,26 @@ FFMPEG = "/opt/homebrew/bin/ffmpeg"
 # Nomes próprios que o modelo de transcrição deve reconhecer (ajuste em WATCHER_VOCABULARIO)
 VOCABULARIO = os.environ.get("WATCHER_VOCABULARIO", "Claude Code, Codex, herdr, Multica")
 
-PROMPT_RESUMO = """Você recebe a transcrição de uma reunião gravada pelo usuário num SenseCAP Watcher.
-Escreva em português do Brasil, em Markdown:
-## Resumo
+PROMPT_RESUMO = f"""Você recebe a transcrição de uma reunião gravada pelo usuário num SenseCAP Watcher.
+Escreva em {NOME}, em Markdown, com exatamente estes títulos:
+## {t('Resumo', 'Summary', '摘要', 'Resumen')}
 3 a 6 frases com o essencial.
-## Decisões
-Lista curta; "Nenhuma registrada" se não houver.
-## Próximos passos
+## {t('Decisões', 'Decisions', '决定', 'Decisiones')}
+Lista curta; "{t('Nenhuma registrada', 'None recorded', '无记录', 'Ninguna registrada')}" se não houver.
+## {t('Próximos passos', 'Next steps', '后续步骤', 'Próximos pasos')}
 Lista com responsável e prazo quando aparecerem na conversa.
-## Pontos em aberto
+## {t('Pontos em aberto', 'Open questions', '待解决问题', 'Puntos pendientes')}
 Dúvidas ou riscos citados.
 Não invente nomes, números ou prazos que não estejam na transcrição."""
+
+
+MESES_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _data_hora(d: datetime) -> str:
+    """Data e hora no formato natural do idioma (pt: 05/10/2026 14:30)."""
+    return t(f"{d:%d/%m/%Y %H:%M}", f"{MESES_EN[d.month - 1]} {d.day}, {d.year} {d:%H:%M}",
+             f"{d.year}年{d.month}月{d.day}日 {d:%H:%M}", f"{d.day}/{d.month}/{d.year} {d:%H:%M}")
 
 
 class GravadorReuniao:
@@ -108,18 +119,23 @@ class GravadorReuniao:
             self._log(f"áudio salvo ({self.minutos:.1f} min)")
             transcricao = self._transcrever()
             self.caminho_wav.unlink(missing_ok=True)
-            titulo = f"Reunião {self.inicio:%d/%m/%Y %H:%M} ({self.minutos:.0f} min)"
+            titulo = t("Reunião", "Meeting", "会议", "Reunión") + f" {_data_hora(self.inicio)} ({self.minutos:.0f} min)"
             (self.pasta / "transcricao.md").write_text(f"# {titulo}\n\n{transcricao}\n", encoding="utf-8")
             resumo = self._resumir(transcricao)
             (self.pasta / "resumo.md").write_text(f"# {titulo}\n\n{resumo}\n", encoding="utf-8")
             self._log("transcrição e resumo prontos")
             self._nota_apple(titulo, resumo, transcricao)
-            self._notificar(f"{titulo}: resumo pronto no Notas e no iCloud.")
+            self._notificar(f"{titulo}: " + t("resumo pronto no Notas e no iCloud.", "summary ready in Notes and iCloud.",
+                                               "摘要已保存到备忘录和 iCloud。", "resumen listo en Notas y en iCloud."))
             from core.utils.vigia import adicionar_aviso
-            adicionar_aviso("reuniao", "Reunião pronta", f"Resumo de {self.minutos:.0f} min salvo no Notas", "happy")
+            minutos = f"{self.minutos:.0f}"
+            adicionar_aviso("reuniao", t("Reunião pronta", "Meeting ready", "会议已就绪", "Reunión lista"),
+                            t(f"Resumo de {minutos} min salvo no Notas", f"{minutos}-min summary saved to Notes",
+                              f"{minutos} 分钟的摘要已保存到备忘录", f"Resumen de {minutos} min guardado en Notas"), "happy")
         except Exception as e:
             self._log(f"ERRO: {e}")
-            self._notificar(f"Reunião gravada, mas o processamento falhou: {e}")
+            self._notificar(t("Reunião gravada, mas o processamento falhou", "Meeting recorded, but processing failed",
+                             "会议已录制，但处理失败", "Reunión grabada, pero el procesamiento falló") + f": {e}")
 
     def _transcrever(self) -> str:
         base = os.environ.get("API_BASE_URL", "https://openrouter.ai/api/v1")
@@ -133,7 +149,8 @@ class GravadorReuniao:
             for i, parte in enumerate(sorted(Path(tmp).glob("parte_*.mp3"))):
                 with open(parte, "rb") as f:
                     r = requests.post(f"{base}/audio/transcriptions", headers={"Authorization": f"Bearer {chave}"},
-                                      data={"model": modelo, "language": "pt", "prompt": f"Reunião em português. Termos: {VOCABULARIO}."}, files={"file": f}, timeout=600)
+                                      data={"model": modelo, "language": CODIGO, "prompt": t("Reunião em português. Termos", "Meeting in English. Terms",
+                                                                              "中文会议。术语", "Reunión en español. Términos") + f": {VOCABULARIO}."}, files={"file": f}, timeout=600)
                 r.raise_for_status()
                 inicio = i * MINUTOS_POR_PARTE
                 partes_txt.append(f"**[{inicio // 60:02d}:{inicio % 60:02d}]** {r.json().get('text', '').strip()}")
@@ -160,8 +177,9 @@ class GravadorReuniao:
                 elif l.strip():
                     linhas.append(f"<div>{html.escape(l)}</div>")
             return "".join(linhas)
-        corpo = (f"<h1>{html.escape(titulo)}</h1>{bloco(resumo)}<h2>Transcrição</h2>{bloco(transcricao)}"
-                 f"<div><br>Arquivos: {html.escape(str(self.pasta))}</div>")
+        corpo = (f"<h1>{html.escape(titulo)}</h1>{bloco(resumo)}"
+                 f"<h2>{t('Transcrição', 'Transcript', '转写', 'Transcripción')}</h2>{bloco(transcricao)}"
+                 f"<div><br>{t('Arquivos', 'Files', '文件', 'Archivos')}: {html.escape(str(self.pasta))}</div>")
         arq = self.pasta / ".nota.html"
         arq.write_text(corpo, encoding="utf-8")
         script = f'''
@@ -176,7 +194,7 @@ end tell'''
 
     def _notificar(self, msg: str):
         msg = msg.replace('"', "'")[:200]
-        subprocess.run(["osascript", "-e", f'display notification "{msg}" with title "Watcher: reunião"'],
+        subprocess.run(["osascript", "-e", f'display notification "{msg}" with title "Watcher: {t("reunião", "meeting", "会议", "reunión")}"'],
                        capture_output=True, timeout=15)
 
 

@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include "idioma_watcher.h"
+
 class CartaoWatcher {
 public:
     static constexpr const char* kRaiz = "/sdcard";
@@ -65,7 +67,8 @@ public:
         localtime_r(&agora, &t);
         char hora[16];
         strftime(hora, sizeof(hora), "%H:%M:%S", &t);
-        const char* quem = papel == "user" ? "Você" : (papel == "assistant" ? "Ollie" : "Aviso");
+        const char* quem = papel == "user" ? TR("Você", "You", "你", "Tú")
+                                           : (papel == "assistant" ? "Ollie" : TR("Aviso", "Notice", "提示", "Aviso"));
         std::lock_guard<std::mutex> trava(trava_);
         pendente_ += std::string(hora) + " " + quem + ": " + texto + "\n";
     }

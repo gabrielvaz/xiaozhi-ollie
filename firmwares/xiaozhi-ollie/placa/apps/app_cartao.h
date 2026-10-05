@@ -5,16 +5,17 @@
 #include <atomic>
 #include <ctime>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppCartao : public AppWatcher {
 public:
-    const char* Nome() const override { return "Backup"; }
+    const char* Nome() const override { return TR("Backup", "Backup", "备份", "Copia de seguridad"); }
     const char* Icone() const override { return MATERIAL_SYMBOLS_SD_CARD; }
-    std::string Detalhe() const override { return "Conversas e reuniões do microSD"; }
+    std::string Detalhe() const override { return TR("Conversas e reuniões do microSD", "Chats and meetings on microSD", "microSD 上的对话和会议", "Chats y reuniones de la microSD"); }
 
     void Abrir(ContextoApps& c) override {
-        c.painel.MostrarStatus("Fazer backup", PainelWatcher::Status::Carregando, "Fazendo backup no Mac…");
+        c.painel.MostrarStatus(TR("Fazer backup", "Back up", "备份", "Copia de seguridad"), PainelWatcher::Status::Carregando, TR("Fazendo backup no Mac…", "Backing up to the Mac…", "正在备份到 Mac…", "Copiando al Mac…"));
         enviar_ = true;
     }
 
@@ -28,11 +29,11 @@ public:
         int n = Enviar(true);
         enviando_ = false;
         if (n < 0) {
-            c.painel.MostrarStatus("Fazer backup", PainelWatcher::Status::Erro, "Sem microSD ou sem conexão agora.", {"Voltar"});
+            c.painel.MostrarStatus(TR("Fazer backup", "Back up", "备份", "Copia de seguridad"), PainelWatcher::Status::Erro, TR("Sem microSD ou sem conexão agora.", "No microSD or no connection right now.", "没有 microSD 卡或暂时无法连接。", "Sin microSD o sin conexión ahora."), {TR("Voltar", "Back", "返回", "Volver")});
         } else {
-            c.painel.MostrarStatus("Fazer backup", PainelWatcher::Status::Sucesso,
-                                   n == 0 ? "Tudo já estava no Mac." : std::to_string(n) + " arquivo(s) enviado(s) ao Mac.",
-                                   {"Voltar"});
+            c.painel.MostrarStatus(TR("Fazer backup", "Back up", "备份", "Copia de seguridad"), PainelWatcher::Status::Sucesso,
+                                   n == 0 ? TR("Tudo já estava no Mac.", "Everything was already on the Mac.", "所有内容都已在 Mac 上。", "Todo ya estaba en el Mac.") : std::to_string(n) + TR(" arquivo(s) enviado(s) ao Mac.", " file(s) sent to the Mac.", " 个文件已发送到 Mac。", " archivo(s) enviado(s) al Mac."),
+                                   {TR("Voltar", "Back", "返回", "Volver")});
         }
     }
 

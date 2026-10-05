@@ -4,6 +4,8 @@ A cada 10 s olha o herdr (pela ponte) e detecta:
   - sessão passou a esperar você (permissão ou pergunta);
   - sessão terminou de trabalhar (com o resumo do que concluiu).
 Outros módulos (ex.: reuniões) chamam adicionar_aviso. O Watcher busca em GET /watcher/avisos.
+Todos os avisos ficam também no histórico (data/avisos_historico.json, os 200 mais recentes),
+lido pelo app Avisos do Watcher em GET /watcher/avisos/historico.
 """
 
 import os
@@ -16,19 +18,59 @@ import requests
 
 INTERVALO_S = 10
 MAX_AVISOS = 50
+MAX_HISTORICO = 200
+HISTORICO = Path(__file__).resolve().parents[2] / "data/avisos_historico.json"
 _avisos: list[dict] = []
 _seq = 0
 _trava = threading.Lock()
 _iniciado = False
 
 
-def adicionar_aviso(tipo: str, titulo: str, texto: str, emocao: str = "neutral") -> None:
+def adicionar_aviso(tipo: str, titulo: str, texto: str, emocao: str = "neutral", sessao: str = "") -> None:
+    """sessao = id do painel no herdr (o mesmo de /watcher/sessoes); com tipo "esperando" o Watcher abre a sessão."""
     global _seq
     with _trava:
         _seq += 1
-        _avisos.append({"id": _seq, "tipo": tipo, "titulo": titulo[:40], "texto": texto[:110], "emocao": emocao,
-                        "quando": int(time.time())})
+        aviso = {"id": _seq, "tipo": tipo, "titulo": titulo[:40], "texto": texto[:110], "emocao": emocao,
+                 "quando": int(time.time())}
+        if sessao:
+            aviso["sessao"] = sessao
+        _avisos.append(aviso)
         del _avisos[:-MAX_AVISOS]
+        _guardar_historico(aviso)
+
+
+def _guardar_historico(aviso: dict) -> None:
+    import json
+    try:
+        itens = json.loads(HISTORICO.read_text(encoding="utf-8")) if HISTORICO.exists() else []
+    except (OSError, ValueError):
+        itens = []
+    itens.append(aviso)
+    HISTORICO.parent.mkdir(parents=True, exist_ok=True)
+    tmp = HISTORICO.with_suffix(".tmp")
+    tmp.write_text(json.dumps(itens[-MAX_HISTORICO:], ensure_ascii=False), encoding="utf-8")
+    tmp.replace(HISTORICO)
+
+
+def historico(limite: int = 60) -> list[dict]:
+    """Avisos mais recentes primeiro, com "detalhe" de quando ("Hoje 19:30", "Ontem 08:10", "Seg 05/10 14:00")."""
+    import json
+    from datetime import datetime
+    with _trava:
+        try:
+            itens = json.loads(HISTORICO.read_text(encoding="utf-8")) if HISTORICO.exists() else []
+        except (OSError, ValueError):
+            itens = []
+    hoje = datetime.now().date()
+    dias = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+    saida = []
+    for a in reversed(itens[-limite:]):
+        q = datetime.fromtimestamp(a.get("quando", 0))
+        dia = ("Hoje" if q.date() == hoje else "Ontem" if (hoje - q.date()).days == 1
+               else f"{dias[q.weekday()]} {q:%d/%m}")
+        saida.append({**a, "detalhe": f"{dia} {q:%H:%M}"})
+    return saida
 
 
 def avisos_desde(ultimo: int) -> dict:
@@ -75,7 +117,8 @@ def _loop(ponte) -> None:
                 chave, estado, feitas = a["sessao"], a["status"], a.get("_conclusoes", 0)
                 if not primeira:
                     if estado == "blocked" and estados.get(chave) != "blocked":
-                        adicionar_aviso("espera", "Esperando você", f"{_titulo_curto(a)[:50]} precisa da sua resposta", "warning")
+                        adicionar_aviso("esperando", "Esperando você", f"{_titulo_curto(a)[:50]} precisa da sua resposta", "warning",
+                                        sessao=chave)
                     # herdr soma completion_seq a cada tarefa terminada (pega até as que duram menos que o intervalo)
                     elif feitas > conclusoes.get(chave, feitas) and estado in ("idle", "done"):
                         time.sleep(3)  # dá tempo de o histórico registrar a fala final

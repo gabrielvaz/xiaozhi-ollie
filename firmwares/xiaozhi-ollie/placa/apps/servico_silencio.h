@@ -3,11 +3,12 @@
 // Não age durante a gravação de reunião.
 #pragma once
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class ServicoSilencio : public AppWatcher {
 public:
-    const char* Nome() const override { return "Silêncio"; }
+    const char* Nome() const override { return TR("Silêncio", "Silence", "静音", "Silencio"); }
     bool Visivel() const override { return false; }
     void Abrir(ContextoApps& c) override {}
     bool Clicar(ContextoApps& c) override { return false; }
