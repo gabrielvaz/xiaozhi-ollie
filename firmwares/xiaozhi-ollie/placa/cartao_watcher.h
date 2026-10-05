@@ -57,7 +57,7 @@ public:
     // ------------------------------------------------------------ conversas
 
     void RegistrarConversa(const std::string& papel, const std::string& texto) {
-        if (!Montado() || texto.empty() || papel == "saudacao") {
+        if (!Montado() || texto.empty() || papel == "saudacao" || papel == "carregando") {
             return;
         }
         time_t agora = time(nullptr);
