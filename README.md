@@ -2,6 +2,8 @@
 
 **Keeps an eye on your agents, and steers them.**
 
+**Website:** [gabrielvaz.github.io/xiaozhi-ollie](https://gabrielvaz.github.io/xiaozhi-ollie/), with a live mockup of the Watcher.
+
 Xiaozhi Ollie is a modified version of the open-source [XiaoZhi](https://github.com/78/xiaozhi-esp32) firmware that turns the **SenseCAP Watcher** (Seeed Studio) into a voice companion for your desk. Say **“Hey Ollie”** to check on your Claude Code and Codex sessions, approve a request, record a meeting or see how much of your Claude plan is left. Clawd, the pixel-art mascot, shows what is going on.
 
 It talks to a small server that you run on your own Mac, not to the xiaozhi.me cloud. Your keys and your access stay with you.
