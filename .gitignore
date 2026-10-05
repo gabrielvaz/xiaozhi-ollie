@@ -27,3 +27,7 @@ __pycache__/
 
 # Configuração local de cada máquina
 firmwares/xiaozhi-ollie/local.env
+
+# Sincronização dos repositórios (ver sincronizar-repos.sh)
+.privado/
+.termos-pessoais
