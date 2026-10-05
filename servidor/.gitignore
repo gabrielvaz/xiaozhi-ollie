@@ -1,0 +1,6 @@
+.env
+.cache/
+xiaozhi-server/.venv/
+xiaozhi-server/data/
+xiaozhi-server/tmp/
+xiaozhi-server/models/

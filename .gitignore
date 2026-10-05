@@ -1,0 +1,29 @@
+# Segredos e estado local
+servidor/.env
+servidor/.cache/
+servidor/logs/
+servidor/xiaozhi-server/
+*.log
+
+# Código de terceiros baixado pelos scripts (versões fixas em instalar.sh e compilar.sh)
+firmwares/xiaozhi-ollie/xiaozhi-esp32/
+firmwares/xiaozhi-ollie/esp-wifi-connect/
+firmwares/xiaozhi-ollie/saida/
+firmwares/xiaozhi-ollie/fonte/*.ttf
+repos/
+
+# Backups do aparelho: têm as senhas do Wi-Fi, nunca versionar
+firmwares/backups/
+
+# Downloads da Seeed e do XiaoZhi (links no README)
+firmwares/01-oficial-factory-v1.1.7/
+firmwares/02-xiaozhi-v2.5.0/
+firmwares/03-himax/
+hardware/
+manual/
+
+.DS_Store
+__pycache__/
+
+# Configuração local de cada máquina
+firmwares/xiaozhi-ollie/local.env

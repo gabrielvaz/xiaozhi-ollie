@@ -1,0 +1,581 @@
+"""Patches do firmware XiaoZhi v2.5.0 para o SenseCAP Watcher (Xiaozhi Ollie).
+
+1. Ajusta textos pt-BR da interface (language.json).
+2. Traduz para português as ferramentas MCP da câmera (sscma_camera.cc), lidas pelo modelo.
+3. Portal de Wi-Fi: acrescenta pt-BR (o original só tem pt-PT) na cópia local do esp-wifi-connect 3.3.1.
+4. Usa essa cópia local no lugar da versão do registro (override_path).
+5. Embute o endereço OTA do servidor do Mac (lido de servidor/.env) na configuração da placa.
+
+Idempotente. Uso: python aplicar_patches.py
+"""
+
+import json
+import re
+import sys
+from pathlib import Path
+
+AQUI = Path(__file__).resolve().parent
+XZ = AQUI / "xiaozhi-esp32"
+WIFI = AQUI / "esp-wifi-connect"
+ENV = AQUI.parents[1] / "servidor" / ".env"
+problemas: list[str] = []
+
+# Parte sempre dos originais: os patches são aplicados em sequência sobre o código limpo,
+# então um patch pode mexer no resultado de outro sem duplicar nada ao rodar de novo.
+import subprocess
+for repo in (XZ, WIFI):
+    subprocess.run(["git", "-C", str(repo), "checkout", "--", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "clean", "-fdq", "--", "main/boards/sensecap-watcher", "assets"], check=False)
+
+
+def trocar(arq: Path, antigo: str, novo: str) -> None:
+    texto = arq.read_text(encoding="utf-8")
+    if novo in texto:
+        return
+    if antigo in texto:
+        arq.write_text(texto.replace(antigo, novo), encoding="utf-8")
+    elif novo not in texto:
+        problemas.append(f"{arq.relative_to(AQUI)}: não achei {antigo[:50]!r}")
+
+
+# 1. Textos da interface -------------------------------------------------------
+lang = XZ / "main/assets/locales/pt-BR/language.json"
+dados = json.loads(lang.read_text(encoding="utf-8"))
+dados["strings"].update({
+    "LISTENING": "Ouvindo...",
+    "STANDBY": "Pronto",
+    "SERVER_NOT_FOUND": "Procurando o servidor...",
+    "SERVER_NOT_CONNECTED": "Sem conexão com o servidor, tente mais tarde",
+    "SERVER_ERROR": "Falha no envio, confira a rede",
+    "CONNECT_TO_HOTSPOT": "No celular, conecte-se à rede ",
+    "ACCESS_VIA_BROWSER": " e abra no navegador ",
+    "HELLO_MY_FRIEND": "Olá!",
+    "RTC_MODE_OFF": "Cancelamento de eco desligado",
+    "RTC_MODE_ON": "Cancelamento de eco ligado",
+    "VOLUME": "Volume",
+})
+lang.write_text(json.dumps(dados, ensure_ascii=False, indent=4) + "\n", encoding="utf-8")
+
+# 2. Ferramentas da câmera em português ----------------------------------------
+cam = XZ / "main/boards/sensecap-watcher/sscma_camera.cc"
+for antigo, novo in [
+    ('"获取当前视觉模型检测的参数配置信息。\\n"', '"Lê a configuração atual da detecção visual (modelo de IA da câmera).\\n"'),
+    ('"返回结果包含：\\n"', '"O resultado traz:\\n"'),
+    ('"  `threshold`: 检测置信度阈值 (0-100)，低于此值的检测结果将被忽略；\\n"', '"  `threshold`: confiança mínima (0-100); detecções abaixo disso são ignoradas;\\n"'),
+    ('"  `interval`: 触发对话后的冷却时间(秒)，防止频繁打断；\\n"', '"  `interval`: tempo de espera (s) depois de uma conversa disparada, para não interromper toda hora;\\n"'),
+    ('"  `duration`: 持续检测确认时间(秒)；\\n"', '"  `duration`: tempo (s) que o alvo precisa ficar visível para confirmar;\\n"'),
+    ('"  `target`: 当前关注的检测目标索引。"', '"  `target`: índice do alvo monitorado."'),
+    ('"配置视觉模型检测参数。当用户希望调整检测灵敏度、频率或特定目标时使用。\\n"', '"Ajusta a detecção visual. Use quando o usuário quiser mudar sensibilidade, frequência ou alvo.\\n"'),
+    ('"参数(均为可选，未提供的参数将保持当前设置不变)：\\n"', '"Parâmetros (todos opcionais; os omitidos ficam como estão):\\n"'),
+    ('"  `threshold`: 置信度阈值 (0-100)。提高此值可减少误报，但可能漏检；\\n"', '"  `threshold`: confiança mínima (0-100); subir reduz falsos alarmes, mas pode perder detecções;\\n"'),
+    ('"  `interval`: 冷却时间(秒)。设置对话结束后多久内不再触发检测；\\n"', '"  `interval`: tempo de espera (s) depois de uma conversa;\\n"'),
+    ('"  `duration`: 持续检测时间(秒)。\\n"', '"  `duration`: tempo de confirmação (s).\\n"'),
+    ('"  `target`: 设置检测目标的索引 ID。"', '"  `target`: índice do alvo."'),
+    ('"控制视觉推理(摄像头检测)功能的开启与关闭，或查询当前状态。\\n"', '"Liga, desliga ou consulta a detecção visual da câmera.\\n"'),
+    ('"当用户指令涉及\'开启/关闭推理\'、\'开始/停止检测\'时使用。\\n"', '"Use quando o usuário pedir para ligar ou desligar a detecção.\\n"'),
+    ('"参数：\\n"', '"Parâmetro:\\n"'),
+    ('"  `enable`: (可选) 整数。1=开启推理，0=关闭推理。若省略则返回当前开关状态。"', '"  `enable`: (opcional) 1 liga, 0 desliga; sem ele, retorna o estado atual."'),
+]:
+    trocar(cam, antigo, novo)
+
+# 3. Portal de Wi-Fi em pt-BR ----------------------------------------------------
+html = WIFI / "assets/wifi_configuration.html"
+PT_BR = """            'pt-BR': {
+                title: 'Configuração de rede',
+                saved_wifi: 'Redes salvas',
+                new_wifi: 'Nova rede Wi-Fi',
+                password: 'Senha:',
+                connect: 'Conectar',
+                connecting: 'Conectando...',
+                select_wifi: 'Escolha uma rede Wi-Fi de 2,4 GHz na lista abaixo:',
+                select_wifi_5g: 'Escolha uma rede Wi-Fi na lista abaixo:',
+                scanning: 'Procurando redes...',
+                wifi_tab: 'Wi-Fi',
+                advanced_tab: 'Avançado',
+                ota_url: 'Endereço do servidor (OTA):',
+                max_tx_power: 'Potência máxima do Wi-Fi:',
+                remember_bssid: 'Lembrar o BSSID ao conectar',
+                sleep_mode: 'Ativar modo de economia',
+                save: 'Salvar',
+                config_success: 'Configuração concluída!'
+            },
+"""
+texto = html.read_text(encoding="utf-8")
+if "'pt-BR': {" not in texto:
+    texto = texto.replace("            'pt-PT': {", PT_BR + "            'pt-PT': {", 1)
+texto = texto.replace("'pt-BR': 'pt-PT'", "'pt-BR': 'pt-BR'")
+texto = texto.replace("'pt': 'pt-PT'", "'pt': 'pt-BR'")
+if '<option value="pt-BR">' not in texto:
+    texto = texto.replace('<option value="pt-PT">Português</option>',
+                          '<option value="pt-BR">Português (Brasil)</option>\n            <option value="pt-PT">Português (Portugal)</option>')
+html.write_text(texto, encoding="utf-8")
+for marca in ("'pt-BR': {", '<option value="pt-BR">', "'pt-BR': 'pt-BR'"):
+    if marca not in texto:
+        problemas.append(f"portal: faltou {marca}")
+
+# 4. Usar a cópia local do esp-wifi-connect ------------------------------------
+manifesto = XZ / "main/idf_component.yml"
+trocar(manifesto, "  78/esp-wifi-connect: ~3.3.1\n",
+       '  78/esp-wifi-connect:\n    version: ~3.3.1\n    override_path: "../../esp-wifi-connect"\n')
+
+# 5. Endereço do servidor embutido ---------------------------------------------
+env = dict(re.findall(r"^([A-Z_]+)=(.*)$", ENV.read_text(), re.M)) if ENV.exists() else {}
+if env.get("HOST_PUBLICO") and env.get("SEGREDO"):
+    ota = f"https://{env['HOST_PUBLICO']}/{env['SEGREDO']}/http/xiaozhi/ota/"
+    cfg = XZ / "main/boards/sensecap-watcher/config.json"
+    placa = json.loads(cfg.read_text(encoding="utf-8"))
+    extra = placa["builds"][0]["sdkconfig_append"]
+    extra[:] = [l for l in extra if not l.startswith("CONFIG_OTA_URL=")] + [f'CONFIG_OTA_URL="{ota}"']
+    cfg.write_text(json.dumps(placa, ensure_ascii=False, indent=4) + "\n", encoding="utf-8")
+else:
+    problemas.append("servidor/.env sem HOST_PUBLICO/SEGREDO: endereço OTA não embutido")
+
+# 6. Mascote: Clawd (Claude Code) no lugar dos emojis ---------------------------
+#    A coleção vem de mascote-clawd/emocoes (gerada por mascote-clawd/gerar.py).
+ativos = XZ / "scripts/build_default_assets.py"
+trocar(ativos, "    # Special handling for otto-gif collection\n",
+       "    # Coleção local por caminho absoluto (mascote Clawd)\n"
+       "    if os.path.isabs(default_emoji_collection) and os.path.isdir(default_emoji_collection):\n"
+       "        return default_emoji_collection\n\n"
+       "    # Special handling for otto-gif collection\n")
+cmake = XZ / "main/CMakeLists.txt"
+trocar(cmake, """    set(BOARD_DIR "sensecap-watcher")
+    set(BUILTIN_TEXT_FONT font_noto_sans_basic_30_4)
+    set(BUILTIN_ICON_FONT font_material_symbols_20_4)
+    set(DEFAULT_EMOJI_COLLECTION noto-color-emoji_128)""", f"""    set(BOARD_DIR "sensecap-watcher")
+    set(BUILTIN_TEXT_FONT font_noto_sans_basic_30_4)
+    set(BUILTIN_ICON_FONT font_material_symbols_20_4)
+    set(DEFAULT_EMOJI_COLLECTION "{AQUI / 'mascote-clawd/emocoes'}")""")
+trocar(cmake, """            "${NOTO_FONTS_PATH}/png/${DEFAULT_EMOJI_COLLECTION}/*"
+        )""", """            "${NOTO_FONTS_PATH}/png/${DEFAULT_EMOJI_COLLECTION}/*"
+            "${DEFAULT_EMOJI_COLLECTION}/*"
+        )""")
+
+# 7. Tela redonda: fala em várias linhas abaixo do mascote ------------------------
+#    O padrão é uma faixa de uma linha rolando de lado no rodapé.
+import shutil
+placa_dir = XZ / "main/boards/sensecap-watcher"
+# Fontes geradas com lv_font_conv (ver fonte/README.md): fala, Mono das Configurações e logo da abertura
+for fonte_c in ("font_noto_sans_pt_24.c", "font_jetbrains_mono_pt_22.c", "font_jetbrains_mono_pt_18.c",
+                "font_ollie_logo_88.c"):
+    shutil.copy(AQUI / "fonte" / fonte_c, placa_dir / fonte_c)
+placa = placa_dir / "sensecap_watcher.cc"
+trocar(placa, '#include <iot_knob.h>\n', '#include <iot_knob.h>\n\n#include "abertura_watcher.h"  // tela de abertura com o logo\n#include "fontes_watcher.h"    // Noto Sans ou JetBrains Mono (Configurações)\n')
+trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
+            lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.75); // 限制宽度，避免文字贴边
+        }
+};""", """            AplicarLayoutRedondo();
+            AberturaWatcher::Mostrar();
+        }
+
+        // Fala em streaming na parte larga do círculo (412x412): 3 linhas visíveis, rola para baixo
+        static constexpr int kTextoLargura = 290;
+        static constexpr int kLinhasVisiveis = 3;
+        static constexpr int kTextoTopo = 200;
+        static constexpr int kSaudacaoTopo = 266;
+        static constexpr int kCarregandoTopo = 290;  // "Verificando atualização": abaixo do Clawd no centro    // saudação da espera: abaixo do Clawd centralizado
+        static constexpr uint32_t kTickFalaMs = 66;  // ~15 caracteres por segundo, o ritmo medido da voz
+
+        std::string fala_;            // texto completo do turno atual
+        size_t fala_exibida_ = 0;     // bytes de fala_ já na tela
+        std::string papel_atual_;
+        lv_timer_t* timer_fala_ = nullptr;
+
+        void AplicarLayoutRedondo() {
+            if (bottom_bar_ == nullptr || chat_message_label_ == nullptr) {
+                return;
+            }
+            lv_obj_set_size(bottom_bar_, kTextoLargura, lv_font_get_line_height(Fontes::Grande()) * kLinhasVisiveis + 4);
+            lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_pad_all(bottom_bar_, 0, 0);
+            lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_scroll_dir(bottom_bar_, LV_DIR_VER);
+            lv_obj_set_scrollbar_mode(bottom_bar_, LV_SCROLLBAR_MODE_OFF);
+            lv_obj_align(bottom_bar_, LV_ALIGN_TOP_MID, 0, kTextoTopo);
+            lv_obj_set_width(chat_message_label_, kTextoLargura);
+            lv_obj_set_height(chat_message_label_, LV_SIZE_CONTENT);
+            lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP);  // quebra linha (o modo de rolagem não quebra)
+            lv_obj_set_style_text_font(chat_message_label_, Fontes::Grande(), 0);
+            lv_obj_set_style_text_line_space(chat_message_label_, 0, 0);
+            lv_obj_set_style_text_align(chat_message_label_, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(chat_message_label_, LV_ALIGN_TOP_MID, 0, 0);
+            // Dia, data e hora menores no topo (a fonte do tema é grande para o arco da tela)
+            if (status_label_ != nullptr) {
+                lv_obj_set_style_text_font(status_label_, Fontes::Pequena(), 0);
+            }
+            // Volume e outras notificações do topo seguem a fonte escolhida em Ajustes
+            if (notification_label_ != nullptr) {
+                lv_obj_set_style_text_font(notification_label_, Fontes::Pequena(), 0);
+            }
+        }
+
+        // Com fala, o mascote encolhe um pouco e sobe; sem fala, volta ao centro
+        void PosicionarMascote(bool com_texto, int dy_centro = -25) {
+            if (emoji_box_ == nullptr) {
+                return;
+            }
+            if (com_texto) {
+                lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, 62);
+                if (emoji_image_ != nullptr) {
+                    lv_image_set_scale(emoji_image_, 220);
+                }
+            } else {
+                lv_obj_align(emoji_box_, LV_ALIGN_CENTER, 0, dy_centro);  // espera: um pouco acima do centro (a saudação fica embaixo)
+                if (emoji_image_ != nullptr) {
+                    lv_image_set_scale(emoji_image_, 256);
+                }
+            }
+        }
+
+        void RolarParaFim() {
+            lv_obj_update_layout(bottom_bar_);
+            int32_t falta = lv_obj_get_scroll_bottom(bottom_bar_);
+            if (falta > 0) {
+                lv_obj_scroll_by(bottom_bar_, 0, -falta, LV_ANIM_OFF);
+            }
+        }
+
+        static void TickFala(lv_timer_t* timer) {
+            static_cast<CustomLcdDisplay*>(lv_timer_get_user_data(timer))->AvancarFala();
+        }
+
+        // Mostra mais um pedaço da fala; acelera se o texto acumulado estiver muito à frente
+        void AvancarFala() {
+            if (chat_message_label_ == nullptr || fala_exibida_ >= fala_.size()) {
+                if (timer_fala_ != nullptr) {
+                    lv_timer_pause(timer_fala_);
+                }
+                return;
+            }
+            // Acompanha a voz: enquanto fala, só avança com o áudio tocando (espera o início e as pausas)
+            auto& app = Application::GetInstance();
+            if (app.GetDeviceState() == kDeviceStateSpeaking && app.GetAudioService().IsPlaybackIdle()) {
+                return;
+            }
+            size_t atraso = fala_.size() - fala_exibida_;
+            int passos = app.GetDeviceState() != kDeviceStateSpeaking ? 8 : (atraso > 200 ? 2 : 1);
+            for (int i = 0; i < passos && fala_exibida_ < fala_.size(); i++) {
+                fala_exibida_++;
+                while (fala_exibida_ < fala_.size() &&
+                       (static_cast<unsigned char>(fala_[fala_exibida_]) & 0xC0) == 0x80) {
+                    fala_exibida_++;  // não corta caracteres acentuados (UTF-8) ao meio
+                }
+            }
+            lv_label_set_text(chat_message_label_, fala_.substr(0, fala_exibida_).c_str());
+            RolarParaFim();
+        }
+
+        virtual void SetChatMessage(const char* role, const char* content) override {
+            DisplayLockGuard lock(this);
+            if (chat_message_label_ == nullptr || bottom_bar_ == nullptr) {
+                return;
+            }
+            std::string papel = role ? role : "";
+            std::string texto = content ? content : "";
+            CartaoWatcher::Instancia().RegistrarConversa(papel, texto);  // registro local no microSD
+            if (texto.empty()) {
+                fala_.clear();
+                fala_exibida_ = 0;
+                papel_atual_.clear();
+                if (timer_fala_ != nullptr) {
+                    lv_timer_pause(timer_fala_);
+                }
+                lv_label_set_text(chat_message_label_, "");
+                lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
+                PosicionarMascote(false);
+                return;
+            }
+            if (papel == "assistant" && papel_atual_ == "assistant") {
+                fala_ += " " + texto;  // próxima frase da mesma resposta
+            } else {
+                fala_ = texto;
+                fala_exibida_ = 0;
+                lv_obj_scroll_to_y(bottom_bar_, 0, LV_ANIM_OFF);
+            }
+            papel_atual_ = papel;
+            // Saudação da espera: Clawd fica no centro e o texto vai para baixo dele
+            bool saudacao = papel == "saudacao";
+            bool carregando = papel == "carregando";  // tela de "Verificando atualização"
+            lv_obj_align(bottom_bar_, LV_ALIGN_TOP_MID, 0,
+                         saudacao ? kSaudacaoTopo : (carregando ? kCarregandoTopo : kTextoTopo));
+            if (papel == "assistant") {
+                if (timer_fala_ == nullptr) {
+                    timer_fala_ = lv_timer_create(TickFala, kTickFalaMs, this);
+                }
+                lv_timer_resume(timer_fala_);
+            } else {
+                // O que o usuário falou e avisos do sistema aparecem de uma vez
+                fala_exibida_ = fala_.size();
+                lv_label_set_text(chat_message_label_, fala_.c_str());
+                RolarParaFim();
+            }
+            if (!hide_subtitle_) {
+                lv_obj_remove_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
+            }
+            if (carregando) {
+                PosicionarMascote(false, 0);  // Clawd no centro exato da tela
+            } else {
+                PosicionarMascote(!saudacao);
+            }
+        }
+
+        virtual void SetTheme(Theme* theme) override {
+            SpiLcdDisplay::SetTheme(theme);
+            DisplayLockGuard lock(this);
+            AplicarLayoutRedondo();
+        }
+};""")
+
+# 8. Tela inicial: dia da semana e data junto com a hora ("Seg, 05/10 · 16:20") ----
+trocar(XZ / "main/display/lvgl_display/lvgl_display.cc", """                char time_str[16];
+                strftime(time_str, sizeof(time_str), "%H:%M", tm_now);
+                SetStatus(time_str);""", """                static const char* const kDiasSemana[] = {"Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"};
+                char time_str[40];
+                snprintf(time_str, sizeof(time_str), "%s, %02d/%02d · %02d:%02d",
+                         kDiasSemana[tm_now->tm_wday % 7], tm_now->tm_mday, tm_now->tm_mon + 1,
+                         tm_now->tm_hour, tm_now->tm_min);
+                SetStatus(time_str);""")
+
+# 9. Reset de fábrica só depois de 20 s segurando a roda (original: 10 s) ---------
+trocar(placa, """            // 长按10s 恢复出厂设置: 2+0.02*400 = 10
+            if (self->long_press_cnt_ > 400) {""", """            // Segurar 20 s restaura as configurações de fábrica: 2 + 0,02 * 900 = 20
+            if (self->long_press_cnt_ > 900) {""")
+
+# 10. Dois cliques na roda: abre a gaveta de apps (ou volta); três cliques fecham (placa/gaveta_watcher.h) -----------
+trocar(placa, """        }, this);
+    }
+
+    void InitializeSpi() {""", """        }, this);
+
+        // Três cliques: fecha a gaveta de qualquer tela
+        static button_event_args_t tres_cliques = {};
+        tres_cliques.multiple_clicks.clicks = 3;
+        iot_button_register_cb(btns, BUTTON_MULTIPLE_CLICK, &tres_cliques, [](void* button_handle, void* usr_data) {
+            auto self = static_cast<SensecapWatcher*>(usr_data);
+            self->power_save_timer_->WakeUp();
+            if (self->gaveta_ != nullptr) {
+                self->gaveta_->Fechar();
+            }
+        }, this);
+
+        // Dois cliques: abre a gaveta; com ela aberta, volta (tela anterior do app, gaveta, ou fecha)
+        iot_button_register_cb(btns, BUTTON_DOUBLE_CLICK, nullptr, [](void* button_handle, void* usr_data) {
+            auto self = static_cast<SensecapWatcher*>(usr_data);
+            self->power_save_timer_->WakeUp();
+            if (self->gaveta_ != nullptr) {
+                self->gaveta_->AbrirOuVoltar();
+            }
+        }, this);
+    }
+
+    void InitializeSpi() {""")
+
+# 11. Tema escuro como padrão (o original começa no claro) ----------------------------
+#     Fixo no boot: o tema salvo na memória (gravado como "light" no 1º boot) venceria o padrão
+lcd = XZ / "main/display/lcd_display.cc"
+trocar(lcd, """    Settings settings("display", false);
+    std::string theme_name = settings.GetString("theme", "light");""", """    // Tema escolhido em Apps > Configurações (padrão: escuro)
+    Settings watcher_settings("watcher", false);
+    std::string theme_name = watcher_settings.GetString("tema");
+    if (theme_name.empty()) {
+        theme_name = "dark";
+    }""")
+
+# 12. Gaveta de ações, navegador de sessões, gravação e avisos (placa/*.h) -------------
+for arq in (AQUI / "placa").rglob("*.h"):
+    destino_arq = placa_dir / arq.relative_to(AQUI / "placa")
+    destino_arq.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(arq, destino_arq)
+trocar(XZ / "main/protocols/protocol.h", "    virtual bool OpenAudioChannel() = 0;",
+       "    virtual bool OpenAudioChannel() = 0;\n    // Mensagem própria (ex.: {\"type\":\"reuniao\"}) pelo mesmo canal\n    bool SendJson(const std::string& json) { return SendText(json); }")
+trocar(XZ / "main/application.h", "    void StopListening();",
+       "    void StopListening();\n    void EnviarJson(const std::string& json);  // mensagem própria ao servidor (reunião)")
+trocar(XZ / "main/application.cc", "void Application::StopListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING); }",
+       """void Application::StopListening() { xEventGroupSetBits(event_group_, MAIN_EVENT_STOP_LISTENING); }
+
+void Application::EnviarJson(const std::string& json) {
+    Schedule([this, json]() {
+        if (protocol_) {
+            protocol_->SendJson(json);
+        }
+    });
+}""")
+trocar(placa, '#include <iot_knob.h>\n', '#include <iot_knob.h>\n#include "registro_apps.h"\n')
+trocar(placa, """    static SensecapWatcher* instance_;""", """    static SensecapWatcher* instance_;
+    GavetaWatcher* gaveta_ = nullptr;""")
+trocar(placa, """        InitializeCamera();
+    }""", """        InitializeCamera();
+        if (IoExpanderGetLevel(BSP_SD_GPIO_DET) == 0) {  // cartão presente
+            CartaoWatcher::Instancia().Montar(BSP_SD_SPI_NUM, BSP_SD_SPI_CS);
+        }
+        gaveta_ = new GavetaWatcher(display_);
+        gaveta_->Contexto().definir_tela_apaga_s = [this](int s) { power_save_timer_->SetSecondsToSleep(s); };
+        gaveta_->Contexto().definir_desliga_s = [this](int s) { power_save_timer_->SetSecondsToShutdown(s); };
+        RegistrarApps(*gaveta_);
+        gaveta_->Iniciar();
+    }""")
+trocar(placa, """    void OnKnobRotate(bool clockwise) {
+        auto codec = GetAudioCodec();""", """    void OnKnobRotate(bool clockwise) {
+        if (gaveta_ != nullptr && gaveta_->Girar(clockwise)) {
+            return;  // painel aberto: a roda navega
+        }
+        auto codec = GetAudioCodec();""")
+trocar(placa, """            app.ToggleChatState();""", """            if (self->gaveta_ != nullptr && self->gaveta_->Clicar()) {
+                return;  // painel aberto: o clique escolhe
+            }
+            app.ToggleChatState();""")
+
+# 13. microSD e gravação local: gancho de áudio, microfone ligado durante a reunião, cartão na placa
+app_h, app_cc = XZ / "main/application.h", XZ / "main/application.cc"
+trocar(app_h, "    void EnviarJson(const std::string& json);  // mensagem própria ao servidor (reunião)",
+       """    void EnviarJson(const std::string& json);  // mensagem própria ao servidor (reunião)
+    // Reunião: cópia de cada pacote de áudio (microSD) e microfone ligado mesmo sem conexão
+    void DefinirGanchoAudio(std::function<void(const std::vector<uint8_t>&)> gancho) { gancho_audio_ = std::move(gancho); }
+    void GravacaoLocal(bool ligada);
+    std::function<void(const std::vector<uint8_t>&)> gancho_audio_;
+    bool gravacao_local_ = false;""")
+trocar(app_cc, """            while (auto packet = audio_service_.PopPacketFromSendQueue()) {
+                if (protocol_ && !protocol_->SendAudio(std::move(packet))) {""", """            while (auto packet = audio_service_.PopPacketFromSendQueue()) {
+                if (gancho_audio_) {
+                    gancho_audio_(packet->payload);  // cópia da reunião no microSD
+                }
+                if (protocol_ && !protocol_->SendAudio(std::move(packet))) {""")
+trocar(app_cc, """                    while (audio_service_.PopPacketFromSendQueue())
+                        ;
+                    break;""", """                    while (auto resto = audio_service_.PopPacketFromSendQueue()) {
+                        if (gancho_audio_) {
+                            gancho_audio_(resto->payload);  // sem conexão, a reunião segue no cartão
+                        }
+                    }
+                    break;""")
+trocar(app_cc, """            audio_service_.EnableVoiceProcessing(false);
+            audio_service_.EnableWakeWordDetection(true);
+            break;""", """            audio_service_.EnableVoiceProcessing(gravacao_local_);  // reunião continua gravando sem conexão
+            audio_service_.EnableWakeWordDetection(!gravacao_local_);
+            break;""")
+trocar(app_cc, """void Application::EnviarJson(const std::string& json) {""", """void Application::GravacaoLocal(bool ligada) {
+    Schedule([this, ligada]() {
+        gravacao_local_ = ligada;
+        if (GetDeviceState() == kDeviceStateIdle) {
+            audio_service_.EnableWakeWordDetection(!ligada);
+            audio_service_.EnableVoiceProcessing(ligada);
+        }
+    });
+}
+
+void Application::EnviarJson(const std::string& json) {""")
+trocar(XZ / "main/CMakeLists.txt", """if(CONFIG_BOARD_TYPE_ESP32_P4_FUNCTION_EV_BOARD)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA""", """if(CONFIG_BOARD_TYPE_SEEED_STUDIO_SENSECAP_WATCHER)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA esp_driver_sdspi sdmmc)  # microSD do Watcher
+endif()
+if(CONFIG_BOARD_TYPE_ESP32_P4_FUNCTION_EV_BOARD)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA""")
+
+
+# 14. Tela: tempos das Configurações, tela apaga (brilho 0) e a roda também acorda ------------------
+trocar(XZ / "main/boards/common/power_save_timer.h", "    void WakeUp();",
+       "    void WakeUp();\n    void SetSecondsToSleep(int s) { seconds_to_sleep_ = s; ticks_ = 0; }      // -1 = nunca\n"
+       "    void SetSecondsToShutdown(int s) { seconds_to_shutdown_ = s; ticks_ = 0; }")
+trocar(placa, """        power_save_timer_ = new PowerSaveTimer(-1, 60, 300);""",
+       """        Settings ajustes("watcher", false);  // Apps > Configurações
+        power_save_timer_ = new PowerSaveTimer(-1, ajustes.GetInt("tela_s", 60), ajustes.GetInt("desliga_s", 300));""")
+trocar(placa, """            GetDisplay()->SetPowerSaveMode(true);
+            GetBacklight()->SetBrightness(10);""", """            GetDisplay()->SetPowerSaveMode(true);
+            GetBacklight()->SetBrightness(0);  // tela apaga""")
+trocar(placa, """    void OnKnobRotate(bool clockwise) {""", """    void OnKnobRotate(bool clockwise) {
+        power_save_timer_->WakeUp();  // girar a roda acorda a tela""")
+
+# 15. Palavra de ativação personalizada no build.py: --wake-word "custom:hey ollie|Ollie" --------
+#     MultiNet7 em inglês (fonemas gerados no aparelho pelo flite_g2p do ESP-SR).
+trocar(XZ / "scripts/build.py", """    if target not in _ESP_WAKE_WORD_TARGETS | _AFE_WAKE_WORD_TARGETS:
+        raise ValueError(f"Wake-word selection is not supported for target {target}")""", """    if normalized.startswith("custom:"):
+        frase, _, exibicao = wake_word.split(":", 1)[1].partition("|")
+        frase = frase.strip().lower()
+        exibicao = (exibicao or frase).strip()
+        options.extend([
+            "CONFIG_USE_CUSTOM_WAKE_WORD=y",
+            f'CONFIG_CUSTOM_WAKE_WORD="{frase}"',
+            f'CONFIG_CUSTOM_WAKE_WORD_DISPLAY="{exibicao}"',
+            "CONFIG_CUSTOM_WAKE_WORD_THRESHOLD=20",
+            "CONFIG_SR_MN_CN_NONE=y",
+            "CONFIG_SR_MN_EN_MULTINET7_QUANT=y",
+        ])
+        return "custom", options, ["CONFIG_USE_CUSTOM_WAKE_WORD"]
+
+    if target not in _ESP_WAKE_WORD_TARGETS | _AFE_WAKE_WORD_TARGETS:
+        raise ValueError(f"Wake-word selection is not supported for target {target}")""")
+
+# 16. Clawd anima conforme o estado: conectando, ouvindo e falando ---------------------------
+#     Enquanto fala, a animação "falando" vale mais que a emoção escolhida pelo LLM.
+trocar(app_cc, """            display->SetStatus(Lang::Strings::CONNECTING);
+            display->SetEmotion("neutral");""", """            display->SetStatus(Lang::Strings::CONNECTING);
+            display->SetEmotion("conectando");""")
+trocar(app_cc, """            display->SetStatus(Lang::Strings::LISTENING);
+            display->SetEmotion("neutral");""", """            display->SetStatus(Lang::Strings::LISTENING);
+            display->SetEmotion("ouvindo");""")
+trocar(app_cc, """            display->SetStatus(Lang::Strings::SPEAKING);
+
+            if (listening_mode_ != kListeningModeRealtime) {""", """            display->SetStatus(Lang::Strings::SPEAKING);
+            display->SetEmotion("falando");
+
+            if (listening_mode_ != kListeningModeRealtime) {""")
+trocar(app_cc, """                Schedule([display, emotion_str = std::string(emotion->valuestring)]() {
+                    display->SetEmotion(emotion_str.c_str());""", """                Schedule([this, display, emotion_str = std::string(emotion->valuestring)]() {
+                    if (GetDeviceState() == kDeviceStateSpeaking) return;  // mantém o Clawd falando
+                    display->SetEmotion(emotion_str.c_str());""")
+
+# 17. Palavra de ativação = "Hey <nome do agente>" escolhido em Configurações (Settings watcher/agente)
+#     O nome compilado (CONFIG_CUSTOM_WAKE_WORD) vale até a primeira escolha. Lido ao iniciar.
+cww = XZ / "main/audio/wake_words/custom_wake_word.cc"
+trocar(cww, '#include "assets.h"\n', '#include "assets.h"\n#include "settings.h"\n\n#include <algorithm>\n#include <cctype>\n')
+trocar(cww, """        ParseWakenetModelConfig();
+    }
+""", """        ParseWakenetModelConfig();
+    }
+
+    // Nome do agente escolhido no Watcher: troca a frase de ativação (a do pacote de assets ou a compilada)
+    {
+        Settings ajustes("watcher", false);
+        std::string agente = ajustes.GetString("agente");
+        if (!agente.empty()) {
+            std::string frase = "hey " + agente;
+            std::transform(frase.begin(), frase.end(), frase.begin(), [](unsigned char ch) { return std::tolower(ch); });
+            if (frase == "hey clawd") {
+                frase = "hey claude";  // mesma pronúncia, fonemas mais confiáveis
+            }
+            bool trocou = false;
+            for (auto& c : commands_) {
+                if (c.action == "wake") {
+                    c.command = frase;
+                    c.text = agente;
+                    trocou = true;
+                }
+            }
+            if (!trocou) {
+                commands_.push_back({frase, agente, "wake"});
+            }
+            ESP_LOGI(TAG, "Palavra de ativação do agente: %s (%s)", frase.c_str(), agente.c_str());
+        }
+    }
+""")
+
+# 18. Tela de carregamento: "Verificando atualização" no centro (no topo ele rolava e saía do arco)
+#     e sem a linha técnica (nome da placa/versão) que aparecia ao ligar
+trocar(app_cc, """    display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());""",
+       """    ESP_LOGI(TAG, "%s", SystemInfo::GetUserAgent().c_str());  // fica só no log""")
+trocar(app_cc, """        display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
+""", """        display->SetStatus("");
+        display->SetChatMessage("carregando", Lang::Strings::CHECKING_NEW_VERSION);
+""")
+trocar(XZ / "main/assets/locales/pt-BR/language.json", '"CHECKING_NEW_VERSION": "Verificando nova versão..."',
+       '"CHECKING_NEW_VERSION": "Verificando atualização..."')
+
+# 19. Getter da gravação local (o serviço de silêncio não encerra a escuta durante uma reunião)
+trocar(app_h, """    bool IsVoiceDetected() const { return audio_service_.IsVoiceDetected(); }""",
+       """    bool IsVoiceDetected() const { return audio_service_.IsVoiceDetected(); }
+    bool GravandoLocal() const { return gravacao_local_; }""")
+
+if problemas:
+    print("Problemas:\n  " + "\n  ".join(problemas))
+    sys.exit(1)
+print("Patches aplicados.")

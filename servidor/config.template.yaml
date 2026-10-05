@@ -1,0 +1,135 @@
+# Gerado em xiaozhi-server/data/.config.yaml pelo iniciar.sh (valores ${...} vêm do .env).
+# Só sobrescreve o que muda em relação ao config.yaml original do xiaozhi-server.
+
+server:
+  ip: 127.0.0.1          # só local; a internet chega pelo Tailscale Funnel
+  port: 8000
+  http_port: 8003
+  websocket: wss://${HOST_PUBLICO}/${SEGREDO}/ws/xiaozhi/v1/
+  vision_explain: https://${HOST_PUBLICO}/${SEGREDO}/http/mcp/vision/explain
+  timezone_offset: -3
+  auth_key: ${AUTH_KEY}
+  auth:
+    enabled: true
+    allowed_devices: []
+    expire_seconds: 2592000
+
+log:
+  log_level: INFO
+
+close_connection_no_voice_time: 120
+tool_call_timeout: 70
+enable_greeting: true
+enable_websocket_ping: true
+
+# O firmware detecta "Hey Ollie" e manda "Ollie" ao servidor, que responde com uma frase curta pronta
+wakeup_words:  # nomes que o agente pode ter (Configurações do Watcher)
+  - "Ollie"
+  - "ollie"
+  - "hey ollie"
+  - "Clawd"
+  - "clawd"
+  - "hey clawd"
+  - "Jarvis"
+  - "jarvis"
+  - "hey jarvis"
+  - "Nova"
+  - "nova"
+  - "hey nova"
+  - "Atlas"
+  - "atlas"
+  - "hey atlas"
+  - "Luna"
+  - "luna"
+  - "hey luna"
+  - "Max"
+  - "max"
+  - "hey max"
+  - "Iris"
+  - "iris"
+  - "hey iris"
+exit_commands:
+  - "tchau"
+  - "até logo"
+  - "pode dormir"
+
+plugins: {}
+
+prompt: |
+  Você é o Ollie, assistente de voz do usuário. Seu nome é Ollie (o usuário chama você dizendo "Hey Ollie"), rodando num SenseCAP Watcher e conectado ao Mac dele.
+  Fale sempre em português do Brasil, frases curtas e diretas, porque tudo vira áudio. Sem markdown, sem listas, sem emojis.
+
+  O que você controla pelo Mac mini:
+  - Sessões de agentes no herdr (Claude Code e Codex): sessoes_listar, sessao_ler, sessao_instruir, sessao_responder.
+  - Perguntas sobre projetos, sem alterar nada: claude_perguntar (padrão) e codex_perguntar.
+  - Trabalho novo: claude_nova_sessao e codex_nova_sessao abrem uma sessão no herdr.
+  - Multica: multica_issues, multica_agentes, multica_criar_issue, multica_comentar, multica_autopilot, multica_status.
+  - Mac: mac_status, mac_atalhos_listar, mac_atalho_executar, mac_notificar.
+  - Tempo: previsao_tempo (sem cidade = onde o Watcher está).
+  - Uso do plano do Claude (limites de 5 h e da semana): uso_claude.
+  - Lembretes e notas: lembrete_salvar ("lembra que...", "anota..."), lembretes_listar, lembrete_apagar. Também vão para a memória offline do Watcher.
+  - Conversas antigas: conversas_buscar (termo opcional) quando ele perguntar o que já conversaram ou o que ele disse antes. Você lembra de todas as conversas anteriores (os resumos recentes estão na memória); nunca diga que só enxerga a conversa atual.
+
+  Regras:
+  1. Ao relatar sessões, use o campo situacao: diga quantas esperam você, quantas trabalham, quantas têm subagentes rodando e quais concluíram recentemente (com o que concluíram, pela ultima_fala resumida e há quanto tempo). Não diga que estão todas paradas se houver subagentes rodando ou conclusões recentes. Não leia ids em voz alta.
+  2. Para saber o que uma sessão fez ou pede, use sessao_ler e resuma em uma ou duas frases.
+  3. Ferramentas que mudam algo devolvem PRECISA_CONFIRMAR. Repita em uma frase o que vai fazer e pergunte "confirma?". Só chame de novo com confirmado=true se o usuário disser sim. Nunca confirme por conta própria.
+  4. Antes de responder a um pedido de permissão (sessao_responder), leia a sessão e explique a opção; aprovar costuma ser enter ou 1.
+  5. Se uma ferramenta disser AINDA_PENSANDO, avise que está demorando e que ele pode perguntar "e aí, o Claude respondeu?"; então use tarefa_resultado.
+  6. Se não souber o projeto, use projetos_listar ou pergunte.
+
+prompt_template: agent-base-prompt-ptbr.txt
+system_error_response: "Tive um problema agora. Tenta de novo daqui a pouco."
+end_prompt:
+  enable: true
+  prompt: |
+    Encerre a conversa com uma frase curta e simpática em português.
+
+selected_module:
+  VAD: SileroVAD
+  ASR: OpenaiASR      # tipo "openai" = qualquer API compatível (OpenRouter, OpenAI...)
+  LLM: OpenAILLM
+  VLLM: OpenAIVLLM
+  TTS: OpenAITTS
+  Memory: nomem
+  Intent: function_call
+
+Intent:
+  function_call:
+    type: function_call
+    functions:
+      - previsao_tempo
+
+ASR:
+  OpenaiASR:
+    type: openai
+    api_key: ${API_KEY}
+    base_url: ${API_BASE_URL}/audio/transcriptions
+    model_name: ${MODELO_ASR}
+    output_dir: tmp/
+
+LLM:
+  OpenAILLM:
+    type: openai
+    base_url: ${API_BASE_URL}
+    model_name: ${MODELO_LLM}
+    api_key: ${API_KEY}
+
+VLLM:
+  OpenAIVLLM:
+    type: openai
+    url: ${API_BASE_URL}
+    model_name: ${MODELO_LLM}
+    api_key: ${API_KEY}
+
+TTS:
+  OpenAITTS:
+    type: openai
+    api_key: ${API_KEY}
+    api_url: ${API_BASE_URL}/audio/speech
+    model: ${MODELO_TTS}
+    voice: ${VOZ}
+    speed: 1.05
+    format: ${TTS_FORMATO}
+    language: português do Brasil
+    output_dir: tmp/

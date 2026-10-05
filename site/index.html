@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Xiaozhi Ollie</title>
+<meta name="description" content="Keeps an eye on your agents, and steers them. A modified XiaoZhi firmware for the SenseCAP Watcher that works with Claude Code, Codex, herdr and macOS.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans:wght@400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Sharp:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+/* Layout: hardware product page. The hero object is a working mockup of the SenseCAP Watcher;
+   below it, spec-sheet bands with mono labels, like the printing on a device housing. */
+:root {
+  /* Color: warm grey of a workbench, dark ink, Clawd orange */
+  --bg: #ecebe7;
+  --surface: #f7f6f3;
+  --ink: #1c1b1a;
+  --muted: #67625c;
+  --line: #d5d1ca;
+  --accent: #b9542f;          /* Clawd orange, darkened for text on light ground */
+  --clawd: #d97757;           /* the exact firmware orange */
+  --code-bg: #1c1b1a;
+  --code-fg: #ece7e1;
+  --shadow: rgba(40, 30, 20, .28);
+
+  /* Type: Archivo (wide, square grotesque) for display, IBM Plex Sans for text, JetBrains Mono for labels */
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --gutter: clamp(16px, 4vw, 40px);
+  --max: 1120px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161514; --surface: #1f1d1c; --ink: #ece8e3; --muted: #a39b93; --line: #34302d;
+    --accent: #e48b6b; --code-bg: #0e0d0c; --code-fg: #ece7e1; --shadow: rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161514; --surface: #1f1d1c; --ink: #ece8e3; --muted: #a39b93; --line: #34302d;
+  --accent: #e48b6b; --code-bg: #0e0d0c; --code-fg: #ece7e1; --shadow: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.6 var(--body); }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+img { max-width: 100%; }
+code { font: 400 .88em var(--mono); }
+.wrap { max-width: var(--max); margin: 0 auto; padding-inline: var(--gutter); }
+.label { font: 500 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h2 { font-size: clamp(30px, 4.4vw, 48px); font-weight: 800; font-stretch: 112%; line-height: 1.02; letter-spacing: -.015em; }
+h3 { font-size: 19px; font-weight: 700; font-stretch: 105%; line-height: 1.25; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 60ch; }
+.icon { font-family: "Material Symbols Sharp"; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal;
+  text-transform: none; white-space: nowrap; direction: ltr; -webkit-font-smoothing: antialiased; font-feature-settings: "liga"; }
+
+/* ---------- top ---------- */
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; padding-block: 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+section[id] { scroll-margin-top: 72px; }  /* anchors land below the fixed header */
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.wordmark { font: 800 26px/1 var(--display); font-stretch: 118%; color: var(--clawd); text-decoration: none; letter-spacing: -.01em; }
+.nav { display: flex; gap: 20px; flex-wrap: wrap; font: 500 13px/1 var(--mono); }
+.nav a { color: var(--ink); text-decoration: none; }
+.nav a:hover { color: var(--accent); }
+
+/* ---------- hero ---------- */
+.hero { padding-block: clamp(24px, 5vw, 56px) clamp(40px, 6vw, 72px); }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(32px, 6vw, 72px); align-items: center; }
+.hero-copy { display: grid; gap: 22px; min-width: 0; }
+.hero h1 { font-size: clamp(72px, 12vw, 148px); font-weight: 900; font-stretch: 122%; color: var(--clawd); letter-spacing: -.035em; line-height: .86; }
+.hero .tagline { font: 700 clamp(24px, 3vw, 32px)/1.15 var(--display); font-stretch: 110%; }
+.hero .lede { font-size: 18px; }
+.ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 4px;
+  font: 600 15px/1 var(--body); text-decoration: none; border: 1px solid var(--ink); color: var(--ink); background: transparent; }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn:hover { border-color: var(--accent); }
+.specs { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.specs span { font: 500 12px/1.4 var(--mono); color: var(--muted); }
+.specs span b { color: var(--ink); font-weight: 500; }
+
+/* ---------- works with ---------- */
+.works { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding-block: 22px; }
+.works .wrap { display: flex; align-items: center; gap: 14px 40px; flex-wrap: wrap; }
+.works ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 12px 36px; flex-wrap: wrap; }
+.works li { font: 700 20px/1 var(--display); font-stretch: 112%; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+.works li .icon { font-size: 22px; color: var(--clawd); }
+
+/* ---------- Watcher mockup ---------- */
+.sim { display: grid; justify-items: center; gap: 18px; min-width: 0; }
+.device {
+  --w: min(440px, 86vw);
+  position: relative; width: var(--w); max-width: 100%; aspect-ratio: 400 / 400;
+  filter: drop-shadow(0 26px 30px var(--shadow));
+}
+.device svg.body { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.knob { /* click target over the drawn wheel */
+  position: absolute; left: 76%; top: 12%; width: 17%; height: 17%; border-radius: 50%; z-index: 1;
+  background: transparent; border: 0; cursor: pointer; padding: 0;
+}
+.knob:active + svg .wheel, .knob:active ~ svg .wheel { transform: rotate(8deg); }
+.screen {
+  --size: calc(var(--w) * 256 / 400);
+  --u: calc(var(--size) / 412);
+  position: absolute; left: calc(100% * (205 - 128) / 400); top: calc(100% * (215 - 128) / 400);
+  width: var(--size); height: var(--size); border-radius: 50%;
+  background: #000; overflow: hidden; color: #ededed;
+  font-family: "Noto Sans", sans-serif; user-select: none;
+}
+.mono-on .screen { font-family: "JetBrains Mono", monospace; }
+.status { position: absolute; top: calc(42 * var(--u)); left: 0; right: 0; text-align: center; font-size: calc(22 * var(--u)); font-variant-numeric: tabular-nums; }
+.mascot { position: absolute; left: 50%; top: 50%; width: calc(150 * var(--u)); height: calc(150 * var(--u));
+  transform: translate(-50%, -50%); image-rendering: pixelated; }
+/* Clawd stays in the center of the screen; speech sits below him, inside the circle */
+.speech { position: absolute; top: calc(288 * var(--u)); left: 50%; transform: translateX(-50%);
+  width: calc(262 * var(--u)); height: calc(27 * 3 * var(--u)); overflow: hidden;
+  font-size: calc(22 * var(--u)); line-height: calc(27 * var(--u)); text-align: center; display: none; }
+.talking .speech { display: block; }
+.speech-inner { position: absolute; left: 0; right: 0; bottom: 0; }
+.speech.user { color: #9a9a9a; }
+.speech.sys { color: var(--clawd); }
+.arcs { position: absolute; inset: 0; width: 100%; height: 100%; }
+.usage { position: relative; display: grid; justify-items: center; gap: calc(2 * var(--u)); }
+.usage .u-h { color: var(--clawd); font-size: calc(24 * var(--u)); margin-bottom: calc(10 * var(--u)); }
+.usage .u-v { font-size: calc(26 * var(--u)); line-height: 1.2; }
+.usage .u-s { font-size: calc(17 * var(--u)); color: #9a9a9a; margin-bottom: calc(8 * var(--u)); }
+.panel { position: absolute; inset: 0; background: #000; display: none; }
+.panel.open { display: block; }
+.panel-title { position: absolute; top: calc(50 * var(--u)); left: 0; right: 0; text-align: center; color: var(--clawd); font-size: calc(24 * var(--u)); }
+.rows { position: absolute; top: calc(92 * var(--u)); left: 50%; transform: translateX(-50%); width: calc(330 * var(--u)); }
+.row { position: absolute; left: 50%; transform: translateX(-50%); height: calc(72 * var(--u));
+  width: calc(290 * var(--u)); border-radius: calc(18 * var(--u)); background: rgba(28,28,28,.7);
+  display: flex; align-items: center; gap: calc(12 * var(--u)); padding-inline: calc(14 * var(--u)); }
+.row.cur { width: calc(320 * var(--u)); background: var(--clawd); color: #000; }
+.row .icon { font-size: calc(30 * var(--u)); color: var(--clawd); width: calc(36 * var(--u)); }
+.row.cur .icon { color: #000; }
+.row .tx { min-width: 0; }
+.row .t { font-size: calc(22 * var(--u)); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .d { font-size: calc(17 * var(--u)); color: #9a9a9a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.cur .d { color: #2a140c; }
+.app-view { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: calc(70 * var(--u)); }
+.app-view .big { font-size: calc(24 * var(--u)); }
+.app-view .small { font-size: calc(17 * var(--u)); color: #9a9a9a; margin-top: calc(10 * var(--u)); }
+.toast { position: absolute; left: 50%; bottom: calc(56 * var(--u)); transform: translateX(-50%);
+  background: #1c1c1c; color: #ededed; border-radius: 999px; padding: calc(8 * var(--u)) calc(18 * var(--u));
+  font-size: calc(18 * var(--u)); opacity: 0; transition: opacity .2s; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.toast.show { opacity: 1; }
+.boot { position: absolute; inset: 0; background: #000; display: grid; place-items: center; transition: opacity .5s; z-index: 2; }
+.boot.gone { opacity: 0; pointer-events: none; }
+.boot-inner { display: grid; justify-items: center; gap: calc(4 * var(--u)); }
+.boot img { width: calc(140 * var(--u)); image-rendering: pixelated; }
+.boot .logo { font: 900 calc(84 * var(--u))/1 var(--display); font-stretch: 122%; letter-spacing: -.03em; color: var(--clawd); margin-top: calc(10 * var(--u)); }
+.boot .tag { font-size: calc(20 * var(--u)); color: #c8c8c8; margin-top: calc(12 * var(--u)); }
+.boot .ver { font-size: calc(20 * var(--u)); color: #6e6e6e; }
+
+.controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 440px; }
+.controls button { font: 500 13px/1 var(--mono); padding: 10px 12px; border-radius: 4px; cursor: pointer;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.controls button:hover { border-color: var(--accent); }
+.controls kbd { font: inherit; color: var(--accent); }
+.sim-note { font: 400 12px/1.5 var(--mono); color: var(--muted); text-align: center; max-width: 46ch; }
+
+/* ---------- bands ---------- */
+section.band { padding-block: clamp(56px, 8vw, 96px); border-top: 1px solid var(--line); }
+.works + section.band { border-top: 0; }
+.band-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px 48px; align-items: end; margin-bottom: 40px; }
+.band-head .label { grid-column: 1 / -1; }
+
+.asks { display: grid; border-top: 1px solid var(--line); }
+.ask { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 40px; padding-block: 18px; border-bottom: 1px solid var(--line); }
+.ask q { font: 700 20px/1.3 var(--display); font-stretch: 105%; quotes: "“" "”"; }
+.ask p { color: var(--muted); }
+
+.gestures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.gesture { background: var(--surface); padding: 22px; display: grid; gap: 8px; align-content: start; }
+.gesture .g { font: 500 13px/1 var(--mono); color: var(--accent); }
+.gesture .clicks { display: flex; gap: 5px; height: 12px; align-items: center; }
+.gesture .clicks i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); display: block; }
+.gesture .clicks i.hold { width: 46px; border-radius: 2px; }
+.gesture .clicks i.long { width: 120px; border-radius: 2px; background: var(--accent); }
+.gesture .clicks .turn { font-size: 16px; }
+
+.apps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 32px; }
+.app { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 14px; align-items: start; }
+.app .icon { grid-row: span 2; font-size: 26px; color: var(--clawd); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; width: 40px; height: 40px; display: grid; place-items: center; }
+.app p { color: var(--muted); font-size: 15px; line-height: 1.5; }
+
+.clawd-groups { display: grid; gap: 40px; }
+.clawd-group h3 { margin-bottom: 6px; }
+.clawd-group > p { color: var(--muted); font-size: 15px; margin-bottom: 18px; max-width: 70ch; }
+.gifs { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.gif { background: #0b0b0b; border-radius: 6px; padding: 10px 6px 8px; display: grid; justify-items: center; gap: 4px; }
+.gif img { width: 80px; height: 80px; image-rendering: pixelated; }
+.gif span { font: 400 11px/1.3 var(--mono); color: #b9b2ab; text-align: center; }
+
+.flow { display: grid; max-width: 820px; }
+.hop { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 6px 28px; padding-block: 18px; border-top: 1px solid var(--line); }
+.hop:last-child { border-bottom: 1px solid var(--line); }
+.hop .label { padding-top: 4px; }
+.hop h3 { margin-bottom: 4px; }
+.hop p { color: var(--muted); font-size: 15px; }
+.hop .via { font: 400 13px/1.5 var(--mono); color: var(--accent); margin-top: 6px; }
+
+.devices { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.device-tier { background: var(--surface); padding: 26px; display: grid; gap: 10px; align-content: start; }
+.device-tier.main { background: var(--ink); color: var(--bg); }
+.device-tier.main .label { color: var(--clawd); }
+.device-tier.main p { color: inherit; opacity: .8; }
+.device-tier h3 { font-size: 24px; font-weight: 800; font-stretch: 110%; }
+.device-tier p { color: var(--muted); font-size: 15px; }
+.device-list { list-style: none; margin: 6px 0 4px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+.device-list li { font: 400 13px/1.4 var(--mono); padding-block: 9px; border-bottom: 1px solid var(--line); }
+.device-tier .fine { font-size: 13px; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 15px; }
+th, td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font: 500 12px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+td:first-child { font-weight: 600; white-space: nowrap; }
+td:nth-child(2) { color: var(--muted); }
+
+.install { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 40px; }
+.reqs { display: grid; gap: 14px; align-content: start; }
+.reqs ul { margin: 0; padding-left: 20px; display: grid; gap: 10px; color: var(--muted); }
+pre { margin: 0; background: var(--code-bg); color: var(--code-fg); border-radius: 6px; padding: 22px; overflow-x: auto; font: 400 14px/1.7 var(--mono); }
+pre .c { color: #8f877f; }
+pre .k { color: #e8a083; }
+
+footer { border-top: 1px solid var(--line); padding-block: 40px 56px; }
+footer .wrap { display: grid; gap: 14px; }
+footer p { color: var(--muted); font-size: 14px; max-width: 80ch; }
+
+@media (max-width: 880px) {
+  .hero .wrap, .band-head, .install, .devices { grid-template-columns: minmax(0, 1fr); }
+  .apps, .gestures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  .apps, .gestures, .ask, .hop, .device-list { grid-template-columns: minmax(0, 1fr); }
+  .nav { gap: 14px; }
+  .works li { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="wordmark" href="#">Ollie</a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#voice">Voice</a>
+      <a href="#wheel">Wheel</a>
+      <a href="#apps">Apps</a>
+      <a href="#clawd">Clawd</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#devices">Devices</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/gabrielvaz/xiaozhi-ollie">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <span class="label">Modified XiaoZhi firmware · SenseCAP Watcher and more</span>
+      <h1>Ollie</h1>
+      <p class="tagline">Keeps an eye on your agents, and steers them.</p>
+      <p class="lede">Xiaozhi Ollie is based on the original <a href="https://github.com/78/xiaozhi-esp32">XiaoZhi</a> firmware, modified to turn the SenseCAP Watcher into a voice companion for your desk. Say “Hey Ollie” to check on your Claude Code and Codex sessions, approve a request, record a meeting or see how much of your plan is left. Clawd shows what is going on.</p>
+      <div class="ctas">
+        <a class="btn primary" href="#install">Install</a>
+        <a class="btn" href="#apps">See the apps</a>
+        <a class="btn" href="https://github.com/gabrielvaz/xiaozhi-ollie">GitHub</a>
+      </div>
+      <div class="specs" aria-label="Specs">
+        <span><b>Base</b> XiaoZhi v2.5.0</span>
+        <span><b>Chip</b> ESP32-S3 · 32 MB flash · 8 MB PSRAM</span>
+        <span><b>Display</b> 1.45″ round, 412 × 412</span>
+        <span><b>Build</b> ESP-IDF v6.1</span>
+      </div>
+    </div>
+
+    <div class="sim" id="sim">
+      <div class="device">
+        <button class="knob" id="knob" type="button" aria-label="Wheel: click once, twice or three times; scroll over the screen to turn it"></button>
+        <svg class="body" viewBox="0 0 400 400" aria-hidden="true">
+          <defs>
+            <linearGradient id="shell" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#fbfaf8"/>
+              <stop offset=".55" stop-color="#ecebe7"/>
+              <stop offset="1" stop-color="#d4d1cb"/>
+            </linearGradient>
+            <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ffffff"/>
+              <stop offset="1" stop-color="#c9c5bf"/>
+            </linearGradient>
+            <radialGradient id="glass" cx=".35" cy=".3" r=".8">
+              <stop offset="0" stop-color="#1b1b1d"/>
+              <stop offset="1" stop-color="#050505"/>
+            </radialGradient>
+            <radialGradient id="lens" cx=".4" cy=".35" r=".7">
+              <stop offset="0" stop-color="#3a4a66"/>
+              <stop offset=".5" stop-color="#101418"/>
+              <stop offset="1" stop-color="#000"/>
+            </radialGradient>
+          </defs>
+          <!-- wheel: mostly hidden behind the shell, only its edge sticks out at the top-right corner -->
+          <g class="wheel" style="transform-origin: 338px 82px">
+            <circle cx="338" cy="82" r="32" fill="#232323"/>
+            <g fill="#3a3a3a" id="teeth"></g>
+            <circle cx="338" cy="82" r="23" fill="#2c2c2c"/>
+            <circle cx="338" cy="82" r="23" fill="none" stroke="#151515" stroke-width="2"/>
+          </g>
+          <!-- shell: square top-left corner, round everywhere else -->
+          <path d="M60 42 H205 A173 173 0 1 1 32 215 V70 A28 28 0 0 1 60 42 Z" fill="url(#rim)"/>
+          <path d="M63 50 H205 A165 165 0 1 1 40 215 V73 A23 23 0 0 1 63 50 Z" fill="url(#shell)"/>
+          <!-- camera -->
+          <circle cx="76" cy="90" r="21" fill="#d9d6d0"/>
+          <circle cx="76" cy="90" r="16" fill="#111"/>
+          <circle cx="76" cy="90" r="10" fill="url(#lens)"/>
+          <circle cx="72" cy="86" r="2.6" fill="#9fb3d6" opacity=".8"/>
+          <!-- RGB light and microphone -->
+          <circle cx="122" cy="72" r="6" fill="#efeee9" stroke="#cfcbc4" stroke-width="1.5"/>
+          <rect x="140" y="67" width="38" height="10" rx="5" fill="#2a2a2a"/>
+          <circle cx="149" cy="72" r="1.6" fill="#555"/><circle cx="159" cy="72" r="1.6" fill="#555"/><circle cx="169" cy="72" r="1.6" fill="#555"/>
+          <!-- display glass -->
+          <circle cx="205" cy="215" r="138" fill="#bdb9b2"/>
+          <circle cx="205" cy="215" r="135" fill="url(#glass)"/>
+        </svg>
+        <div class="screen" id="screen" aria-live="polite">
+          <div class="status" id="status">Mon, Oct 5 · 16:20</div>
+          <img class="mascot" id="mascot" src="clawd/neutral.gif" alt="Clawd">
+          <div class="speech" id="speech"><div class="speech-inner" id="speechText"></div></div>
+          <div class="panel" id="panel">
+            <div class="panel-title" id="panelTitle">Apps</div>
+            <div class="rows" id="rows"></div>
+            <div class="app-view" id="appView" hidden></div>
+          </div>
+          <div class="toast" id="toast"></div>
+          <div class="boot" id="boot">
+            <div class="boot-inner">
+              <img src="clawd/waving.gif" alt="">
+              <div class="logo">Ollie</div>
+              <div class="tag">keeps an eye on your agents</div>
+              <div class="ver">v0.1.0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="controls" role="group" aria-label="Simulate the wheel">
+        <button type="button" data-act="1"><kbd>1×</kbd> talk</button>
+        <button type="button" data-act="3"><kbd>3×</kbd> app drawer</button>
+        <button type="button" data-act="2"><kbd>2×</kbd> back</button>
+        <button type="button" data-act="up"><kbd>↺</kbd> turn</button>
+        <button type="button" data-act="down"><kbd>↻</kbd> turn</button>
+        <button type="button" data-act="font"><kbd>Aa</kbd> font</button>
+      </div>
+      <p class="sim-note">The screen plays a demo on its own. Click the wheel or use the buttons to take over; scroll over the screen to turn the wheel.</p>
+    </div>
+  </div>
+</section>
+
+<section class="works" aria-label="Works with">
+  <div class="wrap">
+    <span class="label">Works with</span>
+    <ul>
+      <li><span class="icon" aria-hidden="true">terminal</span>Claude Code</li>
+      <li><span class="icon" aria-hidden="true">code</span>Codex</li>
+      <li><span class="icon" aria-hidden="true">view_column</span>herdr</li>
+      <li><span class="icon" aria-hidden="true">laptop_mac</span>macOS</li>
+    </ul>
+  </div>
+</section>
+
+<section class="band" id="voice">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="label">Voice</span>
+      <h2>Ask out loud, from anywhere.</h2>
+      <p class="lede">The Watcher talks to your own server on your Mac through a private Tailscale address. Nothing goes through the xiaozhi.me cloud. Anything that changes something asks you to confirm by voice first.</p>
+    </div>
+    <div class="asks">
+      <div class="ask"><q>How are my sessions doing?</q><p>Lists your herdr sessions: which are waiting for you, which are working, which have subagents running and what they finished.</p></div>
+      <div class="ask"><q>What is the checkout session doing?</q><p>Reads the session’s screen and sums it up in a sentence or two.</p></div>
+      <div class="ask"><q>Tell the api session to run the tests.</q><p>Repeats the request, asks “confirm?”, and only then sends the instruction or approves the permission.</p></div>
+      <div class="ask"><q>Ask Claude how the open PR is going.</q><p>Runs <code>claude -p</code> on your Mac in read-only mode, with your own skills and memory.</p></div>
+      <div class="ask"><q>Open a Codex session on the docs repo to review the README.</q><p>Starts a new session in herdr.</p></div>
+      <div class="ask"><q>How much of my Claude plan have I used?</q><p>Shows and reads out the 5-hour and weekly usage, and when each one resets.</p></div>
+      <div class="ask"><q>Remember the team meeting is at three.</q><p>Saves it to <code>Lembretes.md</code> in iCloud Drive and to the offline memory on the microSD card.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="wheel">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="label">Wheel</span>
+      <h2>One wheel does it all.</h2>
+      <p class="lede">The Watcher has a wheel on its corner that turns and clicks. The firmware counts the clicks and knows whether you are on the home screen or inside an app.</p>
+    </div>
+    <div class="gestures">
+      <div class="gesture"><div class="clicks"><i></i></div><span class="g">1 click</span><p>Talk. Click again to interrupt the answer.</p></div>
+      <div class="gesture"><div class="clicks"><i></i><i></i></div><span class="g">2 clicks</span><p>Back: the previous screen of the app, then the drawer, then close.</p></div>
+      <div class="gesture"><div class="clicks"><i></i><i></i><i></i></div><span class="g">3 clicks</span><p>Opens and closes the app drawer.</p></div>
+      <div class="gesture"><div class="clicks"><span class="turn">↺ ↻</span></div><span class="g">Turn</span><p>Volume on the home screen. Navigation in the drawer and inside apps.</p></div>
+      <div class="gesture"><div class="clicks"><i class="hold"></i></div><span class="g">Hold 2 s</span><p>Powers off when the Watcher is not charging.</p></div>
+      <div class="gesture"><div class="clicks"><i class="long"></i></div><span class="g">Hold 20 s</span><p>Factory reset. The original firmware used 10 s, which was too easy to trigger by accident.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="apps">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="label">App drawer</span>
+      <h2>Apps on the wheel.</h2>
+      <p class="lede">Click three times to open the drawer. Each app is one file in <code>placa/apps/</code> plus one line in the registry, so adding your own is quick.</p>
+    </div>
+    <div class="apps" id="appsGrid"></div>
+  </div>
+</section>
+
+<section class="band" id="clawd">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="label">Mascot</span>
+      <h2>Clawd reacts to everything.</h2>
+      <p class="lede">Every reaction is a 128 px pixel-art GIF drawn by a Python script (<code>mascote-clawd/gerar.py</code>). The server picks an emotion for each answer, and the firmware switches states on its own while it listens, thinks and talks.</p>
+    </div>
+    <div class="clawd-groups" id="clawdGroups"></div>
+  </div>
+</section>
+
+<section class="band" id="how-it-works">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="label">How it works</span>
+      <h2>From the Watcher to your Mac.</h2>
+      <p class="lede">The firmware is the front end. The smarts run on a server you host at home, so your keys and access stay under your control.</p>
+    </div>
+    <div class="flow">
+      <div class="hop"><span class="label">Device</span><div><h3>SenseCAP Watcher running Xiaozhi Ollie</h3><p>Detects “Hey Ollie” on the chip, shows speech in up to three lines and runs the apps in the drawer.</p><p class="via">home Wi-Fi or phone hotspot · wss and https</p></div></div>
+      <div class="hop"><span class="label">Network</span><div><h3>Tailscale Funnel</h3><p>Only one secret path is public. The root returns 404.</p></div></div>
+      <div class="hop"><span class="label">Server</span><div><h3>xiaozhi-server on your Mac</h3><p>Listens on 127.0.0.1 only. Transcribes, thinks and speaks through any OpenAI-compatible API, such as OpenRouter.</p><p class="via">voice → text → model → voice</p></div></div>
+      <div class="hop"><span class="label">Tools</span><div><h3>MCP bridge</h3><p>herdr sessions, <code>claude -p</code>, <code>codex exec</code>, Multica, macOS Shortcuts, weather, reminders and your Claude plan usage. No free-form shell.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="devices">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="label">Devices</span>
+      <h2>Made for the Watcher. Works with other XiaoZhi devices.</h2>
+      <p class="lede">The full firmware targets the SenseCAP Watcher. The Ollie server speaks the standard XiaoZhi protocol, so other devices running XiaoZhi can use the same voice assistant and agent tools.</p>
+    </div>
+    <div class="devices">
+      <div class="device-tier main">
+        <span class="label">Full support</span>
+        <h3>SenseCAP Watcher</h3>
+        <p>Seeed Studio. The complete Xiaozhi Ollie firmware: app drawer, wheel controls, Clawd, boot screen, round speech layout, microSD memory and alerts.</p>
+      </div>
+      <div class="device-tier">
+        <span class="label">Voice and agent tools</span>
+        <h3>Other XiaoZhi devices</h3>
+        <p>Any board running XiaoZhi v2 can talk to the Ollie server: enter its address in the “Custom OTA URL” field of the Wi-Fi setup page. You get the voice assistant and the tools for Claude Code, Codex, herdr and macOS. The Watcher-only screens need porting.</p>
+        <ul class="device-list">
+          <li>Espressif ESP32-S3-BOX-3</li>
+          <li>M5Stack CoreS3</li>
+          <li>M5Stack AtomS3R with Echo Base</li>
+          <li>M5Stack Tab5</li>
+          <li>M5Stack Cardputer ADV</li>
+          <li>Waveshare ESP32-S3 Touch AMOLED 1.8</li>
+          <li>Waveshare ESP32-S3 Touch LCD 1.85</li>
+          <li>LILYGO T-Circle-S3</li>
+        </ul>
+        <p class="fine">XiaoZhi v2.5.0 ships about 170 board configurations; these are a few examples. We have tested the Ollie server only with the SenseCAP Watcher so far.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="changes">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="label">Compared to XiaoZhi</span>
+      <h2>What the firmware changes.</h2>
+      <p class="lede">Ollie applies its changes as patches on top of a clean XiaoZhi v2.5.0, so new upstream versions can be followed without maintaining a fork.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Area</th><th scope="col">Original XiaoZhi</th><th scope="col">Xiaozhi Ollie</th></tr></thead>
+        <tbody>
+          <tr><td>Language</td><td>Chinese or English</td><td>Brazilian Portuguese throughout, including the Wi-Fi setup portal</td></tr>
+          <tr><td>Wake word</td><td>“你好小智”</td><td>“Hey Ollie”, or one of 8 agent names</td></tr>
+          <tr><td>Server</td><td>xiaozhi.me</td><td>Your own server on your Mac, address built in</td></tr>
+          <tr><td>Mascot</td><td>Noto emoji</td><td>Clawd, as animated pixel-art GIFs</td></tr>
+          <tr><td>Boot screen</td><td>XiaoZhi logo</td><td>Clawd waving, Ollie logo and version</td></tr>
+          <tr><td>Speech on screen</td><td>One line scrolling sideways</td><td>Up to three lines, paced with the voice</td></tr>
+          <tr><td>Font</td><td>Noto Sans</td><td>Noto Sans or JetBrains Mono, picked in Settings</td></tr>
+          <tr><td>Home screen</td><td>Time</td><td>Day, date, time and a greeting with your name</td></tr>
+          <tr><td>Wheel</td><td>Volume and talk</td><td>Also the app drawer and back</td></tr>
+          <tr><td>microSD</td><td>Unused</td><td>Conversation log, meeting copies and offline memory</td></tr>
+          <tr><td>Alerts</td><td>None</td><td>Session waiting for you, task finished, meeting ready</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="install">
+  <div class="wrap">
+    <div class="band-head">
+      <span class="label">Install</span>
+      <h2>Build it from scratch.</h2>
+      <p class="lede">Set up the server on your Mac first, then the firmware. The first flash backs up the device and leaves the factory partition alone.</p>
+    </div>
+    <div class="install">
+      <div class="reqs">
+        <h3>You will need</h3>
+        <ul>
+          <li>A SenseCAP Watcher, ideally the “for XiaoZhi” edition</li>
+          <li>A Mac that stays on at home, with Tailscale</li>
+          <li>An OpenAI-compatible API key (OpenRouter, for example)</li>
+          <li>ESP-IDF v6.1 to build the firmware</li>
+          <li>Optional: a microSD card in FAT32 with MBR (ESP-IDF cannot read exFAT or GPT)</li>
+        </ul>
+        <p class="lede">Prefer to let a coding agent do it? The install guide in <code>docs/INSTALL.md</code> has a ready-made prompt for Claude Code or Codex.</p>
+      </div>
+      <pre><span class="c"># Server (Mac)</span>
+<span class="k">servidor/instalar.sh</span>                  <span class="c"># downloads, patches, creates .env</span>
+<span class="c">#   set API_KEY in servidor/.env</span>
+<span class="k">servidor/testar-api.sh</span>                <span class="c"># real chat, voice and transcription</span>
+<span class="k">servidor/instalar-servico.sh</span> instalar
+<span class="k">servidor/configurar-funnel.sh</span> ligar
+
+<span class="c"># Firmware</span>
+<span class="k">firmwares/xiaozhi-ollie/compilar.sh</span>
+<span class="k">firmwares/gravar-xiaozhi.sh</span>           <span class="c"># first flash: erases saved Wi-Fi</span>
+<span class="k">firmwares/atualizar-firmware.sh</span>       <span class="c"># updates: keeps Wi-Fi</span></pre>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="wordmark">Ollie</span>
+    <p>Xiaozhi Ollie is a modified version of the original <a href="https://github.com/78/xiaozhi-esp32">XiaoZhi firmware</a> (MIT license), and its server builds on <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server">xiaozhi-esp32-server</a>. Fonts: Noto Sans and JetBrains Mono, under the SIL Open Font License. Released under the MIT license; source on <a href="https://github.com/gabrielvaz/xiaozhi-ollie">GitHub</a>.</p>
+    <p>Clawd is the Claude Code mascot, by Anthropic. Claude Code, Codex, herdr, macOS and SenseCAP are trademarks of their owners. This is an independent project with no affiliation to Anthropic, OpenAI, Apple, Seeed Studio or the XiaoZhi project.</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  // Wheel teeth (knurling) around the drawn knob
+  const teeth = $("teeth");
+  for (let i = 0; i < 24; i++) {
+    const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    r.setAttribute("x", "335.5"); r.setAttribute("y", "48"); r.setAttribute("width", "5"); r.setAttribute("height", "8"); r.setAttribute("rx", "1.5");
+    r.setAttribute("transform", `rotate(${i * 15} 338 82)`);
+    teeth.appendChild(r);
+  }
+
+  // ---------- data ----------
+  // [icon, name on device, detail on device, description on page]
+  const APPS = [
+    ["terminal", "Claude Code sessions", "View, read and send requests", "Your herdr sessions and their state. Open one to read the last message and send a request by voice."],
+    ["forum", "Conversations", "Read or replay", "Past conversations saved on the microSD card, to read or listen to again."],
+    ["donut_large", "Claude usage", "5-hour and weekly limits", "Arcs for the 5-hour and weekly limits and the time until they reset. The token stays on the Mac."],
+    ["partly_cloudy_day", "Weather", "Now, today and tomorrow", "Now, today and tomorrow: low, high and chance of rain, with no AI involved. One click reads it out."],
+    ["mic", "Record a meeting", "Transcript and summary in Notes", "Audio goes to the Mac for transcript, summary, decisions and next steps in Apple Notes. Offline, it keeps recording to the card."],
+    ["timer", "Stopwatch", "Start, pause and reset", "Down to the millisecond. Keeps running with the drawer closed."],
+    ["hourglass_top", "Countdown", "Each wheel step adds 30 s", "Set it by turning the wheel, 30 seconds per step. Plays an alarm when it ends."],
+    ["public", "World clock", "Milan", "Milan, Lisbon, London, New York, Tokyo, Sydney and more, with daylight saving time."],
+    ["qr_code_2", "QR codes", "Wi-Fi, links and contacts", "The current Wi-Fi network and your own list from iCloud Drive."],
+    ["sd_card", "Offline memory", "Works without internet", "Sessions, recent meetings and reminders, as text and audio on the microSD card."],
+    ["upload", "Send card to Mac", "Conversations and meetings", "Copies conversations and meetings from the card to iCloud Drive."],
+    ["settings", "Settings", "Name, theme, font, screen…", "Agent name (Ollie, Clawd, Jarvis, Nova, Atlas, Luna, Max or Iris), theme, font, brightness, volume and alerts."],
+  ];
+
+  const CLAWD = [
+    ["Emotions", "The model picks one of these for each answer.", [
+      ["neutral", "neutral"], ["happy", "happy"], ["laughing", "laughing"], ["funny", "funny"], ["sad", "sad"],
+      ["angry", "angry"], ["crying", "crying"], ["loving", "loving"], ["embarrassed", "embarrassed"],
+      ["surprised", "surprised"], ["shocked", "shocked"], ["thinking", "thinking"], ["winking", "winking"],
+      ["cool", "cool"], ["relaxed", "relaxed"], ["delicious", "delicious"], ["kissy", "kissy"],
+      ["confident", "confident"], ["sleepy", "sleepy"], ["silly", "silly"], ["confused", "confused"]]],
+    ["Device states", "The firmware switches these on its own, based on what the Watcher is doing.", [
+      ["robot_2", "starting"], ["conectando", "connecting"], ["ouvindo", "listening"], ["falando", "talking"],
+      ["warning", "alert"], ["staticstate", "idle"]]],
+    ["Poses", "Clawd doing things: working, running, celebrating a deploy.", [
+      ["waving", "waving"], ["nerd", "glasses"], ["reading", "reading"], ["working", "working"],
+      ["running", "running"], ["coffee", "coffee"], ["party", "party"], ["celebrating", "celebrating"],
+      ["music", "music"], ["searching", "searching"], ["idea", "idea"], ["rocket", "deploy"],
+      ["bug", "found a bug"], ["sunny", "sunny"], ["rainy", "rainy"], ["recording", "recording"]]],
+  ];
+
+  // Conversations used when the viewer clicks to talk
+  const CONVERSAS = [
+    ["How are my sessions doing?",
+     "Three sessions are working and one is waiting for you. The checkout session finished its tests ten minutes ago.", "working"],
+    ["How much of my plan have I used?",
+     "42 percent of the 5-hour window, which resets in 1 hour 18 minutes. 61 percent of the week.", "nerd"],
+    ["Will it rain tomorrow?",
+     "Rain is likely in the afternoon, 70 percent chance. Low of 22, high of 27. Take an umbrella.", "rainy"],
+    ["Did the deploy finish?",
+     "Yes, four minutes ago, and the site is responding normally. All live.", "rocket"],
+  ];
+
+  $("appsGrid").innerHTML = APPS.map(([ic, nome, , desc]) =>
+    `<div class="app"><span class="icon" aria-hidden="true">${ic}</span><h3>${nome}</h3><p>${desc}</p></div>`).join("");
+  $("clawdGroups").innerHTML = CLAWD.map(([titulo, texto, itens]) =>
+    `<div class="clawd-group"><h3>${titulo}</h3><p>${texto}</p><div class="gifs">` +
+    itens.map(([f, nome]) => `<div class="gif"><img src="clawd/${f}.gif" alt="Clawd ${nome}" loading="lazy"><span>${nome}</span></div>`).join("") +
+    `</div></div>`).join("");
+
+  // ---------- simulator: plays a scripted demo; the viewer can take over at any time ----------
+  const screen = $("screen"), mascot = $("mascot"), speech = $("speech"), speechText = $("speechText");
+  const panel = $("panel"), rows = $("rows"), appView = $("appView"), toast = $("toast");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const DIAS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const MESES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const st = { modo: "espera", sel: 0, volume: 60, conversa: 0 };
+
+  const dd = (n) => String(n).padStart(2, "0");
+  function relogio() {
+    const d = new Date();
+    $("status").textContent = `${DIAS[d.getDay()]}, ${MESES[d.getMonth()]} ${d.getDate()} · ${dd(d.getHours())}:${dd(d.getMinutes())}`;
+  }
+  relogio(); setInterval(relogio, 15000);
+
+  function saudacao() {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12) return "Good morning! Ready to start the day?";
+    if (h >= 12 && h < 18) return "Good afternoon! How is your day going?";
+    if (h >= 18) return "Good evening! Still going strong?";
+    return "Late night? Productive one, I hope.";
+  }
+
+  // Every scripted step waits with pausa(); bumping "geracao" cancels whatever is running
+  const CANCELADO = Symbol("cancelado");
+  let geracao = 0;
+  const pausa = (ms) => {
+    const g = geracao;
+    return new Promise((ok, nao) => setTimeout(() => (g === geracao ? ok() : nao(CANCELADO)), ms));
+  };
+  const ignorarCancelamento = (e) => { if (e !== CANCELADO) throw e; };
+
+  const emocao = (nome) => { mascot.src = `clawd/${nome}.gif`; };
+  function fala(texto, papel) {
+    screen.classList.add("talking");
+    speech.classList.toggle("user", papel === "user");
+    speech.classList.toggle("sys", papel === "system");
+    speechText.textContent = texto;
+  }
+  const semFala = () => { screen.classList.remove("talking"); speechText.textContent = ""; };
+
+  function espera() {
+    st.modo = "espera";
+    panel.classList.remove("open");
+    emocao("neutral");
+    fala(saudacao(), "saudacao");
+  }
+
+  async function responder(texto, pose) {
+    emocao("falando");
+    if (reduce) {
+      fala(texto, "assistant");
+    } else {
+      for (let i = 1; i <= texto.length; i++) {  // ~18 characters per second, as in the firmware
+        fala(texto.slice(0, i), "assistant");
+        await pausa(55);
+      }
+    }
+    emocao(pose);
+  }
+
+  async function turno(pergunta, resposta, pose) {
+    st.modo = "conversa";
+    panel.classList.remove("open");
+    semFala();
+    emocao("ouvindo");
+    await pausa(900);
+    fala(pergunta, "user");
+    await pausa(1300);
+    emocao("thinking");
+    await pausa(1100);
+    await responder(resposta, pose);
+    await pausa(3200);
+  }
+
+  function aviso(texto, emo) {
+    st.modo = "espera";
+    emocao(emo);
+    fala(texto, "system");
+  }
+
+  function desenharGaveta() {
+    $("panelTitle").textContent = "Apps";
+    appView.hidden = true; rows.hidden = false; rows.innerHTML = "";
+    for (let linha = 0; linha < 3; linha++) {
+      const i = st.sel - 1 + linha;
+      if (i < 0 || i >= APPS.length) continue;
+      const [ic, nome, det] = APPS[i];
+      const el = document.createElement("div");
+      el.className = "row" + (i === st.sel ? " cur" : "");
+      el.style.top = `calc(${linha * 84} * var(--u))`;
+      el.innerHTML = `<span class="icon" aria-hidden="true">${ic}</span><div class="tx"><div class="t">${nome}</div><div class="d">${det}</div></div>`;
+      rows.appendChild(el);
+    }
+  }
+  function abrirGaveta() { semFala(); st.modo = "gaveta"; panel.classList.add("open"); desenharGaveta(); }
+  function girarGaveta(passo) { st.sel = Math.max(0, Math.min(APPS.length - 1, st.sel + passo)); desenharGaveta(); }
+
+  // Arc around the inside of the screen, from the top, clockwise
+  function arco(raio, pct, cor) {
+    const c = 206, ang = (pct / 100) * 2 * Math.PI - Math.PI / 2;
+    const x = c + raio * Math.cos(ang), y = c + raio * Math.sin(ang);
+    return `<circle cx="206" cy="206" r="${raio}" fill="none" stroke="#1c1c1c" stroke-width="12"/>` +
+      `<path d="M206 ${c - raio} A${raio} ${raio} 0 ${pct > 50 ? 1 : 0} 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" stroke="${cor}" stroke-width="12" stroke-linecap="round"/>`;
+  }
+
+  function abrirApp() {
+    const [, nome, det] = APPS[st.sel];
+    st.modo = "app";
+    rows.hidden = true; appView.hidden = false;
+    if (nome === "Claude usage") {
+      $("panelTitle").textContent = "";
+      appView.innerHTML =
+        `<svg class="arcs" viewBox="0 0 412 412" aria-hidden="true">${arco(190, 42, "#3fb950")}${arco(170, 61, "#e3b341")}</svg>` +
+        `<div class="usage"><div class="u-h">Claude usage</div>` +
+        `<div class="u-v" style="color:#3fb950">5 h: 42%</div><div class="u-s">resets in 1 h 18 min</div>` +
+        `<div class="u-v" style="color:#e3b341">Week: 61%</div><div class="u-s">resets in 2 d 4 h</div></div>`;
+    } else {
+      $("panelTitle").textContent = nome;
+      appView.innerHTML = `<div><div class="big">${det}</div><div class="small">Click twice to go back</div></div>`;
+    }
+  }
+
+  function avisar(texto) {
+    toast.textContent = texto;
+    toast.classList.add("show");
+    clearTimeout(avisar.t);
+    avisar.t = setTimeout(() => toast.classList.remove("show"), 1200);
+  }
+
+  // ---------- the scripted demo ----------
+  async function demo() {
+    try {
+      for (;;) {
+        espera(); await pausa(3200);
+        await turno("How are my sessions doing?",
+          "Three sessions are working and one is waiting for you. The checkout session finished its tests ten minutes ago.", "working");
+        espera(); await pausa(2200);
+        emocao("coffee"); await pausa(2600);
+        emocao("neutral"); await pausa(900);
+
+        aviso("Claude Code in api is waiting for you", "shocked"); await pausa(3400);
+        await turno("What does it want?",
+          "It wants to run the database migration: two new tables, nothing deleted. Confirm?", "nerd");
+        await turno("Confirm.", "Done, approved. Claude Code is back to work.", "celebrating");
+        espera(); await pausa(2200);
+
+        abrirGaveta(); await pausa(1200);
+        for (const passo of [1, 1, 1, -1]) { girarGaveta(passo); await pausa(800); }
+        abrirApp(); await pausa(4200);
+        st.modo = "gaveta"; desenharGaveta(); await pausa(900);
+        st.sel = 0; espera(); await pausa(2400);
+
+        emocao("music"); await pausa(2800);
+        await turno("Will it rain tomorrow?",
+          "Rain is likely in the afternoon, 70 percent chance. Low of 22, high of 27. Take an umbrella.", "rainy");
+        espera(); await pausa(2000);
+
+        await turno("Ask Claude how the PR is going.", "I asked Claude Code. It is looking now.", "running");
+        aviso("Claude answered", "idea"); await pausa(2000);
+        await responder("The PR passed its tests and has one approval. It only needs the Codex review.", "happy");
+        await pausa(3200);
+        espera(); await pausa(2000);
+
+        await turno("Did the deploy finish?", "Yes, four minutes ago, and the site is responding normally. All live.", "rocket");
+        espera(); await pausa(1500);
+        emocao("sleepy"); await pausa(2600);
+      }
+    } catch (e) { ignorarCancelamento(e); }
+  }
+
+  // ---------- manual control: any action stops the demo; it comes back after 20 s of quiet ----------
+  let retomar;
+  function assumir() {
+    geracao++;
+    clearTimeout(retomar);
+    retomar = setTimeout(() => { geracao++; st.sel = 0; demo(); }, 20000);
+  }
+
+  function acao(a) {
+    if (!$("boot").classList.contains("gone")) return;
+    const estava = st.modo;
+    assumir();
+    if (a === "font") {
+      const mono = $("sim").classList.toggle("mono-on");
+      avisar(mono ? "Font: JetBrains Mono" : "Font: Noto Sans");
+      return;
+    }
+    if (a === "3") {
+      if (estava === "gaveta" || estava === "app") espera(); else abrirGaveta();
+      return;
+    }
+    if (a === "2") {
+      if (estava === "app") { st.modo = "gaveta"; desenharGaveta(); }
+      else espera();
+      return;
+    }
+    if (a === "1") {
+      if (estava === "gaveta") { st.modo = "gaveta"; abrirApp(); }
+      else if (estava === "app") { st.modo = "app"; }
+      else if (estava === "conversa") espera();   // a second click interrupts
+      else {
+        const [p, r, pose] = CONVERSAS[st.conversa++ % CONVERSAS.length];
+        turno(p, r, pose).then(espera, ignorarCancelamento);
+      }
+      return;
+    }
+    const passo = a === "down" ? 1 : -1;
+    if (estava === "gaveta") { st.modo = "gaveta"; girarGaveta(passo); }
+    else if (estava === "app") { st.modo = "app"; }
+    else {
+      st.modo = estava === "conversa" ? "espera" : estava;
+      st.volume = Math.max(0, Math.min(100, st.volume + passo * 10));
+      avisar(`Volume ${st.volume}%`);
+    }
+  }
+
+  document.querySelectorAll(".controls button").forEach((b) => b.addEventListener("click", () => acao(b.dataset.act)));
+
+  // The wheel counts clicks like the firmware: it waits a moment to see if another click follows
+  let cliques = 0, janela;
+  $("knob").addEventListener("click", () => {
+    cliques++;
+    clearTimeout(janela);
+    janela = setTimeout(() => { acao(String(Math.min(cliques, 3))); cliques = 0; }, 380);
+  });
+  let acumulado = 0;
+  screen.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    acumulado += e.deltaY;
+    if (Math.abs(acumulado) >= 40) { acao(acumulado > 0 ? "down" : "up"); acumulado = 0; }
+  }, { passive: false });
+
+  // Boot screen: the logo stays about 3 s and fades out, then the demo starts
+  setTimeout(() => { $("boot").classList.add("gone"); demo(); }, reduce ? 300 : 3200);
+})();
+</script>
+</body>
+</html>
