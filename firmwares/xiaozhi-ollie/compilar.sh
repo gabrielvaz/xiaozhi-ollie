@@ -3,6 +3,8 @@
 # portal de Wi-Fi em pt-BR e endereço do servidor do Mac embutido.
 # Saída: firmwares/xiaozhi-ollie/saida/merged-binary.bin (gravar com ../gravar-xiaozhi.sh --ptbr)
 set -euo pipefail
+# Nada aqui lê do teclado: sem terminal (launchd, agentes), um subprocesso esperando a stdin travaria o build
+exec < /dev/null
 
 AQUI="${0:A:h}"
 # Caminhos da sua máquina (opcional, fora do git): firmwares/xiaozhi-ollie/local.env
