@@ -35,6 +35,9 @@ EMOJIS = {
     "🎤": "recording",
     "🛹": "skate",
     "😤": "chateado",
+    "🍳": "cozinhando",
+    "🗣": "tagarelando",
+    "🤬": "xingando",
 }
 
 # Ferramenta -> pose enquanto ela roda. Vale o nome exato; depois o prefixo; senão "thinking".

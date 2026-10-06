@@ -30,6 +30,7 @@ LV_FONT_DECLARE(font_material_symbols_16_4);
 #include "anel_volume.h"       // anel do volume na borda
 #include "tela_sem_wifi.h"     // modo de configuração de Wi-Fi
 #include "spinner_watcher.h"   // spinner da atualização do sistema
+#include "asterisco_claude.h"  // asterisco animado do Claude Code
 
 static constexpr int kLado = 412;
 static uint16_t g_fb[kLado * kLado];
@@ -334,8 +335,13 @@ public:
     }
 
     // SetChatMessage do Watcher, sem o streaming (a fala aparece inteira)
-    void SetChatMessage(const std::string& papel, const std::string& texto) {
+    AsteriscoClaude asterisco_;
+
+    void SetChatMessage(const std::string& papel, const std::string& texto_original) {
+        std::string texto = texto_original;
+        bool asterisco = papel == "saudacao" && AsteriscoClaude::PrepararTexto(texto);
         if (texto.empty()) {
+            asterisco_.Esconder();
             papel_atual_.clear();
             lv_label_set_text(chat_message_label_, "");
             lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
@@ -350,6 +356,11 @@ public:
             lv_obj_remove_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
         }
         PosicionarMascote();
+        if (asterisco) {
+            asterisco_.Mostrar(chat_message_label_);
+        } else {
+            asterisco_.Esconder();
+        }
     }
 
     void SetHideSubtitle(bool hide) {
@@ -510,6 +521,13 @@ int main() {
     t.SetChatMessage("saudacao", "* Codando…\nxiaozhi-ollie +2");
     Avancar(200);
     SalvarPng("05-espera-trabalhando");
+    // Quadros do asterisco do Claude Code (· ✢ ✳ ✶ ✻ ✽), só para ver: "-sucesso" o medir.py não mede
+    for (int q = 0; q < 6; q++) {
+        t.asterisco_.IrParaQuadro(q);
+        lv_obj_invalidate(t.asterisco_.Objeto());
+        Avancar(1);
+        SalvarPng("05-asterisco-" + std::to_string(q) + "-sucesso");
+    }
 
     t.SetStatus("Conectando...");
     t.SetEmotion("conectando");

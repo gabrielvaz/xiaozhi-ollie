@@ -101,6 +101,7 @@ private:
             TR("Cozinhando", "Cooking", "烹饪中", "Cocinando"), TR("Lapidando", "Polishing", "打磨中", "Puliendo"),
             TR("Orquestrando", "Orchestrating", "编排中", "Orquestando"), TR("Destrinchando", "Untangling", "梳理中", "Desenredando")};
         constexpr int n = sizeof(kVerbos) / sizeof(kVerbos[0]);
+        constexpr int kCozinhando = 8;  // posição de "Cozinhando" em kVerbos
         verbo_ = (verbo_ + 1 + (int)(esp_random() % (n - 1))) % n;  // nunca repete o anterior
         int outras = ContextoApps::atividade_n - 1;
         std::string frase = std::string("* ") + kVerbos[verbo_] + "…\n" + ContextoApps::atividade_titulo +
@@ -108,7 +109,9 @@ private:
         ContextoApps::App().Schedule([frase]() {
             Board::GetInstance().GetDisplay()->SetChatMessage("saudacao", frase.c_str());
         });
-        if (trocar_pose) {
+        if (verbo_ == kCozinhando) {  // "Cozinhando…": o Clawd de chapéu de chef, mexendo a panela
+            ContextoApps::App().Schedule([]() { Board::GetInstance().GetDisplay()->SetEmotion("cozinhando"); });
+        } else if (trocar_pose) {
             static const char* const kPoses[] = {"codando", "teclando", "working", "searching", "reading", "bug", "rocket"};
             const char* pose = kPoses[esp_random() % (sizeof(kPoses) / sizeof(kPoses[0]))];
             ContextoApps::App().Schedule([pose]() { Board::GetInstance().GetDisplay()->SetEmotion(pose); });

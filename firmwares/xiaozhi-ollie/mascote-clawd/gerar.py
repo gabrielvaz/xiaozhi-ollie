@@ -49,6 +49,8 @@ EMOCOES = [
     "volume_mais", "volume_menos",
     # sem Wi-Fi configurado (modo de configuração de rede): confuso, com "?" e o Wi-Fi falhando
     "sem_wifi",
+    # cozinhando (chapéu de chef, mexendo a panela), falando sem parar e xingando (balão com #@$!)
+    "cozinhando", "tagarelando", "xingando",
 ]
 
 CINZA_ESCURO = (70, 70, 80)
@@ -165,26 +167,91 @@ def pose(nome, f):
         t.px(17, 5 if par else 6, LARANJA, 2, 2); t.px(19 if par else 18, 4 if par else 5, LARANJA)
         olhos(t, "feliz"); boca(t, "sorriso"); bochechas(t)
         return t.img
-    if nome in ("nerd", "reading"):       # óculos redondos (lendo um livro)
+    if nome == "reading":                 # lendo: óculos, olhos correndo pelas linhas, vira a página
+        t = Tela(dy=(0, 0, 0, 0, 1, 0)[f] * PX // 3)
+        corpo(t, bracos_y=None)
+        for x in (5, 12):                 # armação redonda
+            t.px(x, 5, OLHO, 3, 1); t.px(x, 8, OLHO, 3, 1)
+            t.px(x, 6, OLHO, 1, 2); t.px(x + 2, 6, OLHO, 1, 2)
+        t.px(8, 6, OLHO, 4, 1); t.px(3, 6, OLHO, 2, 1); t.px(15, 6, OLHO, 2, 1)
+        olhar = (0, 1, 1, 0, 0, 0)[f]     # pupilas acompanham a linha e voltam
+        t.px(6 + olhar, 7, OLHO); t.px(13 + olhar, 7, OLHO)
+        t.px(2, 11, MARROM, 16, 4)                              # capa
+        t.px(3, 11, BRANCO, 6, 3); t.px(11, 11, BRANCO, 6, 3)   # páginas
+        t.px(9, 11, CINZA, 2, 3)                                # lombada
+        lidas = (1, 2, 3, 3, 0, 1)[f]                           # linhas lidas acendem; virou a página: zera
+        for k in range(3):
+            t.px(4, 11 + k if k < 2 else 13, CINZA if k >= lidas else CINZA_ESCURO, 4 - k, 1)
+            t.px(12, 11 + k if k < 2 else 13, CINZA, 4 - (k % 2), 1)
+        if f == 4:                                              # página virando por cima da lombada
+            t.px(9, 8, BRANCO, 3, 3); t.px(12, 9, BRANCO, 1, 2)
+        t.px(1, 11, LARANJA, 2, 2); t.px(17, 11 - (f == 4), LARANJA, 2, 2)   # a mão direita vira a página
+        return t.img
+    if nome == "cozinhando":              # chapéu de chef, mexendo a panela, bolhas e vapor
+        t = Tela(dy=(0, -1, 0, 0, -1, 0)[f] * PX // 3)
+        corpo(t, bracos_y=None)
+        t.px(4, 1, BRANCO, 4, 2); t.px(8, 0, BRANCO, 4, 3); t.px(12, 1, BRANCO, 4, 2)   # chapéu
+        t.px(5, 3, CINZA, 10, 1)                                # faixa do chapéu
+        olhos(t, "feliz" if f in (2, 3) else "normal", dy=1)
+        s = (0, -1, -2, -1, 0, 1)[f]                            # colher mexendo em círculo na panela
+        t.px(17, 7 + f % 2, LARANJA, 2, 2)                      # braço direito, por fora do corpo
+        t.px(16 + s, 8, MARROM); t.px(15 + s, 9, MARROM)        # cabo entrando na panela
+        t.px(1, 9, LARANJA, 2, 2)                               # outra mão na alça
+        t.px(2, 10, CINZA, 16, 1)                               # borda da panela
+        t.px(3, 11, CINZA_ESCURO, 14, 4)                        # panela
+        t.px(1, 11, CINZA_ESCURO, 1, 1); t.px(18, 11, CINZA_ESCURO, 1, 1)   # alças
+        for i, bx in enumerate((5, 9, 14)):                     # bolhas estourando na borda
+            if (f + i) % 3 == 0:
+                t.px(bx, 9, BRANCO)
+        for i, vx in enumerate((0, 18)):                        # vapor subindo pelos lados
+            vy = 8 - (f + i * 3) % 6
+            t.px(vx + (vy % 2), vy, CINZA)
+        return t.img
+    if nome == "tagarelando":             # falando sem parar: boca a mil, balões e mãos gesticulando
+        t = Tela(dy=(0, -1, 0, -1, 0, 0)[f] * PX // 3)
+        corpo(t, bracos_y=None)
+        t.px(1, (6, 8, 7, 6, 8, 7)[f], LARANJA, 2, 2); t.px(17, (8, 6, 8, 7, 6, 8)[f], LARANJA, 2, 2)
+        olhos(t, "feliz" if f in (1, 4) else "normal")
+        abertura = (3, 1, 2, 3, 1, 2)[f]
+        t.px(8, 10, OLHO, 4, abertura)
+        if abertura > 1:
+            t.px(9, 10 + abertura - 1, VERMELHO, 2, 1)
+        lado = 13 if f % 2 == 0 else 1                          # balão "..." pulando de um lado para o outro
+        t.px(lado, -1, BRANCO, 6, 3); t.px(lado + (1 if lado == 1 else 4), 2, BRANCO)
+        for k in range(1 + f % 3):
+            t.px(lado + 1 + k * 2, 0, OLHO)
+        t.px(19 if f % 2 == 0 else 0, 9, CINZA); t.px(19 if f % 2 == 0 else 0, 11, CINZA)   # ondas de som
+        return t.img
+    if nome == "xingando":                # vermelho de raiva, gritando um balão de #@$!
+        VERMELHAO = (226, 92, 72)
         t = Tela()
-        corpo(t, bracos_y=None if nome == "reading" else 8)
+        t.ox += (0, 2, -2, 1, -1, 0)[f]                         # tremendo
+        corpo(t, VERMELHAO, bracos_y=None)
+        y = 5 if f % 2 else 7                                   # punhos sacudindo
+        t.px(1, y, VERMELHAO, 2, 2); t.px(17, 12 - y, VERMELHAO, 2, 2)
+        olhos(t, "bravo")
+        t.px(8, 10, OLHO, 4, 2); t.px(9, 11, VERMELHO, 2, 1)    # gritando
+        t.px(1, -1, BRANCO, 18, 5)                              # balão
+        simbolos = [["#.#", "###", "#.#"], ["###", "#.#", "##."], [".##", "#.#", "##."], ["#", "#", "."]]
+        cores = (VERMELHO, OLHO, AMARELO, VERMELHO)
+        for k, s in enumerate(simbolos):
+            dy = (k + f) % 2                                    # cada símbolo pula
+            texto_pixel(t, 2 + k * 4, 0 - dy + 1 if k < 3 else 0, s, cores[(k + f) % 4])
+        t.px(15, 3, VERMELHO)                                   # o ponto do "!"
+        if f in (1, 3, 5):                                      # fumaça saindo dos lados
+            t.px(0, 6, CINZA, 2, 1); t.px(18, 6, CINZA, 2, 1)
+        return t.img
+    if nome == "nerd":                    # óculos redondos
+        t = Tela()
+        corpo(t)
         for x in (5, 12):                 # armação ao redor de cada olho
             t.px(x, 5, OLHO, 3, 1); t.px(x, 8, OLHO, 3, 1)
             t.px(x, 6, OLHO, 1, 2); t.px(x + 2, 6, OLHO, 1, 2)
         t.px(8, 6, OLHO, 4, 1); t.px(3, 6, OLHO, 2, 1); t.px(15, 6, OLHO, 2, 1)
-        dy = 1 if nome == "reading" else 0
-        t.px(6, 6 + dy, OLHO); t.px(13, 6 + dy, OLHO)
+        t.px(6, 6, OLHO); t.px(13, 6, OLHO)
         if f == 2:
             t.px(5, 5, BRANCO); t.px(12, 5, BRANCO)
-        if nome == "reading":
-            t.px(2, 11, MARROM, 16, 4)                              # capa
-            t.px(3, 11, BRANCO, 6, 3); t.px(11, 11, BRANCO, 6, 3)   # páginas
-            t.px(9, 11, CINZA, 2, 3)                                # lombada
-            for y in (12, 13):                                      # linhas de texto
-                t.px(4, y, CINZA, 4 - par * (y - 12), 1); t.px(12, y, CINZA, 4 - (1 - par) * (y - 12), 1)
-            t.px(1, 11, LARANJA, 2, 2); t.px(17, 11, LARANJA, 2, 2)
-        else:
-            boca(t, "sorriso")
+        boca(t, "sorriso")
         return t.img
     if nome == "working":                 # notebook, digitando
         t = Tela()
@@ -198,17 +265,21 @@ def pose(nome, f):
         if par:
             t.px(18, 1, VERDE, 2, 1)
         return t.img
-    if nome == "running":                 # correndo
-        t = Tela(dy=-PX // 2 if par else 0)
+    if nome == "running":                 # correndo: pernas em ciclo, braços balançando, poeira para trás
+        t = Tela(dy=(0, -1, -2, 0, -1, -2)[f] * PX // 3)
         t.px(3, 4, LARANJA, 14, 9)
-        t.px(1, 6 if par else 9, LARANJA, 2, 2); t.px(17, 9 if par else 6, LARANJA, 2, 2)
-        pernas = [(3, 13), (6, 14), (13, 13), (16, 14)] if par else [(4, 14), (7, 13), (12, 14), (15, 13)]
-        for x, y in pernas:
-            t.px(x, y, LARANJA, 1 if y == 14 else 2, 1 if y == 14 else 2)
+        bracos = ((5, 9), (7, 7), (9, 5))[f % 3]
+        t.px(1, bracos[0], LARANJA, 2, 2); t.px(17, bracos[1], LARANJA, 2, 2)
+        pernas = (((3, 13, 2), (6, 14, 1), (13, 13, 2), (16, 14, 1)),
+                  ((4, 13, 1), (6, 13, 2), (13, 14, 1), (15, 13, 2)),
+                  ((5, 14, 1), (7, 13, 1), (12, 13, 2), (14, 14, 1)))[f % 3]
+        for x, y, h in pernas:
+            t.px(x, y, LARANJA, 1, h)
         olhos(t, "normal", dx=1); boca(t, "sorriso_lado")
-        for y, w in ((5, 2), (8, 3), (11, 2)):          # linhas de velocidade
-            t.px(-1 - (f % 2), y, CINZA, w, 1)
-        t.px(16, 2 + f % 3, AZUL)                        # suor
+        for k, (y, w) in enumerate(((5, 2), (8, 3), (11, 2))):  # linhas de velocidade
+            t.px(-1 - (f + k) % 3, y, CINZA, w, 1)
+        t.px(1 - f % 3, 15, CINZA_ESCURO, 2, 1)                  # poeira
+        t.px(16, 2 + f % 3, AZUL)                                # suor
         return t.img
     if nome == "coffee":                  # cafezinho
         t = Tela()
@@ -409,7 +480,8 @@ def pose(nome, f):
 
 
 POSES = set(EMOCOES[EMOCOES.index("waving"):])
-ESTADOS = {"conectando": 180, "ouvindo": 220, "falando": 140, "choque": 90, "codando": 260, "teclando": 120,
+ESTADOS = {"cozinhando": 200, "tagarelando": 110, "xingando": 120, "running": 110, "reading": 320,
+           "conectando": 180, "ouvindo": 220, "falando": 140, "choque": 90, "codando": 260, "teclando": 120,
            "skate": 140, "chateado": 220, "offline": 260, "sad": 320, "searching": 240,
            "volume_mais": 130, "volume_menos": 170, "sem_wifi": 330}   # ms por quadro (6 quadros)
 

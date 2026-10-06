@@ -273,7 +273,10 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             std::string papel = role ? role : "";
             std::string texto = content ? content : "";
             CartaoWatcher::Instancia().RegistrarConversa(papel, texto);  // registro local no microSD
+            // "* Codando…" (sessão trabalhando): o asterisco animado do Claude Code no lugar do "*"
+            bool asterisco = papel == "saudacao" && AsteriscoClaude::PrepararTexto(texto);
             if (texto.empty()) {
+                asterisco_.Esconder();
                 fala_.clear();
                 fala_exibida_ = 0;
                 papel_atual_.clear();
@@ -308,7 +311,14 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
                 lv_obj_remove_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
             }
             PosicionarMascote();
+            if (asterisco) {
+                asterisco_.Mostrar(chat_message_label_);
+            } else {
+                asterisco_.Esconder();
+            }
         }
+
+        AsteriscoClaude asterisco_;  // placa/asterisco_claude.h
 
         // Roda girando (volume): o Clawd mostra "volume_mais" ou "volume_menos" e o anel branco na borda mostra
         // o volume enquanto gira; 1,2 s depois do último passo o anel some e o Clawd volta para a emoção de
@@ -962,9 +972,9 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.5.6"
-OLLIE_POSE_ASSETS = "sem_wifi"
-OLLIE_ARQUIVO_ASSETS = "ollie-assets_2.bin"
+OLLIE_VERSAO_APP = "2.5.7"
+OLLIE_POSE_ASSETS = "xingando"
+OLLIE_ARQUIVO_ASSETS = "ollie-assets_3.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
 trocar(app_cc, '#include "websocket_protocol.h"\n', '#include "websocket_protocol.h"\n#include "lvgl_theme.h"\n')
 trocar(app_cc, """    std::string download_url = settings.GetString("download_url");
@@ -1016,6 +1026,8 @@ trocar(display_h, """    virtual void EsconderSemWifi() {}""", """    virtual vo
     virtual void MostrarAtualizando(bool ativo) {}""")
 trocar(placa, """#include "tela_sem_wifi.h"     // modo de configuração de Wi-Fi\n""",
        """#include "tela_sem_wifi.h"     // modo de configuração de Wi-Fi\n#include "spinner_watcher.h"   // spinner da tela de atualização\n""")
+trocar(placa, """#include "spinner_watcher.h"   // spinner da tela de atualização\n""",
+       """#include "spinner_watcher.h"   // spinner da tela de atualização\n#include "asterisco_claude.h"  // asterisco animado do Claude Code\n""")
 trocar(placa, """        // Modo de configuração de Wi-Fi: tela própria (placa/tela_sem_wifi.h) no lugar do alerta do XiaoZhi""",
        """        // Atualização do sistema: spinner no lugar do Clawd, no centro da tela; com 100 px ele termina onde
         // começa a caixa do progresso (layout de conversa, placa/layout_mascote.h)
