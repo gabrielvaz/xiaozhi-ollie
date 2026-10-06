@@ -42,6 +42,8 @@ EMOCOES = [
     # poses extras (o servidor escolhe pelo emoji da resposta ou pelo que está acontecendo)
     "waving", "nerd", "reading", "working", "running", "coffee", "party", "music",
     "searching", "idea", "rocket", "bug", "sunny", "rainy", "recording", "celebrating",
+    # roda girando (volume): aumentando e diminuindo
+    "volume_mais", "volume_menos",
 ]
 
 CINZA_ESCURO = (70, 70, 80)
@@ -244,6 +246,28 @@ def pose(nome, f):
         t.px(14, 9, AZUL, 4, 2); t.px(14, 9, BRANCO)
         t.px(18, 12, MARROM); t.px(19, 13, MARROM)
         return t.img
+    if nome in ("volume_mais", "volume_menos"):
+        # Medidor de volume em cima da cabeça: 4 barras (alturas 1 a 4) que acendem uma a uma ao aumentar
+        # e apagam ao diminuir. Aumentando: Clawd animado, braços para cima, pulinho. Diminuindo: tapa
+        # os ouvidos e o som vai embora pelos lados
+        mais = nome == "volume_mais"
+        acesas = (1, 2, 3, 4, 4, 4)[f] if mais else (4, 3, 2, 1, 0, 0)[f]
+        t = Tela(dy=-(PX // 2) if mais and par else 0)
+        corpo(t, bracos_y=None)
+        for i, x in enumerate((3, 7, 11, 15)):
+            cor = (VERDE, VERDE, AMARELO, VERMELHO)[i] if i < acesas else CINZA_ESCURO
+            t.px(x, 2 - i, cor, 2, i + 1)
+        if mais:
+            y = 5 if par else 7                                    # braços batendo no ar
+            t.px(1, y, LARANJA, 2, 2); t.px(17, y, LARANJA, 2, 2)
+            olhos(t, "feliz"); boca(t, "aberta")
+        else:
+            t.px(1, 5, LARANJA, 2, 3); t.px(17, 5, LARANJA, 2, 3)  # mãos tapando os ouvidos
+            t.px(3, 5, LARANJA_ESCURO, 1, 3); t.px(16, 5, LARANJA_ESCURO, 1, 3)
+            olhos(t, "fechado" if f in (1, 2, 3) else "meio"); boca(t, "reta")
+            if f in (1, 2, 3):                                     # o som indo embora pelos lados
+                t.px(0, 8 - f % 2, CINZA); t.px(19, 8 - f % 2, CINZA)
+        return t.img
     if nome == "idea":                    # lâmpada acendendo
         t = Tela()
         corpo(t)
@@ -302,7 +326,8 @@ def pose(nome, f):
 
 
 POSES = set(EMOCOES[EMOCOES.index("waving"):])
-ESTADOS = {"conectando": 180, "ouvindo": 220, "falando": 140, "choque": 90, "codando": 260, "teclando": 120}   # ms por quadro (6 quadros)
+ESTADOS = {"conectando": 180, "ouvindo": 220, "falando": 140, "choque": 90, "codando": 260, "teclando": 120,
+           "volume_mais": 130, "volume_menos": 170}   # ms por quadro (6 quadros)
 
 
 def quadro(emocao, f):

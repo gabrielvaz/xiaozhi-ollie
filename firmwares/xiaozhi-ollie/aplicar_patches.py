@@ -163,7 +163,7 @@ for fonte_c in ("font_noto_sans_pt_24.c", "font_jetbrains_mono_pt_22.c", "font_j
                 "font_ollie_logo_88.c"):
     shutil.copy(AQUI / "fonte" / fonte_c, placa_dir / fonte_c)
 placa = placa_dir / "sensecap_watcher.cc"
-trocar(placa, '#include <iot_knob.h>\n', '#include <iot_knob.h>\n\n#include "abertura_watcher.h"  // tela de abertura com o logo\n#include "fontes_watcher.h"    // Noto Sans ou JetBrains Mono (Configurações)\n')
+trocar(placa, '#include <iot_knob.h>\n', '#include <iot_knob.h>\n\n#include "abertura_watcher.h"  // tela de abertura com o logo\n#include "fontes_watcher.h"    // Noto Sans ou JetBrains Mono (Configurações)\n#include "layout_mascote.h"    // onde ficam o Clawd e o texto\n')
 trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.75); // 限制宽度，避免文字贴边
         }
@@ -171,12 +171,10 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             AberturaWatcher::Mostrar();
         }
 
-        // Fala em streaming na parte larga do círculo (412x412): 3 linhas visíveis, rola para baixo
+        // Fala em streaming na parte larga do círculo (412x412): 3 linhas visíveis, rola para baixo.
+        // A altura do Clawd e do texto vem de placa/layout_mascote.h (a mesma regra em todos os fluxos)
         static constexpr int kTextoLargura = 290;
         static constexpr int kLinhasVisiveis = 3;
-        static constexpr int kTextoTopo = 214;       // logo abaixo do mascote (82 + 110 + folga)
-        static constexpr int kSaudacaoTopo = 266;
-        static constexpr int kCarregandoTopo = 290;  // "Verificando atualização": abaixo do Clawd no centro    // saudação da espera: abaixo do Clawd centralizado
         static constexpr uint32_t kTickFalaMs = 66;  // ~15 caracteres por segundo, o ritmo medido da voz
 
         std::string fala_;            // texto completo do turno atual
@@ -194,7 +192,6 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_set_scroll_dir(bottom_bar_, LV_DIR_VER);
             lv_obj_set_scrollbar_mode(bottom_bar_, LV_SCROLLBAR_MODE_OFF);
-            lv_obj_align(bottom_bar_, LV_ALIGN_TOP_MID, 0, kTextoTopo);
             lv_obj_set_width(chat_message_label_, kTextoLargura);
             lv_obj_set_height(chat_message_label_, LV_SIZE_CONTENT);
             lv_label_set_long_mode(chat_message_label_, LV_LABEL_LONG_WRAP);  // quebra linha (o modo de rolagem não quebra)
@@ -210,24 +207,23 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             if (notification_label_ != nullptr) {
                 lv_obj_set_style_text_font(notification_label_, Fontes::Pequena(), 0);
             }
+            PosicionarMascote();  // a altura da linha muda com a fonte
         }
 
-        // Com fala, o mascote encolhe um pouco e sobe; sem fala, volta ao centro
-        void PosicionarMascote(bool com_texto, int dy_centro = -25) {
-            if (emoji_box_ == nullptr) {
-                return;
-            }
-            if (com_texto) {
-                lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, 82);  // ~20 px abaixo do status ("Ouvindo")
-                if (emoji_image_ != nullptr) {
-                    lv_image_set_scale(emoji_image_, 220);
-                }
-            } else {
-                lv_obj_align(emoji_box_, LV_ALIGN_CENTER, 0, dy_centro);  // espera: um pouco acima do centro (a saudação fica embaixo)
-                if (emoji_image_ != nullptr) {
-                    lv_image_set_scale(emoji_image_, 256);
-                }
-            }
+        int AlturaCaixaTexto() const {
+            return lv_font_get_line_height(Fontes::Grande()) * kLinhasVisiveis + 4;
+        }
+
+        // Clawd e texto como um bloco centrado na vertical; sem texto, o Clawd no centro exato
+        void PosicionarMascote() {
+            LayoutMascote::Aplicar(emoji_box_, emoji_image_, bottom_bar_, chat_message_label_, papel_atual_,
+                                   hide_subtitle_, AlturaCaixaTexto());
+        }
+
+        virtual void SetHideSubtitle(bool hide) override {
+            SpiLcdDisplay::SetHideSubtitle(hide);
+            DisplayLockGuard lock(this);
+            PosicionarMascote();  // modo só voz: sem texto, o Clawd volta ao centro
         }
 
         void RolarParaFim() {
@@ -286,7 +282,7 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
                 }
                 lv_label_set_text(chat_message_label_, "");
                 lv_obj_add_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
-                PosicionarMascote(false);
+                PosicionarMascote();
                 return;
             }
             if (papel == "assistant" && papel_atual_ == "assistant") {
@@ -296,12 +292,7 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
                 fala_exibida_ = 0;
                 lv_obj_scroll_to_y(bottom_bar_, 0, LV_ANIM_OFF);
             }
-            papel_atual_ = papel;
-            // Saudação da espera: Clawd fica no centro e o texto vai para baixo dele
-            bool saudacao = papel == "saudacao";
-            bool carregando = papel == "carregando";  // tela de "Verificando atualização"
-            lv_obj_align(bottom_bar_, LV_ALIGN_TOP_MID, 0,
-                         saudacao ? kSaudacaoTopo : (carregando ? kCarregandoTopo : kTextoTopo));
+            papel_atual_ = papel;  // "saudacao" (espera), "carregando" ("Verificando atualização") ou conversa
             if (papel == "assistant") {
                 if (timer_fala_ == nullptr) {
                     timer_fala_ = lv_timer_create(TickFala, kTickFalaMs, this);
@@ -316,11 +307,43 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             if (!hide_subtitle_) {
                 lv_obj_remove_flag(bottom_bar_, LV_OBJ_FLAG_HIDDEN);
             }
-            if (carregando) {
-                PosicionarMascote(false, 0);  // Clawd no centro exato da tela
-            } else {
-                PosicionarMascote(!saudacao);
+            PosicionarMascote();
+        }
+
+        // Roda girando (volume): o Clawd mostra "volume_mais" ou "volume_menos" enquanto gira e, 1,2 s depois
+        // do último passo, volta para a emoção de antes (ou a que chegou nesse meio-tempo)
+        static constexpr uint32_t kVolumeFimMs = 1200;
+        std::string emocao_atual_ = "neutral";
+        int volume_sentido_ = 0;  // 0: parado; 1: aumentando; -1: diminuindo
+        lv_timer_t* timer_volume_ = nullptr;
+
+        virtual void SetEmotion(const char* emotion) override {
+            DisplayLockGuard lock(this);
+            emocao_atual_ = emotion ? emotion : "neutral";
+            if (volume_sentido_ == 0) {
+                SpiLcdDisplay::SetEmotion(emotion);
             }
+        }
+
+        void MostrarVolume(bool aumentando) {
+            DisplayLockGuard lock(this);
+            int sentido = aumentando ? 1 : -1;
+            if (sentido != volume_sentido_) {  // só troca o GIF quando muda o sentido (não reinicia a animação)
+                volume_sentido_ = sentido;
+                SpiLcdDisplay::SetEmotion(aumentando ? "volume_mais" : "volume_menos");
+            }
+            if (timer_volume_ == nullptr) {
+                timer_volume_ = lv_timer_create(FimVolume, kVolumeFimMs, this);
+            }
+            lv_timer_reset(timer_volume_);
+            lv_timer_resume(timer_volume_);
+        }
+
+        static void FimVolume(lv_timer_t* timer) {
+            auto self = static_cast<CustomLcdDisplay*>(lv_timer_get_user_data(timer));
+            lv_timer_pause(timer);
+            self->volume_sentido_ = 0;
+            self->SpiLcdDisplay::SetEmotion(self->emocao_atual_.c_str());
         }
 
         // Percentual da bateria ao lado do ícone (o topo do círculo é estreito: os ícones vão um pouco à esquerda)
@@ -534,6 +557,10 @@ trocar(placa, """            GetDisplay()->SetPowerSaveMode(true);
             GetBacklight()->SetBrightness(0);  // tela apaga""")
 trocar(placa, """    void OnKnobRotate(bool clockwise) {""", """    void OnKnobRotate(bool clockwise) {
         power_save_timer_->WakeUp();  // girar a roda acorda a tela""")
+# Volume na roda: o Clawd anima enquanto gira (horário diminui, anti-horário aumenta, como no original)
+trocar(placa, """        GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + ": "+std::to_string(codec->output_volume()));""",
+       """        GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + ": "+std::to_string(codec->output_volume()));
+        static_cast<CustomLcdDisplay*>(display_)->MostrarVolume(!clockwise);""")
 
 # 15. Palavra de ativação personalizada no build.py: --wake-word "custom:hey ollie|Ollie" --------
 #     MultiNet7 em inglês (fonemas gerados no aparelho pelo flite_g2p do ESP-SR).

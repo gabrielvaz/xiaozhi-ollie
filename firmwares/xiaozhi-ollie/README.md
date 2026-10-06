@@ -61,6 +61,8 @@ Para criar um app: veja [`placa/README.md`](placa/README.md). Cada app é um arq
 | `aplicar_patches.py` | Todas as mudanças no código original, aplicadas sempre sobre o código limpo |
 | `placa/` | Plataforma de apps, telas, microSD e os apps |
 | `mascote-clawd/` | `gerar.py` desenha o Clawd; `previa.png` |
+| `placa/layout_mascote.h` | Onde ficam o Clawd e o texto: o corpo do Clawd sempre no centro exato da tela, e o texto logo abaixo dele |
+| `simulador/` | Tela do Watcher no Mac (LVGL 9.5 e decodificador de GIF do firmware, mesmo layout). `./rodar.sh --abrir` gera as cenas (abertura, carregando, espera, saudação, trabalhando, ouvindo, falando), confere se o Clawd está centrado e abre `saida/folha.png` e `saida/poses.png`. Precisa de um `compilar.sh` antes (usa os componentes baixados) |
 | `fonte/` | Noto Sans 24 px, JetBrains Mono (opção nas Configurações) e o logo da abertura; como gerar em `fonte/README.md` |
 | `../gravar-xiaozhi.sh` | Primeira gravação, com backup e sem tocar na partição de fábrica |
 | `../atualizar-firmware.sh` | Atualizações seguintes (mantém o Wi-Fi) |
