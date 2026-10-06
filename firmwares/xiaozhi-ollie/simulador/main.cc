@@ -606,6 +606,13 @@ int main() {
                         {"Atualizar agora", "Agora não"});
     Avancar(300);
     SalvarPng("22-atualizacao-pronta-sucesso");  // "-sucesso": tela sem Clawd, o medir.py não mede
+    // Sessão do Claude Code aberta (app_sessoes.h): título longo numa linha, sem cobrir a mensagem
+    painel.MostrarTexto("xiaozhi-ollie: corrigir o mascote sumido depois da atualização OTA",
+                        "Trabalhando · há 2 min\n\nCompilei a 2.5.4 e publiquei no servidor do OTA. "
+                        "O Watcher baixou os desenhos de novo e o Clawd voltou à tela inicial.",
+                        {"Enviar pedido", "Voltar"});
+    Avancar(300);
+    SalvarPng("24-sessao-detalhe-sucesso");  // "-sucesso": sem Clawd, o medir.py não mede
     painel.Fechar();
 
     // Modo de configuração de Wi-Fi (o firmware chama MostrarSemWifi com a rede e o endereço do portal)

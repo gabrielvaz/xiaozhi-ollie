@@ -195,7 +195,7 @@ public:
             lv_obj_center(erro);
         }
         auto r = Rotulo(Fontes::Pequena(), 0x9A9A9A, legenda);
-        lv_obj_set_width(r, 260);
+        lv_obj_set_size(r, 260, lv_font_get_line_height(Fontes::Pequena()));  // uma linha (LONG_DOT)
         lv_label_set_long_mode(r, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(r, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(r, LV_ALIGN_CENTER, 0, 142);
@@ -291,7 +291,7 @@ public:
         lv_obj_set_style_transform_scale(t, 512, 0);  // 2x, crescendo a partir do canto de cima
         lv_obj_align(t, LV_ALIGN_TOP_MID, 30, 98);
         auto d = Rotulo(Fontes::Pequena(), 0xEDEDED, descricao);
-        lv_obj_set_width(d, 300);
+        lv_obj_set_size(d, 300, lv_font_get_line_height(Fontes::Pequena()));  // uma linha (LONG_DOT)
         lv_label_set_long_mode(d, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(d, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(d, LV_ALIGN_TOP_MID, 0, 168);
@@ -384,7 +384,7 @@ public:
             angulo_aro_ = alvo_aro_ = alvo;
             PosicionarNoAro(cursor_aro_, alvo);
             cidade_aro_ = Rotulo(Fontes::Grande(), 0xD97757, "");
-            lv_obj_set_width(cidade_aro_, 260);
+            lv_obj_set_size(cidade_aro_, 260, lv_font_get_line_height(Fontes::Grande()));  // uma linha (LONG_DOT)
             lv_label_set_long_mode(cidade_aro_, LV_LABEL_LONG_DOT);
             lv_obj_set_style_text_align(cidade_aro_, LV_TEXT_ALIGN_CENTER, 0);
             lv_obj_align(cidade_aro_, LV_ALIGN_CENTER, 0, -82);
@@ -759,7 +759,9 @@ private:
 
     void Cabecalho(const std::string& texto) {
         auto r = Rotulo(Fontes::Grande(), 0xD97757, texto);
-        lv_obj_set_width(r, 260);
+        // Uma linha só: sem altura fixa o LONG_DOT quebra linha, e um título longo (nome de sessão) descia
+        // por cima do texto da tela
+        lv_obj_set_size(r, 260, lv_font_get_line_height(Fontes::Grande()));
         lv_label_set_long_mode(r, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(r, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(r, LV_ALIGN_TOP_MID, 0, 50);
