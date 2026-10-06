@@ -975,12 +975,25 @@ trocar(app_cc, """    std::string download_url = settings.GetString("download_ur
                     pedido.SetString("download_url", url);
                 }}
                 ESP_LOGW(TAG, "Assets sem a pose {OLLIE_POSE_ASSETS}: reiniciando para baixar %s", url.c_str());
+                // Programa recém-chegado pelo OTA ainda "a verificar": reiniciar sem marcá-lo válido faz o
+                // bootloader voltar à versão anterior, que baixava os assets e, se falhasse, ficava sem Clawd
+                ota_->MarkCurrentVersionValid();
                 Reboot();
                 return;
             }}
         }}
     }}
 """)
+#     Partição de assets apagada (download interrompido: o cabeçalho só é gravado no fim) não é "válida",
+#     e o original desistia aí: o Clawd sumia de vez. Com a partição presente, baixa de novo a cada boot
+#     até dar certo (sem reiniciar: nada está mapeado).
+trocar(XZ / "main/assets.h", """    inline bool partition_valid() const { return partition_valid_; }""",
+       """    inline bool partition_valid() const { return partition_valid_; }
+    inline bool partition_found() const { return partition_ != nullptr; }  // existe, mesmo apagada""")
+trocar(app_cc, """    if (!assets.partition_valid()) {
+        ESP_LOGW(TAG, "Assets partition is disabled for board %s", BOARD_NAME);""",
+       """    if (!assets.partition_found()) {
+        ESP_LOGW(TAG, "Assets partition is disabled for board %s", BOARD_NAME);""")
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))
