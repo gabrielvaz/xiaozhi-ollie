@@ -43,6 +43,22 @@ public:
             proxima_ = std::max(proxima_, aviso + 600);
             return;
         }
+        // Sessão do Claude Code rodando: Clawd trabalhando e uma frase de progresso no estilo do Claude Code
+        if (ContextoApps::atividade_n > 0) {
+            trabalhando_ = true;
+            if (agora >= proxima_trabalho_) {
+                proxima_trabalho_ = agora + 5;
+                MostrarTrabalho(agora >= proxima_pose_);
+                if (agora >= proxima_pose_) {
+                    proxima_pose_ = agora + 20;
+                }
+            }
+            return;
+        }
+        if (trabalhando_) {  // acabou: volta para a saudação na hora
+            trabalhando_ = false;
+            proxima_ = proxima_pose_ = agora;
+        }
         if (agora >= proxima_pose_) {
             proxima_pose_ = agora + 40 + (int)(esp_random() % 51);  // 40 a 90 s
             std::string pose = Pose();
@@ -69,6 +85,33 @@ private:
     bool perfil_ok_ = false;
     int ultima_frase_ = -1;
     int proxima_pose_ = 0;
+    int proxima_trabalho_ = 0;
+    bool trabalhando_ = false;
+    int verbo_ = -1;
+
+    // "Codando…" + a sessão que está rodando (e quantas mais); troca a pose de trabalho quando pedido
+    void MostrarTrabalho(bool trocar_pose) {
+        static const char* const kVerbos[] = {
+            TR("Codando", "Coding", "编码中", "Programando"), TR("Pensando", "Thinking", "思考中", "Pensando"),
+            TR("Ruminando", "Pondering", "琢磨中", "Rumiando"), TR("Refatorando", "Refactoring", "重构中", "Refactorizando"),
+            TR("Depurando", "Debugging", "调试中", "Depurando"), TR("Compilando", "Compiling", "编译中", "Compilando"),
+            TR("Arquitetando", "Architecting", "构思中", "Diseñando"), TR("Tecendo", "Weaving", "编织中", "Tejiendo"),
+            TR("Cozinhando", "Cooking", "烹饪中", "Cocinando"), TR("Lapidando", "Polishing", "打磨中", "Puliendo"),
+            TR("Orquestrando", "Orchestrating", "编排中", "Orquestando"), TR("Destrinchando", "Untangling", "梳理中", "Desenredando")};
+        constexpr int n = sizeof(kVerbos) / sizeof(kVerbos[0]);
+        verbo_ = (verbo_ + 1 + (int)(esp_random() % (n - 1))) % n;  // nunca repete o anterior
+        int outras = ContextoApps::atividade_n - 1;
+        std::string frase = std::string("* ") + kVerbos[verbo_] + "…\n" + ContextoApps::atividade_titulo +
+                            (outras > 0 ? " +" + std::to_string(outras) : "");
+        ContextoApps::App().Schedule([frase]() {
+            Board::GetInstance().GetDisplay()->SetChatMessage("saudacao", frase.c_str());
+        });
+        if (trocar_pose) {
+            static const char* const kPoses[] = {"codando", "teclando", "working", "searching", "reading", "bug", "rocket"};
+            const char* pose = kPoses[esp_random() % (sizeof(kPoses) / sizeof(kPoses[0]))];
+            ContextoApps::App().Schedule([pose]() { Board::GetInstance().GetDisplay()->SetEmotion(pose); });
+        }
+    }
     std::string ultima_pose_;
 
     // Pose do Clawd para a espera: um conjunto comum mais poses do período, sem repetir a anterior

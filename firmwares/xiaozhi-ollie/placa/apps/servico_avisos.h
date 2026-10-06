@@ -50,6 +50,13 @@ public:
             }
         }
         ultimo_id_ = RedeWatcher::Numero(raiz, "ultimo", ultimo_id_);
+        cJSON* atividade = cJSON_GetObjectItem(raiz, "atividade");
+        if (cJSON_IsObject(atividade)) {
+            ContextoApps::atividade_n = RedeWatcher::Numero(atividade, "trabalhando", 0);
+            cJSON* titulos = cJSON_GetObjectItem(atividade, "titulos");
+            cJSON* primeiro = cJSON_IsArray(titulos) ? cJSON_GetArrayItem(titulos, 0) : nullptr;
+            ContextoApps::atividade_titulo = cJSON_IsString(primeiro) ? primeiro->valuestring : "";
+        }
         cJSON_Delete(raiz);
     }
 

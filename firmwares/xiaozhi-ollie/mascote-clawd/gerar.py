@@ -37,6 +37,8 @@ EMOCOES = [
     "conectando", "ouvindo", "falando",
     # carregador conectado: o Clawd leva um choque
     "choque",
+    # trabalhando (sessões do Claude Code rodando): no terminal e no teclado
+    "codando", "teclando",
     # poses extras (o servidor escolhe pelo emoji da resposta ou pelo que está acontecendo)
     "waving", "nerd", "reading", "working", "running", "coffee", "party", "music",
     "searching", "idea", "rocket", "bug", "sunny", "rainy", "recording", "celebrating",
@@ -300,7 +302,7 @@ def pose(nome, f):
 
 
 POSES = set(EMOCOES[EMOCOES.index("waving"):])
-ESTADOS = {"conectando": 180, "ouvindo": 220, "falando": 140, "choque": 90}   # ms por quadro (6 quadros)
+ESTADOS = {"conectando": 180, "ouvindo": 220, "falando": 140, "choque": 90, "codando": 260, "teclando": 120}   # ms por quadro (6 quadros)
 
 
 def quadro(emocao, f):
@@ -424,6 +426,30 @@ def quadro(emocao, f):
         for i, (x, y) in enumerate(((0, 1), (18, 0), (19, 9), (0, 11), (17, 14))):
             if (i + f) % 2 == 0:         # faíscas em zigue-zague
                 t.px(x, y, AMARELO); t.px(x + 1, y + 1, AMARELO); t.px(x, y + 2, AMARELO)
+        return t.img
+    elif emocao == "codando":            # atrás de um terminal: linhas de código aparecendo
+        olhos(t, "normal", dy=1)                         # olhando para a tela
+        t.px(2, 10, CINZA_ESCURO, 16, 6)                 # monitor na frente da parte de baixo
+        t.px(3, 11, OLHO, 14, 4)                         # tela escura
+        cores = [VERDE, LARANJA, AZUL, AMARELO]
+        linhas = min(4, f % 6)
+        for k in range(linhas):                          # uma linha nova por quadro
+            t.px(4 + (k % 2) * 2, 11 + k, cores[k], (9, 6, 10, 5)[k], 1)
+        if f % 2:
+            t.px(5 + (linhas % 2) * 2 + (9, 6, 10, 5)[min(linhas, 3)] , 11 + min(linhas, 3), BRANCO)  # cursor
+        t.px(1 if f % 2 else 2, 15, LARANJA, 2, 1); t.px(17 if f % 2 == 0 else 16, 15, LARANJA, 2, 1)  # mãos
+        return t.img
+    elif emocao == "teclando":           # batendo rápido no teclado, teclas acendendo
+        t = Tela(dy=(0, -1)[f % 2] * PX // 3)
+        corpo(t, bracos_y=None)
+        olhos(t, "meio" if f % 3 else "normal", dy=1); boca(t, "reta")
+        t.px(2, 13, CINZA_ESCURO, 16, 2)                 # teclado
+        for k in range(7):
+            t.px(3 + k * 2, 13, CINZA if (k + f) % 3 else AMARELO, 1, 1)
+        t.px(1 if f % 2 else 3, 11 if f % 2 else 12, LARANJA, 2, 2)    # braços alternando
+        t.px(16 if f % 2 else 15, 12 if f % 2 else 11, LARANJA, 2, 2)
+        if f % 3 == 0:
+            t.px(17, 2, CINZA); t.px(18, 1, CINZA)       # "tec tec"
         return t.img
     elif emocao == "warning":
         olhos(t, "grande"); boca(t, "triste")

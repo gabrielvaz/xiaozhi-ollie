@@ -143,7 +143,10 @@ struct ContextoApps {
     }
 
     // Aviso na tela principal (som opcional: Lang::Sounds::OGG_POPUP etc.)
-    inline static std::atomic<int> ultimo_aviso{-100000};  // Agora() do último aviso (a saudação não o cobre)
+    inline static std::atomic<int> ultimo_aviso{-100000};
+    // Sessões do Claude Code trabalhando agora (vem junto com os avisos; a tela de espera mostra o Clawd trabalhando)
+    inline static std::atomic<int> atividade_n{0};
+    inline static std::string atividade_titulo;  // escrito e lido só pela tarefa da gaveta  // Agora() do último aviso (a saudação não o cobre)
 
     static void Avisar(const std::string& titulo, const std::string& texto, const std::string& emocao,
                        std::string_view som = "") {

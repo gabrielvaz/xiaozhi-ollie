@@ -23,6 +23,7 @@ MAX_AVISOS = 50
 MAX_HISTORICO = 200
 HISTORICO = Path(__file__).resolve().parents[2] / "data/avisos_historico.json"
 _avisos: list[dict] = []
+_atividade: dict = {"trabalhando": 0, "titulos": []}
 _seq = 0
 _trava = threading.Lock()
 _iniciado = False
@@ -91,9 +92,10 @@ def historico(limite: int = 60) -> list[dict]:
 
 def avisos_desde(ultimo: int) -> dict:
     with _trava:
+        # "atividade": sessões trabalhando agora (o Watcher mostra o Clawd trabalhando na tela de espera)
         if ultimo < 0:  # primeira consulta do aparelho: só sincroniza, sem repetir avisos antigos
-            return {"ultimo": _seq, "avisos": []}
-        return {"ultimo": _seq, "avisos": [a for a in _avisos if a["id"] > ultimo]}
+            return {"ultimo": _seq, "avisos": [], "atividade": dict(_atividade)}
+        return {"ultimo": _seq, "avisos": [a for a in _avisos if a["id"] > ultimo], "atividade": dict(_atividade)}
 
 
 def _frase_curta(titulo: str, fala: str) -> str:
@@ -129,7 +131,12 @@ def _loop(ponte) -> None:
     primeira = True
     while True:
         try:
-            for a in ponte._agentes():
+            agentes = ponte._agentes()
+            ativos = [_titulo_curto(a) for a in agentes
+                      if a.get("situacao") in ("trabalhando", "subagentes rodando") or a.get("status") == "working"]
+            with _trava:
+                _atividade.update(trabalhando=len(ativos), titulos=ativos[:3])
+            for a in agentes:
                 chave, estado, feitas = a["sessao"], a["status"], a.get("_conclusoes", 0)
                 if not primeira:
                     if estado == "blocked" and estados.get(chave) != "blocked":
