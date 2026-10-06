@@ -200,6 +200,7 @@ public:
     enum class Status { Carregando, Sucesso, Erro };
     // Ícone especial para Item::icone: sol desenhado em vetor (usado pelo app de previsão do tempo)
     static constexpr const char* kIconeSol = "\x01sol";
+    static constexpr const char* kIconeAmpulheta = "\x01ampulheta";  // ampulheta em contorno (cronômetro)
 
     // Status com ícone: spinner girando (carregando), check verde (sucesso) ou X vermelho (erro)
     void MostrarStatus(const std::string& cabecalho, Status status, const std::string& texto,
@@ -784,6 +785,11 @@ private:
                 celulas_.push_back(celula);
                 continue;
             }
+            if (item.icone != nullptr && strcmp(item.icone, kIconeAmpulheta) == 0) {
+                AmpulhetaContorno(celula);  // idem: a fonte não tem ampulheta
+                celulas_.push_back(celula);
+                continue;
+            }
             auto ic = Rotulo(&font_material_symbols_30_4, 0xD97757,
                              item.icone != nullptr ? item.icone : MATERIAL_SYMBOLS_ROBOT_2, celula);
             lv_obj_set_style_transform_scale(ic, 358, 0);
@@ -822,6 +828,29 @@ private:
         for (const auto& raio : kRaios) {
             auto l = lv_line_create(sol);
             lv_line_set_points(l, raio, 2);
+            lv_obj_set_style_line_width(l, 4, 0);
+            lv_obj_set_style_line_rounded(l, true, 0);
+            lv_obj_set_style_line_color(l, lv_color_hex(0xD97757), 0);
+        }
+    }
+
+    // Ampulheta em contorno: tampas em cima e embaixo e os dois vidros se encontrando no meio
+    void AmpulhetaContorno(lv_obj_t* celula) {
+        auto amp = lv_obj_create(celula);
+        lv_obj_remove_style_all(amp);
+        lv_obj_set_size(amp, 44, 44);
+        lv_obj_add_flag(amp, LV_OBJ_FLAG_USER_1);  // AtualizarGrade repinta as partes
+        lv_obj_center(amp);
+        static const lv_point_precise_t kTampaCima[] = {{9, 4}, {35, 4}};
+        static const lv_point_precise_t kTampaBaixo[] = {{9, 40}, {35, 40}};
+        static const lv_point_precise_t kEsquerda[] = {{13, 5}, {13, 12}, {22, 22}, {13, 32}, {13, 39}};
+        static const lv_point_precise_t kDireita[] = {{31, 5}, {31, 12}, {22, 22}, {31, 32}, {31, 39}};
+        static const lv_point_precise_t kAreia[] = {{17, 36}, {27, 36}};
+        const lv_point_precise_t* tracos[] = {kTampaCima, kTampaBaixo, kEsquerda, kDireita, kAreia};
+        const int pontos[] = {2, 2, 5, 5, 2};
+        for (int k = 0; k < 5; k++) {
+            auto l = lv_line_create(amp);
+            lv_line_set_points(l, tracos[k], pontos[k]);
             lv_obj_set_style_line_width(l, 4, 0);
             lv_obj_set_style_line_rounded(l, true, 0);
             lv_obj_set_style_line_color(l, lv_color_hex(0xD97757), 0);

@@ -25,6 +25,10 @@ for linha in open(sys.argv[1], encoding="utf-8"):
                   f"maior bloco {e['maior_bloco_k']}k)  psram {e['psram_k']}k  estado {e['estado']}")
     elif e["tipo"] == "buraco":
         print(f"{e['quando']}  ** SEM PULSO por {e['sem_pulso_s'] // 60} min: {e['explicacao']}")
+    elif e["tipo"] == "sessao_anterior":
+        print(f"{e['quando']}  ligou de novo ({e.get('motivo_deste_inicio')}). Fim da sessão anterior (microSD):")
+        for r in e.get("rastro", "").splitlines()[-15:]:
+            print(f"      {r}")
     elif e["tipo"] == "reinicio":
         print(f"{e['quando']}  ** REINICIOU: {e['motivo']}. Últimos eventos antes disso:")
         for r in e.get("rastro", "").splitlines():

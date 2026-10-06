@@ -204,7 +204,8 @@ TROCAS: list[tuple[str, str, str]] = [
                                 web.get("/watcher/conversas", conversas.handle_lista),
                                 web.get("/watcher/conversas/{id}", conversas.handle_conversa),
                                 web.get("/watcher/conversas/{id}/audio", conversas.handle_audio),
-                                web.get("/watcher/reunioes", reunioes.handle_lista)])
+                                web.get("/watcher/reunioes", reunioes.handle_lista),
+                                web.get("/watcher/reunioes/{id}", reunioes.handle_reuniao)])
                 iniciar_vigia()
                 # 添加路由
                 app.add_routes("""),

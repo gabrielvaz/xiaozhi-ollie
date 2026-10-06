@@ -5,6 +5,7 @@
 #pragma once
 
 #include <atomic>
+#include <cctype>
 #include <vector>
 
 #include "../idioma_watcher.h"
@@ -12,7 +13,8 @@
 
 class AppReuniao : public AppWatcher {
 public:
-    const char* Nome() const override { return TR("Reuniões", "Meetings", "会议", "Reuniones"); }
+    const char* Nome() const override { return TR("Gravador", "Recorder", "录音机", "Grabadora"); }
+    const char* Id() const override { return "gravador"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_MIC; }
     std::string Detalhe() const override { return TR("Transcrição e resumo no Notas", "Transcript, summary in Notes", "转写与摘要存入备忘录", "Transcripción y resumen en Notas"); }
     bool PrendeTela() const override { return gravando_; }
@@ -20,7 +22,7 @@ public:
     void Abrir(ContextoApps& c) override {
         tela_ = Tela::Carregando;
         buscar_em_ = 0;
-        c.painel.MostrarStatus(TR("Reuniões", "Meetings", "会议", "Reuniones"), PainelWatcher::Status::Carregando,
+        c.painel.MostrarStatus(TR("Gravador", "Recorder", "录音机", "Grabadora"), PainelWatcher::Status::Carregando,
                                TR("Carregando reuniões…", "Loading meetings…", "正在加载会议…", "Cargando reuniones…"));
     }
 
@@ -79,8 +81,12 @@ public:
             return true;
         }
         if (tela_ == Tela::Lista && i > 1 && i <= (int)lista_.size() + 1) {
-            tela_ = Tela::Item;
-            c.painel.MostrarTexto(lista_[i - 2].titulo, lista_[i - 2].detalhe, {TR("Voltar", "Back", "返回", "Volver")});
+            // Detalhe: duração e resumo, buscados no Mac (no Tique, fora da trava da gaveta)
+            atual_ = i - 2;
+            tela_ = Tela::Carregando;
+            buscar_detalhe_ = true;
+            c.painel.MostrarStatus(lista_[atual_].titulo, PainelWatcher::Status::Carregando,
+                                   TR("Abrindo a reunião…", "Opening meeting…", "正在打开会议…", "Abriendo la reunión…"));
             return true;
         }
         if (tela_ == Tela::Item) {
@@ -99,6 +105,18 @@ public:
     }
 
     void Tique(ContextoApps& c) override {
+        if (tela_ == Tela::Carregando && buscar_detalhe_.exchange(false)) {
+            const auto& r = lista_[atual_];
+            std::string corpo, texto;
+            if (RedeWatcher::Pedir("GET", "/watcher/reunioes/" + Codificar(r.id), "", corpo)) {
+                cJSON* raiz = cJSON_Parse(corpo.c_str());
+                texto = RedeWatcher::Campo(raiz, "texto");
+                cJSON_Delete(raiz);
+            }
+            tela_ = Tela::Item;
+            c.painel.MostrarTexto(r.titulo, texto.empty() ? r.detalhe : texto, {TR("Voltar", "Back", "返回", "Volver")});
+            return;
+        }
         if (tela_ == Tela::Carregando) {
             if (ContextoApps::Agora() >= buscar_em_) {
                 BuscarLista(c);
@@ -125,8 +143,25 @@ public:
 
 private:
     enum class Tela { Gravando, Carregando, Lista, Item };
+    std::atomic<bool> buscar_detalhe_{false};
+    int atual_ = 0;
+
+    static std::string Codificar(const std::string& texto) {  // id tem espaço ("2026-10-05 19h55")
+        static const char* hex = "0123456789ABCDEF";
+        std::string saida;
+        for (unsigned char ch : texto) {
+            if (isalnum(ch) || ch == '-' || ch == '_' || ch == '.') {
+                saida += (char)ch;
+            } else {
+                saida += '%';
+                saida += hex[ch >> 4];
+                saida += hex[ch & 15];
+            }
+        }
+        return saida;
+    }
     struct Reuniao {
-        std::string titulo, detalhe;
+        std::string id, titulo, detalhe;
     };
     std::atomic<Tela> tela_{Tela::Gravando};
     std::atomic<bool> gravando_{false};
@@ -186,7 +221,7 @@ private:
         // Lista das reuniões gravadas (espera o servidor registrar a que acabou de terminar)
         tela_ = Tela::Carregando;
         buscar_em_ = ContextoApps::Agora() + 2;
-        c.painel.MostrarStatus(TR("Reuniões", "Meetings", "会议", "Reuniones"), PainelWatcher::Status::Carregando,
+        c.painel.MostrarStatus(TR("Gravador", "Recorder", "录音机", "Grabadora"), PainelWatcher::Status::Carregando,
                                TR("Salvando a reunião…", "Saving meeting…", "正在保存会议…", "Guardando la reunión…"));
     }
 
@@ -202,7 +237,8 @@ private:
         cJSON* itens = raiz ? cJSON_GetObjectItem(raiz, "reunioes") : nullptr;
         cJSON* item = nullptr;
         cJSON_ArrayForEach(item, itens) {
-            lista_.push_back({RedeWatcher::Campo(item, "titulo"), RedeWatcher::Campo(item, "detalhe")});
+            lista_.push_back({RedeWatcher::Campo(item, "id"), RedeWatcher::Campo(item, "titulo"),
+                              RedeWatcher::Campo(item, "detalhe")});
         }
         cJSON_Delete(raiz);
         MostrarLista(c);
@@ -217,6 +253,6 @@ private:
         for (const auto& r : lista_) {
             itens.push_back({r.titulo, r.detalhe, MATERIAL_SYMBOLS_SCHEDULE});
         }
-        c.painel.MostrarLista(TR("Reuniões", "Meetings", "会议", "Reuniones"), itens, 1);
+        c.painel.MostrarLista(TR("Gravador", "Recorder", "录音机", "Grabadora"), itens, 1);
     }
 };

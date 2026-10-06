@@ -1,14 +1,19 @@
 // Diagnóstico de travamentos do Watcher.
 // - Rastro: os últimos eventos (estado, app aberto, memória livre) numa área da RAM que sobrevive a
 //   reinícios por pânico ou watchdog (RTC_NOINIT). Ao religar, se o motivo foi anormal, o rastro vai ao Mac.
-// - Pulso: a cada minuto o aparelho manda ao Mac memória livre, estado e app aberto. Se ele congelar sem
+// - Cópia no microSD (/sdcard/watcher/diagnostico.log): sobrevive até a desligar e ligar na mão (que apaga a
+//   RAM); ao ligar, o fim da sessão anterior vai ao Mac.
+// - Pulso: a cada 30 s o aparelho manda ao Mac memória livre, estado e app aberto. Se ele congelar sem
 //   reiniciar, o buraco entre os pulsos aparece no registro do servidor (data/diagnostico.log).
 #pragma once
 
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 #include <string>
+
+#include <sys/stat.h>
 
 #include <esp_attr.h>
 #include <esp_heap_caps.h>
@@ -66,6 +71,50 @@ public:
         strncpy(destino, linha, kTamanho - 1);  // corta o que passar do espaço da entrada
         destino[kTamanho - 1] = '\0';
         rastro_.proxima = (rastro_.proxima + 1) % kEntradas;
+        std::lock_guard<std::mutex> trava(trava_);
+        if (pendente_.size() < 8192) {
+            pendente_ += std::string(linha) + "\n";
+        }
+    }
+
+    // Grava no microSD o que foi anotado desde a última vez (chamado a cada poucos segundos)
+    static void GravarNoCartao(const char* pasta) {
+        std::string bloco;
+        {
+            std::lock_guard<std::mutex> trava(trava_);
+            bloco.swap(pendente_);
+        }
+        if (bloco.empty()) {
+            return;
+        }
+        std::string caminho = std::string(pasta) + "/diagnostico.log";
+        struct stat info;
+        if (stat(caminho.c_str(), &info) == 0 && info.st_size > 256 * 1024) {
+            rename(caminho.c_str(), (caminho + ".antigo").c_str());  // limita o tamanho
+        }
+        if (FILE* f = fopen(caminho.c_str(), "a")) {
+            fwrite(bloco.data(), 1, bloco.size(), f);
+            fclose(f);
+        }
+    }
+
+    // Últimas linhas da sessão anterior no microSD (até a linha "liga" desta sessão, que ainda não foi gravada)
+    static std::string FimDaSessaoAnterior(const char* pasta, size_t bytes = 1600) {
+        std::string caminho = std::string(pasta) + "/diagnostico.log";
+        FILE* f = fopen(caminho.c_str(), "r");
+        if (f == nullptr) {
+            return "";
+        }
+        fseek(f, 0, SEEK_END);
+        long tamanho = ftell(f);
+        long inicio = tamanho > (long)bytes ? tamanho - (long)bytes : 0;
+        fseek(f, inicio, SEEK_SET);
+        std::string texto(tamanho - inicio, '\0');
+        size_t lidos = fread(texto.data(), 1, texto.size(), f);
+        fclose(f);
+        texto.resize(lidos);
+        auto quebra = texto.find('\n');
+        return inicio > 0 && quebra != std::string::npos ? texto.substr(quebra + 1) : texto;
     }
 
     static bool RelatorioPendente() { return relatorio_pendente_; }
@@ -100,4 +149,6 @@ private:
     inline static esp_reset_reason_t motivo_ = ESP_RST_UNKNOWN;
     inline static bool relatorio_pendente_ = false;
     inline static std::string rastro_anterior_;
+    inline static std::mutex trava_;
+    inline static std::string pendente_;  // linhas ainda não gravadas no microSD
 };

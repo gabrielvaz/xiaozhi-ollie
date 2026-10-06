@@ -63,7 +63,7 @@ def _resumo_sessoes(ponte) -> str:
 
 
 def _reunioes(limite: int = 3) -> list[dict]:
-    pasta = ICLOUD / "Reuniões"
+    from core.utils.reuniao import PASTA as pasta  # local (o iCloud recebe a cópia só no Backup)
     itens = []
     for d in sorted(pasta.glob("*/resumo.md"), reverse=True)[:limite]:
         texto = ler_texto(d, padrao="")

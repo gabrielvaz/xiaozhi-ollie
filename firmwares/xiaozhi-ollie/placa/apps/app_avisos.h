@@ -43,13 +43,15 @@ public:
             const auto& a = avisos_[atual_];
             tela_ = Tela::Item;
             c.painel.MostrarTexto(a.Nome(), a.Linha() + "\n\n" + a.texto,
-                                  a.sessao.empty() ? std::vector<std::string>{TR("Voltar", "Back", "返回", "Volver")}
-                                                   : std::vector<std::string>{TR("Ir para a sessão", "Go to session", "前往会话", "Ir a la sesión"),
+                                  !a.TemSessao() ? std::vector<std::string>{TR("Voltar", "Back", "返回", "Volver")}
+                                                 : std::vector<std::string>{TR("Continuar", "Continue", "继续", "Continuar"),
                                                                             TR("Voltar", "Back", "返回", "Volver")});
             return true;
         }
-        if (tela_ == Tela::Item && i == 0 && !avisos_[atual_].sessao.empty() && c.abrir_app) {
-            c.abrir_app("sessoes", "ir\n" + avisos_[atual_].sessao);
+        // Continuar: abre a sessão no app Claude Code (mensagens, enviar pedido, responder pergunta)
+        if (tela_ == Tela::Item && i == 0 && avisos_[atual_].TemSessao() && c.abrir_app) {
+            const auto& a = avisos_[atual_];
+            c.abrir_app("sessoes", "ir\n" + a.sessao + "\n" + a.Nome());
             return true;
         }
         MostrarLista(c);
@@ -98,6 +100,7 @@ private:
             auto pos = texto.find(": ");
             return (tipo == "concluiu" && pos != std::string::npos && pos < 40) ? texto.substr(0, pos) : titulo;
         }
+        bool TemSessao() const { return !sessao.empty() || Nome() != titulo; }
         // Linha de baixo: quando e o tipo do aviso ("Hoje 19:30 · Tarefa concluída")
         std::string Linha() const { return Nome() == titulo ? detalhe : detalhe + " · " + titulo; }
     };

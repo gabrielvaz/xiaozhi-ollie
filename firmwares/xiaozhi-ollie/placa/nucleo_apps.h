@@ -23,6 +23,7 @@
 #include "application.h"
 #include "board.h"
 #include "cartao_watcher.h"
+#include "diagnostico_watcher.h"
 #include "painel_watcher.h"
 #include "settings.h"
 #include "system_info.h"
@@ -83,6 +84,9 @@ public:
             return false;
         }
         auto http = rede->CreateHttp(0);
+        // 15 s (o padrão era 30 s, e a gaveta inteira esperava); áudio gerado na hora pode demorar mais
+        http->SetTimeout(caminho.find("/audio") != std::string::npos ? 90000 : 15000);
+        DiagnosticoWatcher::Marcar("%s %.32s", metodo, caminho.c_str());
         http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
         http->SetHeader("Client-Id", board.GetUuid());
         http->SetHeader("Authorization", "Bearer " + token);
@@ -91,15 +95,18 @@ public:
             http->SetContent(std::string(conteudo));
         }
         if (auto aberto = http->Open(metodo, BaseUrl() + caminho); !aberto) {
+            DiagnosticoWatcher::Marcar("  falhou ao abrir");
             return false;
         }
         auto status = http->GetStatusCode();
         if (!status || *status != 200) {
+            DiagnosticoWatcher::Marcar("  status %d", status ? *status : -1);
             http->Close();
             return false;
         }
         corpo = http->ReadAll();
         http->Close();
+        DiagnosticoWatcher::Marcar("  ok %u bytes", (unsigned)corpo.size());
         return true;
     }
 

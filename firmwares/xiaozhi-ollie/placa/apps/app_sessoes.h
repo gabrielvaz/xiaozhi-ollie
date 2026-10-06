@@ -1,7 +1,7 @@
 // App "Claude Code": lista as sessões do Claude Code/Codex no herdr, mostra as últimas mensagens (roláveis),
 // manda um pedido por voz e responde pela tela às perguntas da sessão (escolha única ou múltipla,
 // e pedidos de permissão), ou pede ao agente para ler as opções e responder por voz.
-// Aberto por um aviso de "sessão esperando você", mostra o aviso com o botão "Ir para a sessão".
+// Aberto por um aviso (sessão esperando você ou tarefa concluída), mostra o aviso com o botão "Continuar".
 #pragma once
 
 #include <atomic>
@@ -26,7 +26,7 @@ public:
         pedido_ = Pedido::Lista;
     }
 
-    // Argumento "aviso\n<id>\n<título>\n<texto>": tela do aviso com "Ir para a sessão"
+    // Argumento "aviso\n<id>\n<título>\n<texto>": tela do aviso com "Continuar" (abre a sessão)
     void AbrirCom(ContextoApps& c, const std::string& argumento) override {
         std::vector<std::string> partes;
         size_t ini = 0;
@@ -38,8 +38,11 @@ public:
             partes.push_back(argumento.substr(ini, fim - ini));
             ini = fim + 1;
         }
-        if (argumento.rfind("ir\n", 0) == 0) {  // "ir\n<id>": abre direto a sessão (ex.: do histórico de avisos)
-            ir_para_ = argumento.substr(3);
+        if (argumento.rfind("ir\n", 0) == 0) {  // "ir\n<id>[\n<título>]": abre direto a sessão (ex.: de um aviso)
+            std::string resto = argumento.substr(3);
+            auto quebra = resto.find('\n');
+            ir_para_ = resto.substr(0, quebra);
+            ir_titulo_ = quebra == std::string::npos ? "" : resto.substr(quebra + 1);
             tela_ = Tela::Carregando;
             c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
             pedido_ = Pedido::Lista;
@@ -51,7 +54,7 @@ public:
         }
         ir_para_ = partes[1];
         tela_ = Tela::Aviso;
-        c.painel.MostrarTexto(partes[2], argumento.substr(ini), {TR("Ir para a sessão", "Go to session", "前往会话", "Ir a la sesión"), TR("Fechar", "Close", "关闭", "Cerrar")});
+        c.painel.MostrarTexto(partes[2], argumento.substr(ini), {TR("Continuar", "Continue", "继续", "Continuar"), TR("Fechar", "Close", "关闭", "Cerrar")});
     }
 
     void Girar(ContextoApps& c, int passo) override {
@@ -227,7 +230,8 @@ private:
     std::atomic<Pedido> pedido_{Pedido::Nada};
     std::vector<Sessao> sessoes_;
     int atual_ = 0;
-    std::string ir_para_;    // id da sessão a abrir depois de carregar a lista (vindo de um aviso)
+    std::string ir_para_;
+    std::string ir_titulo_;    // id da sessão a abrir depois de carregar a lista (vindo de um aviso)
     std::string mensagens_;  // últimas mensagens da sessão aberta
     Pergunta pergunta_;      // pergunta aberta na sessão (texto vazio = nenhuma)
     std::vector<int> escolhas_;
@@ -266,10 +270,19 @@ private:
         }
         cJSON_Delete(raiz);
         if (!ir_para_.empty()) {  // veio de um aviso: abre direto a sessão
-            std::string alvo;
+            std::string alvo, titulo;
             alvo.swap(ir_para_);
+            titulo.swap(ir_titulo_);
             for (int i = 0; i < (int)sessoes_.size(); i++) {
-                if (sessoes_[i].id == alvo) {
+                if (!alvo.empty() && sessoes_[i].id == alvo) {
+                    AbrirSessao(c, i);
+                    return;
+                }
+            }
+            // Sem id (avisos antigos) ou id mudou: procura pelo título (um pode estar cortado)
+            for (int i = 0; i < (int)sessoes_.size() && !titulo.empty(); i++) {
+                const auto& t = sessoes_[i].titulo;
+                if (t.rfind(titulo.substr(0, t.size()), 0) == 0 || titulo.rfind(t, 0) == 0) {
                     AbrirSessao(c, i);
                     return;
                 }

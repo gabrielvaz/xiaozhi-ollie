@@ -174,7 +174,7 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
         // Fala em streaming na parte larga do círculo (412x412): 3 linhas visíveis, rola para baixo
         static constexpr int kTextoLargura = 290;
         static constexpr int kLinhasVisiveis = 3;
-        static constexpr int kTextoTopo = 200;
+        static constexpr int kTextoTopo = 214;       // logo abaixo do mascote (82 + 110 + folga)
         static constexpr int kSaudacaoTopo = 266;
         static constexpr int kCarregandoTopo = 290;  // "Verificando atualização": abaixo do Clawd no centro    // saudação da espera: abaixo do Clawd centralizado
         static constexpr uint32_t kTickFalaMs = 66;  // ~15 caracteres por segundo, o ritmo medido da voz
@@ -218,7 +218,7 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
                 return;
             }
             if (com_texto) {
-                lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, 62);
+                lv_obj_align(emoji_box_, LV_ALIGN_TOP_MID, 0, 82);  // ~20 px abaixo do status ("Ouvindo")
                 if (emoji_image_ != nullptr) {
                     lv_image_set_scale(emoji_image_, 220);
                 }
@@ -252,7 +252,8 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             }
             // Acompanha a voz: enquanto fala, só avança com o áudio tocando (espera o início e as pausas)
             auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateSpeaking && app.GetAudioService().IsPlaybackIdle()) {
+            if (app.GetDeviceState() == kDeviceStateSpeaking && app.VozLigada() &&
+                app.GetAudioService().IsPlaybackIdle()) {
                 return;
             }
             size_t atraso = fala_.size() - fala_exibida_;
@@ -320,6 +321,34 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             } else {
                 PosicionarMascote(!saudacao);
             }
+        }
+
+        // Percentual da bateria ao lado do ícone (o topo do círculo é estreito: os ícones vão um pouco à esquerda)
+        lv_obj_t* bateria_pct_ = nullptr;
+
+        virtual void UpdateStatusBar(bool update_all = false) override {
+            SpiLcdDisplay::UpdateStatusBar(update_all);
+            int nivel = 0;
+            bool carregando = false, descarregando = false;
+            if (!Board::GetInstance().GetBatteryLevel(nivel, carregando, descarregando)) {
+                return;
+            }
+            DisplayLockGuard lock(this);
+            if (top_bar_ == nullptr || battery_label_ == nullptr) {
+                return;
+            }
+            if (bateria_pct_ == nullptr) {
+                auto icone = static_cast<LvglTheme*>(current_theme_)->icon_font()->font();
+                int l = icone->line_height;
+                lv_obj_align(network_label_, LV_ALIGN_TOP_MID, -5 * l / 2, 0);
+                lv_obj_align(mute_label_, LV_ALIGN_TOP_MID, -l / 2, 0);
+                lv_obj_align(battery_label_, LV_ALIGN_TOP_MID, 3 * l / 2, 0);
+                bateria_pct_ = lv_label_create(top_bar_);
+                lv_obj_set_style_text_font(bateria_pct_, Fontes::Pequena(), 0);
+            }
+            lv_obj_set_style_text_color(bateria_pct_, lv_obj_get_style_text_color(battery_label_, LV_PART_MAIN), 0);
+            lv_label_set_text_fmt(bateria_pct_, "%d%%", nivel);
+            lv_obj_align_to(bateria_pct_, battery_label_, LV_ALIGN_OUT_RIGHT_MID, 4, 0);
         }
 
         virtual void SetTheme(Theme* theme) override {
@@ -594,6 +623,19 @@ trocar(XZ / "main/assets/locales/pt-BR/language.json", '"CHECKING_NEW_VERSION": 
 trocar(app_h, """    bool IsVoiceDetected() const { return audio_service_.IsVoiceDetected(); }""",
        """    bool IsVoiceDetected() const { return audio_service_.IsVoiceDetected(); }
     bool GravandoLocal() const { return gravacao_local_; }""")
+
+# 20. Respostas faladas liga/desliga (Configurações): desligadas, o áudio da resposta é descartado e
+#     só o texto aparece na tela
+trocar(app_h, """    bool GravandoLocal() const { return gravacao_local_; }""",
+       """    bool GravandoLocal() const { return gravacao_local_; }
+    bool VozLigada() const { return voz_ligada_; }
+    void DefinirVoz(bool ligada) { voz_ligada_ = ligada; }
+    bool voz_ligada_ = true;  // Configurações > Respostas faladas""")
+trocar(app_cc, """        if (GetDeviceState() == kDeviceStateSpeaking) {
+            audio_service_.PushPacketToDecodeQueue(std::move(packet));
+        }""", """        if (GetDeviceState() == kDeviceStateSpeaking && voz_ligada_) {  // modo só texto: não toca a resposta
+            audio_service_.PushPacketToDecodeQueue(std::move(packet));
+        }""")
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))

@@ -26,6 +26,15 @@
 
 inline void RegistrarApps(GavetaWatcher& gaveta) {
     DiagnosticoWatcher::Iniciar();  // motivo do último reinício e rastro anterior
+    ContextoApps::App().DefinirVoz(ConfigWatcher::Int("voz", 1));  // Configurações > Respostas faladas
+    // JSON das respostas do servidor (milhares de pedacinhos) na PSRAM: a memória interna fragmentava
+    static cJSON_Hooks ganchos = {
+        [](size_t n) -> void* {
+            void* p = heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            return p ? p : malloc(n);
+        },
+        [](void* p) { free(p); }};
+    cJSON_InitHooks(&ganchos);
     gaveta.Registrar(std::make_unique<AppSessoes>());
     gaveta.Registrar(std::make_unique<AppCodex>());
     gaveta.Registrar(std::make_unique<AppAvisos>());

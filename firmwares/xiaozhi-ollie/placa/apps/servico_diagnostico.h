@@ -1,4 +1,4 @@
-// Serviço (sem tela na gaveta): anota mudanças de estado no rastro de diagnóstico, manda um pulso por minuto
+// Serviço (sem tela na gaveta): anota mudanças de estado no rastro de diagnóstico, manda um pulso a cada 30 s
 // ao Mac (memória livre, estado, tempo ligado) e, depois de um reinício anormal (pânico, watchdog, queda de
 // energia), manda o motivo e o rastro do que acontecia antes. Ver diagnostico_watcher.h.
 #pragma once
@@ -23,8 +23,28 @@ public:
             estado_anterior_ = estado;
         }
         int agora = ContextoApps::Agora();
+        auto& cartao = CartaoWatcher::Instancia();
+        if (cartao.Montado()) {
+            if (!leu_sessao_anterior_) {  // antes de gravar a sessão atual por cima
+                leu_sessao_anterior_ = true;
+                sessao_anterior_ = DiagnosticoWatcher::FimDaSessaoAnterior(CartaoWatcher::kPasta);
+            }
+            if (agora - ultima_gravacao_ >= 5) {
+                ultima_gravacao_ = agora;
+                DiagnosticoWatcher::GravarNoCartao(CartaoWatcher::kPasta);
+            }
+        }
         if (!RedeWatcher::Online()) {
             return;
+        }
+        if (!sessao_anterior_.empty()) {  // fim da sessão anterior (útil quando foi desligado na mão)
+            std::string corpo = "{\"tipo\":\"sessao_anterior\",\"motivo_deste_inicio\":\"" +
+                                std::string(DiagnosticoWatcher::NomeMotivo(DiagnosticoWatcher::Motivo())) +
+                                "\",\"rastro\":\"" + Escapar(sessao_anterior_) + "\"}";
+            std::string resposta;
+            if (RedeWatcher::Pedir("POST", "/watcher/diagnostico", corpo, resposta)) {
+                sessao_anterior_.clear();
+            }
         }
         if (DiagnosticoWatcher::RelatorioPendente()) {
             std::string corpo = "{\"tipo\":\"reinicio\",\"motivo\":\"" +
@@ -35,7 +55,7 @@ public:
                 DiagnosticoWatcher::RelatorioEnviado();
             }
         }
-        if (agora - ultimo_pulso_ < 60) {
+        if (agora - ultimo_pulso_ < 30) {
             return;
         }
         ultimo_pulso_ = agora;
@@ -55,6 +75,9 @@ public:
 private:
     DeviceState estado_anterior_ = kDeviceStateUnknown;
     int ultimo_pulso_ = -1000;
+    int ultima_gravacao_ = 0;
+    bool leu_sessao_anterior_ = false;
+    std::string sessao_anterior_;
 
     static std::string Escapar(const std::string& texto) {
         std::string saida;

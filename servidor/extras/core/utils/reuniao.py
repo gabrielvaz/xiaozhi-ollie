@@ -6,7 +6,9 @@ Durante a reunião o Watcher manda o áudio pelo mesmo canal da voz; o servidor 
   2. transcreve em partes de 10 min (OpenRouter, MODELO_ASR_REUNIAO);
   3. gera resumo, decisões e próximos passos (MODELO_RESUMO);
   4. cria uma nota no Apple Notes (pasta "Reuniões Watcher") e avisa no Mac.
-Pasta: iCloud Drive/Watcher/Reuniões/AAAA-MM-DD HHhMM/ (ou WATCHER_PASTA_REUNIOES).
+Pasta LOCAL: xiaozhi-server/data/reunioes/AAAA-MM-DD HHhMM/ (ler o iCloud de dentro do serviço falha enquanto
+ele sincroniza). A cópia para iCloud Drive/Watcher/Reuniões (ou WATCHER_PASTA_REUNIOES) só acontece no app
+Backup do Watcher (espelhar()).
 """
 
 import html
@@ -23,7 +25,8 @@ import requests
 
 from core.utils.idioma import CODIGO, NOME, t
 
-PASTA = Path(os.environ.get(
+PASTA = Path(__file__).resolve().parents[2] / "data/reunioes"
+ESPELHO = Path(os.environ.get(
     "WATCHER_PASTA_REUNIOES",
     Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Watcher/Reuniões",
 ))
@@ -33,7 +36,9 @@ FFMPEG = "/opt/homebrew/bin/ffmpeg"
 # Nomes próprios que o modelo de transcrição deve reconhecer (ajuste em WATCHER_VOCABULARIO)
 VOCABULARIO = os.environ.get("WATCHER_VOCABULARIO", "Claude Code, Codex, herdr, Multica")
 
-PROMPT_RESUMO = f"""Você recebe a transcrição de uma reunião gravada pelo usuário num SenseCAP Watcher.
+PROMPT_RESUMO = f"""Você recebe a transcrição de uma gravação feita pelo usuário num SenseCAP Watcher: pode ser
+uma reunião ou uma anotação de voz (ideias, lembretes, um ditado). Se for anotação, resuma as ideias e liste o que
+fazer; as seções sem conteúdo ficam com "Nenhuma".
 Escreva em {NOME}, em Markdown, com exatamente estes títulos:
 ## {t('Resumo', 'Summary', '摘要', 'Resumen')}
 3 a 6 frases com o essencial.
@@ -119,9 +124,10 @@ class GravadorReuniao:
             self._log(f"áudio salvo ({self.minutos:.1f} min)")
             transcricao = self._transcrever()
             self.caminho_wav.unlink(missing_ok=True)
-            titulo = t("Reunião", "Meeting", "会议", "Reunión") + f" {_data_hora(self.inicio)} ({self.minutos:.0f} min)"
-            (self.pasta / "transcricao.md").write_text(f"# {titulo}\n\n{transcricao}\n", encoding="utf-8")
             resumo = self._resumir(transcricao)
+            titulo = titulo_ia(transcricao, resumo) or (
+                t("Gravação", "Recording", "录音", "Grabación") + f" {_data_hora(self.inicio)} ({self.minutos:.0f} min)")
+            (self.pasta / "transcricao.md").write_text(f"# {titulo}\n\n{transcricao}\n", encoding="utf-8")
             (self.pasta / "resumo.md").write_text(f"# {titulo}\n\n{resumo}\n", encoding="utf-8")
             self._log("transcrição e resumo prontos")
             self._nota_apple(titulo, resumo, transcricao)
@@ -129,7 +135,7 @@ class GravadorReuniao:
                                                "摘要已保存到备忘录和 iCloud。", "resumen listo en Notas y en iCloud."))
             from core.utils.vigia import adicionar_aviso
             minutos = f"{self.minutos:.0f}"
-            adicionar_aviso("reuniao", t("Reunião pronta", "Meeting ready", "会议已就绪", "Reunión lista"),
+            adicionar_aviso("reuniao", t("Gravação pronta", "Recording ready", "录音已就绪", "Grabación lista"),
                             t(f"Resumo de {minutos} min salvo no Notas", f"{minutos}-min summary saved to Notes",
                               f"{minutos} 分钟的摘要已保存到备忘录", f"Resumen de {minutos} min guardado en Notas"), "happy")
         except Exception as e:
@@ -251,3 +257,81 @@ def processar_backup(caminho: Path, logger=None) -> str:
                 pass
     gravador._log(f"reunião recebida do microSD ({caminho.name})")
     return f"processando {gravador.parar()}"
+
+
+def titulo_ia(transcricao: str, resumo: str = "") -> str:
+    """Título curto (até 6 palavras) do que foi gravado, gerado pela IA. Vazio se falhar."""
+    try:
+        base = os.environ.get("API_BASE_URL", "https://openrouter.ai/api/v1")
+        r = requests.post(f"{base}/chat/completions", timeout=60,
+                          headers={"Authorization": f"Bearer {os.environ.get('API_KEY', '')}"},
+                          json={"model": os.environ.get("MODELO_LLM", "openai/gpt-6-luna"), "max_tokens": 300,
+                                "reasoning": {"effort": "minimal"},
+                                "messages": [{"role": "system", "content":
+                                              f"Dê um título em {NOME} para esta gravação (reunião ou anotação de voz): "
+                                              "até 6 palavras, específico sobre o assunto, sem aspas, sem ponto final, "
+                                              "sem a palavra reunião/gravação."},
+                                             {"role": "user", "content": (resumo or transcricao)[:6000]}]})
+        r.raise_for_status()
+        titulo = r.json()["choices"][0]["message"]["content"].strip().strip('"“”.').splitlines()[0]
+        return titulo[:60]
+    except Exception:
+        return ""
+
+
+# ---------------------------------------------------------------- cópia no iCloud (só pelo app Backup)
+
+def _copiar_seguro(origem: Path, destino: Path) -> bool:
+    """Copia sem nunca trocar um arquivo por outro vazio ou menor; tenta de novo enquanto o iCloud sincroniza."""
+    import errno
+    import shutil
+    import time as _time
+    try:
+        tam_origem = origem.stat().st_size
+        tam_destino = destino.stat().st_size if destino.exists() else 0
+    except OSError:
+        return False
+    if tam_origem == 0 or tam_origem < tam_destino:
+        return True  # nada a fazer (ou o destino já é maior): não é falha
+    for tentativa in range(10):
+        try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            temporario = destino.with_name(f".{destino.name}.{os.getpid()}.tmp")
+            shutil.copyfile(origem, temporario)
+            os.replace(temporario, destino)
+            return True
+        except OSError as e:
+            if e.errno != errno.EDEADLK or tentativa == 9:
+                return False
+            _time.sleep(0.5)
+    return False
+
+
+def trazer_do_icloud() -> None:
+    """Primeira vez com a pasta local: traz as reuniões que já estavam no iCloud (sem criar cópias vazias)."""
+    if PASTA.exists() or not ESPELHO.is_dir():
+        return
+    PASTA.mkdir(parents=True, exist_ok=True)
+    for origem in ESPELHO.rglob("*"):
+        if origem.is_file() and not origem.name.startswith("."):
+            _copiar_seguro(origem, PASTA / origem.relative_to(ESPELHO))
+
+
+def espelhar() -> tuple[int, list[str]]:
+    """Backup: copia para o iCloud as reuniões locais. Devolve (copiados, falhas)."""
+    copiados, falhas = 0, []
+    if not PASTA.is_dir():
+        return 0, []
+    for origem in PASTA.rglob("*"):
+        if not origem.is_file() or origem.name.startswith(".") or origem.suffix == ".tmp":
+            continue
+        destino = ESPELHO / origem.relative_to(PASTA)
+        antes = destino.stat().st_size if destino.exists() else -1
+        if _copiar_seguro(origem, destino):
+            copiados += 1 if (destino.exists() and destino.stat().st_size != antes) else 0
+        else:
+            falhas.append(origem.name)
+    return copiados, falhas
+
+
+trazer_do_icloud()

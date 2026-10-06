@@ -99,6 +99,12 @@ public:
                 }
                 break;
             }
+            case kVoz: {  // respostas faladas: desligadas, o Ollie responde só por texto na tela
+                bool ligada = !ConfigWatcher::Int("voz", 1);
+                ConfigWatcher::SetInt("voz", ligada ? 1 : 0);
+                ContextoApps::App().DefinirVoz(ligada);
+                break;
+            }
             case kAvisos:
                 ConfigWatcher::SetInt("avisos", ConfigWatcher::Int("avisos", 1) ? 0 : 1);
                 break;
@@ -114,7 +120,7 @@ public:
     }
 
 private:
-    enum { kAgente, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kSobre };
+    enum { kAgente, kVoz, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kSobre };
     inline static const std::vector<int> kOpcoesTela = {30, 60, 120, 300, 900, -1};
     inline static const std::vector<int> kOpcoesBrilho = {25, 50, 75, 100};
     inline static const std::vector<int> kOpcoesVolume = {0, 20, 40, 60, 80, 100};
@@ -144,6 +150,9 @@ private:
             TR("Configurações", "Settings", "设置", "Ajustes"),
             {{TR("Nome do agente", "Agent name", "助手名称", "Nombre del agente"), "Hey " + AgenteWatcher::Nome() +
                                     (reiniciar_em_ ? TR(" · reinicia em instantes", " · restarting soon", " · 即将重启", " · se reinicia pronto") : "")},
+             {TR("Respostas faladas", "Spoken replies", "语音回复", "Respuestas habladas"),
+              ConfigWatcher::Int("voz", 1) ? TR("Ligadas", "On", "开启", "Activadas")
+                                           : TR("Só texto na tela", "Text only", "仅屏幕文字", "Solo texto")},
              {TR("Tema", "Theme", "主题", "Tema"), ConfigWatcher::Texto("tema", "dark") == "dark" ? TR("Escuro", "Dark", "深色", "Oscuro") : TR("Claro", "Light", "浅色", "Claro")},
              {TR("Fonte", "Font", "字体", "Fuente"), Fontes::Nome()},
              {TR("Tela apaga após", "Screen off after", "熄屏时间", "Apagar pantalla"), Tempo(ConfigWatcher::Int("tela_s", 60))},

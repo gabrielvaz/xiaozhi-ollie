@@ -37,10 +37,16 @@ public:
             std::string titulo = RedeWatcher::Campo(a, "titulo"), texto = RedeWatcher::Campo(a, "texto");
             CartaoWatcher::Instancia().RegistrarConversa("aviso", titulo + ": " + texto);
             ContextoApps::Avisar(titulo, texto, RedeWatcher::Campo(a, "emocao"), Lang::Sounds::OGG_POPUP);  // "plim" curto
-            // Sessão esperando você: abre a tela do aviso com o botão "Ir para a sessão"
             std::string sessao = RedeWatcher::Campo(a, "sessao");
-            if (!sessao.empty() && RedeWatcher::Campo(a, "tipo") == "esperando" && c.abrir_app) {
-                c.abrir_app("sessoes", "aviso\n" + sessao + "\n" + titulo + "\n" + texto);
+            // Todo aviso ganha um botão: de sessão (esperando ou concluída) -> "Continuar" leva à sessão;
+            // reunião pronta -> abre o Gravador na lista
+            std::string tipo = RedeWatcher::Campo(a, "tipo");
+            std::string nome = RedeWatcher::Campo(a, "nome_sessao");
+            if (!sessao.empty() && c.abrir_app) {
+                c.abrir_app("sessoes", "aviso\n" + sessao + "\n" + (nome.empty() ? titulo : nome) + "\n" +
+                                           (nome.empty() ? texto : titulo + "\n\n" + texto));
+            } else if (tipo == "reuniao" && c.abrir_app) {
+                c.abrir_app("gravador", "");
             }
         }
         ultimo_id_ = RedeWatcher::Numero(raiz, "ultimo", ultimo_id_);

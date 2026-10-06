@@ -92,7 +92,49 @@ def listar() -> list[dict]:
     return itens
 
 
+def detalhe(rid: str) -> dict | None:
+    """Uma reunião: título, quando, duração e o resumo (sem os títulos de Markdown)."""
+    p = reuniao.PASTA / rid
+    try:
+        quando = datetime.strptime(rid, "%Y-%m-%d %Hh%M")
+    except ValueError:
+        return None
+    if not p.is_dir():
+        return None
+    linhas = ler_texto(p / "resumo.md", padrao="").strip().splitlines() if (p / "resumo.md").exists() else []
+    titulo = linhas[0].removeprefix("# ").strip() if linhas else t("Processando…", "Processing…", "处理中…", "Procesando…")
+    # Só a seção de resumo (as listas de decisões e próximos passos ficam no Notas e no arquivo)
+    secao, dentro = [], False
+    for l in linhas[1:]:
+        if l.startswith("## "):
+            if dentro:
+                break
+            dentro = True
+            continue
+        if dentro:
+            secao.append(l)
+    corpo = "\n".join(secao).strip() or "\n".join(l for l in linhas[1:] if not l.startswith("#")).strip()
+    duracao = _duracao_s(p)
+    cabecalho = f"{rotulo_dia(quando)} {quando:%H:%M}"
+    if duracao is not None:
+        cabecalho += " · " + t("duração", "duration", "时长", "duración") + " " + _formatar_duracao(duracao)
+    if not corpo:
+        corpo = t("Ainda processando: a transcrição e o resumo aparecem aqui em alguns minutos.",
+                  "Still processing: the transcript and summary show up here in a few minutes.",
+                  "仍在处理：几分钟后这里会显示转写和摘要。",
+                  "Todavía procesando: la transcripción y el resumen aparecen aquí en unos minutos.")
+    return {"titulo": titulo, "texto": f"{cabecalho}\n\n{corpo}"[:3000]}
+
+
 class ReunioesHandler(AvisosHandler):
+    async def handle_reuniao(self, request: web.Request) -> web.Response:
+        if not self._autorizado(request):
+            return web.json_response({"erro": "não autorizado"}, status=401)
+        dados = await asyncio.to_thread(detalhe, request.match_info["id"])
+        if dados is None:
+            return web.json_response({"erro": "não encontrada"}, status=404)
+        return web.json_response(dados)
+
     async def handle_lista(self, request: web.Request) -> web.Response:
         if not self._autorizado(request):
             return web.json_response({"erro": "não autorizado"}, status=401)

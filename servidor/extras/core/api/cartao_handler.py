@@ -88,12 +88,16 @@ class CartaoHandler(AvisosHandler):
         """App Backup do Watcher: o único momento em que as conversas são copiadas para o iCloud."""
         if not self._autorizado(request):
             return web.json_response({"erro": "não autorizado"}, status=401)
-        from core.utils import diario
+        from core.utils import diario, reuniao
         try:
             copiados = await asyncio.to_thread(diario.espelhar)
         except OSError as e:
             return web.json_response({"ok": False, "copiados": 0, "erro": str(e)[:200]})
-        return web.json_response({"ok": True, "copiados": copiados})
+        reunioes, falhas = await asyncio.to_thread(reuniao.espelhar)
+        if falhas:
+            return web.json_response({"ok": False, "copiados": copiados + reunioes,
+                                      "erro": f"{len(falhas)} arquivo(s) de reunião não copiados: {', '.join(falhas[:3])}"})
+        return web.json_response({"ok": True, "copiados": copiados + reunioes})
 
     async def handle_memoria(self, request: web.Request) -> web.Response:
         if not self._autorizado(request):
