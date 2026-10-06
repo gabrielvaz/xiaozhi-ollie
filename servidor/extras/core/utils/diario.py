@@ -196,15 +196,16 @@ def _trazer_do_icloud() -> None:
     """Primeira vez com a pasta local: traz as conversas que já estavam no iCloud."""
     if (PASTA / "indice.json").exists() or not (ESPELHO / "indice.json").exists():
         return
-    import shutil
     for origem in ESPELHO.rglob("*"):
-        if origem.is_file():
+        if origem.is_file() and origem.suffix in (".md", ".json"):
+            # lê pelo conteúdo (força o download de arquivos que o iCloud deixou só na nuvem);
+            # se não vier nada, não cria a cópia local vazia
+            texto = ler_texto(origem, padrao="")
+            if not texto:
+                continue
             destino = PASTA / origem.relative_to(ESPELHO)
             destino.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                shutil.copy2(origem, destino)
-            except OSError:
-                pass
+            destino.write_text(texto, encoding="utf-8")
 
 
 def espelhar() -> int:
@@ -223,6 +224,13 @@ def espelhar() -> int:
                     or origem.stat().st_mtime < desde):
                 continue
             destino = ESPELHO / origem.relative_to(PASTA)
+            # Trava de segurança: conversas só crescem; nunca troca um arquivo do iCloud por um menor ou vazio
+            try:
+                tam_destino = destino.stat().st_size
+            except OSError:
+                tam_destino = 0
+            if origem.stat().st_size == 0 or (origem.suffix == ".md" and origem.stat().st_size < tam_destino):
+                continue
             for tentativa in range(10):  # o iCloud devolve EDEADLK enquanto sincroniza: tenta de novo
                 try:
                     destino.parent.mkdir(parents=True, exist_ok=True)
