@@ -580,6 +580,20 @@ trocar(placa, """            GetDisplay()->SetPowerSaveMode(true);
             GetBacklight()->SetBrightness(0);  // tela apaga""")
 trocar(placa, """    void OnKnobRotate(bool clockwise) {""", """    void OnKnobRotate(bool clockwise) {
         power_save_timer_->WakeUp();  // girar a roda acorda a tela""")
+# Tela apagada: o primeiro clique só acende a tela (não abre o microfone nem escolhe item na gaveta)
+trocar(XZ / "main/boards/common/power_save_timer.h", "    void WakeUp();\n",
+       "    void WakeUp();\n    bool Dormindo() const { return in_sleep_mode_; }  // tela apagada\n")
+trocar(placa, """        iot_button_register_cb(btns, BUTTON_SINGLE_CLICK, nullptr, [](void* button_handle, void* usr_data) {
+            auto self = static_cast<SensecapWatcher*>(usr_data);
+            self->power_save_timer_->WakeUp();
+""", """        iot_button_register_cb(btns, BUTTON_SINGLE_CLICK, nullptr, [](void* button_handle, void* usr_data) {
+            auto self = static_cast<SensecapWatcher*>(usr_data);
+            bool tela_apagada = self->power_save_timer_->Dormindo();
+            self->power_save_timer_->WakeUp();
+            if (tela_apagada) {
+                return;  // o primeiro toque só acende a tela
+            }
+""")
 # Volume na roda: o Clawd anima enquanto gira (horário diminui, anti-horário aumenta, como no original)
 trocar(placa, """        GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + ": "+std::to_string(codec->output_volume()));""",
        """        GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + ": "+std::to_string(codec->output_volume()));
@@ -948,7 +962,7 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.5.3"
+OLLIE_VERSAO_APP = "2.5.4"
 OLLIE_POSE_ASSETS = "sem_wifi"
 OLLIE_ARQUIVO_ASSETS = "ollie-assets_2.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
@@ -994,6 +1008,53 @@ trocar(app_cc, """    if (!assets.partition_valid()) {
         ESP_LOGW(TAG, "Assets partition is disabled for board %s", BOARD_NAME);""",
        """    if (!assets.partition_found()) {
         ESP_LOGW(TAG, "Assets partition is disabled for board %s", BOARD_NAME);""")
+
+# 26. Tela de atualização do sistema (programa ou desenhos baixando): o spinner das Configurações
+#     (placa/spinner_watcher.h) no lugar do Clawd, com o progresso ("37% 120KB/s") logo abaixo.
+trocar(display_h, """    virtual void EsconderSemWifi() {}""", """    virtual void EsconderSemWifi() {}
+    // Atualização do sistema em andamento: a placa pode mostrar um spinner
+    virtual void MostrarAtualizando(bool ativo) {}""")
+trocar(placa, """#include "tela_sem_wifi.h"     // modo de configuração de Wi-Fi\n""",
+       """#include "tela_sem_wifi.h"     // modo de configuração de Wi-Fi\n#include "spinner_watcher.h"   // spinner da tela de atualização\n""")
+trocar(placa, """        // Modo de configuração de Wi-Fi: tela própria (placa/tela_sem_wifi.h) no lugar do alerta do XiaoZhi""",
+       """        // Atualização do sistema: spinner no lugar do Clawd, no centro da tela; com 100 px ele termina onde
+        // começa a caixa do progresso (layout de conversa, placa/layout_mascote.h)
+        lv_obj_t* spinner_atualizacao_ = nullptr;
+
+        virtual void MostrarAtualizando(bool ativo) override {
+            DisplayLockGuard lock(this);
+            if (emoji_box_ == nullptr || ativo == (spinner_atualizacao_ != nullptr)) {
+                return;
+            }
+            if (ativo) {
+                spinner_atualizacao_ = SpinnerWatcher(lv_obj_get_parent(emoji_box_), 100, 12, 0x2A2A2A);
+                lv_obj_align(spinner_atualizacao_, LV_ALIGN_CENTER, 0, 0);
+                lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_delete(spinner_atualizacao_);
+                spinner_atualizacao_ = nullptr;
+                lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+
+        // Modo de configuração de Wi-Fi: tela própria (placa/tela_sem_wifi.h) no lugar do alerta do XiaoZhi""")
+trocar(app_cc, """    led->OnStateChanged();
+
+    switch (new_state) {""", """    led->OnStateChanged();
+    display->MostrarAtualizando(new_state == kDeviceStateUpgrading);
+
+    switch (new_state) {""")
+#     Falhou: o estado pode continuar "atualizando"; o spinner sai para o alerta aparecer
+trocar(app_cc, """        board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);  // Restore power save level
+        Alert(Lang::Strings::ERROR, Lang::Strings::UPGRADE_FAILED, "cancel",""",
+       """        board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);  // Restore power save level
+        display->MostrarAtualizando(false);
+        Alert(Lang::Strings::ERROR, Lang::Strings::UPGRADE_FAILED, "cancel",""")
+trocar(app_cc, """        if (!success) {
+            Alert(Lang::Strings::ERROR, Lang::Strings::DOWNLOAD_ASSETS_FAILED, "cancel",""",
+       """        if (!success) {
+            display->MostrarAtualizando(false);
+            Alert(Lang::Strings::ERROR, Lang::Strings::DOWNLOAD_ASSETS_FAILED, "cancel",""")
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))

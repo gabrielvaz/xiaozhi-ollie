@@ -28,7 +28,7 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 
 | Ação | Resultado |
 |---|---|
-| "Hey Ollie" ou 1 clique | Conversar (clique de novo interrompe) |
+| "Hey Ollie" ou 1 clique | Conversar (clique de novo interrompe). Com a tela apagada, o primeiro clique só acende a tela |
 | **2 cliques** | Abre a gaveta de apps; com ela aberta, volta (tela anterior do app, gaveta, ou fecha) |
 | **3 cliques** | Fecha a gaveta de qualquer tela |
 | Girar | Fora da gaveta: volume. Na gaveta: navega |

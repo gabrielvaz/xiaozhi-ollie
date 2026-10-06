@@ -17,6 +17,7 @@
 #include "display.h"
 #include "fontes_watcher.h"
 #include "clawd_animado.h"
+#include "spinner_watcher.h"
 #include "layout_mascote.h"
 #include "idioma_watcher.h"
 #include "material_symbols.h"
@@ -701,26 +702,7 @@ private:
     // Spinner (arco laranja girando) reaproveitado nas telas de carregamento e nas listas
     static lv_obj_t* Spinner(lv_obj_t* pai, int tamanho, int espessura, uint32_t cor_fundo,
                              uint32_t cor = 0xD97757) {
-        auto arco = lv_arc_create(pai);
-        lv_obj_set_size(arco, tamanho, tamanho);
-        lv_arc_set_bg_angles(arco, 0, 360);
-        lv_arc_set_angles(arco, 0, 90);
-        lv_obj_remove_style(arco, nullptr, LV_PART_KNOB);
-        lv_obj_remove_flag(arco, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_style_pad_all(arco, 0, 0);
-        lv_obj_set_style_arc_width(arco, espessura, LV_PART_MAIN);
-        lv_obj_set_style_arc_width(arco, espessura, LV_PART_INDICATOR);
-        lv_obj_set_style_arc_color(arco, lv_color_hex(cor_fundo), LV_PART_MAIN);
-        lv_obj_set_style_arc_color(arco, lv_color_hex(cor), LV_PART_INDICATOR);
-        lv_anim_t a;
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, arco);
-        lv_anim_set_values(&a, 0, 360);
-        lv_anim_set_duration(&a, 1000);
-        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-        lv_anim_set_exec_cb(&a, [](void* obj, int32_t v) { lv_arc_set_rotation((lv_obj_t*)obj, v); });
-        lv_anim_start(&a);
-        return arco;
+        return SpinnerWatcher(pai, tamanho, espessura, cor_fundo, cor);
     }
 
     // Centra o objeto no aro, no ângulo dado em décimos de grau (0 = topo, sentido horário)

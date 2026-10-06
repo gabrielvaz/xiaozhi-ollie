@@ -29,6 +29,7 @@ LV_FONT_DECLARE(font_material_symbols_16_4);
 #include "painel_watcher.h"    // telas dos apps (placa/), com o Clawd no carregamento
 #include "anel_volume.h"       // anel do volume na borda
 #include "tela_sem_wifi.h"     // modo de configuração de Wi-Fi
+#include "spinner_watcher.h"   // spinner da atualização do sistema
 
 static constexpr int kLado = 412;
 static uint16_t g_fb[kLado * kLado];
@@ -555,6 +556,19 @@ int main() {
     Avancar(1300);
     t.SetStatus("Seg, 05/10 · 16:22");
     SalvarPng("14-volume-parou");
+
+    // Atualização do sistema (MostrarAtualizando no firmware): spinner no lugar do Clawd, progresso abaixo
+    {
+        auto spinner = SpinnerWatcher(lv_obj_get_parent(t.emoji_box_), 100, 12, 0x2A2A2A);
+        lv_obj_align(spinner, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_add_flag(t.emoji_box_, LV_OBJ_FLAG_HIDDEN);
+        t.SetChatMessage("system", "37% 120KB/s");
+        Avancar(300);
+        SalvarPng("23-sistema-atualizando-sucesso");  // "-sucesso": sem Clawd, o medir.py não mede
+        lv_obj_delete(spinner);
+        lv_obj_remove_flag(t.emoji_box_, LV_OBJ_FLAG_HIDDEN);
+        t.SetChatMessage("system", "");
+    }
 
     // Telas de carregamento dos apps: o Clawd no lugar do spinner (o mesmo PainelWatcher do firmware)
     LvglTheme tema;

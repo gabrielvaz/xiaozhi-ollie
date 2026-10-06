@@ -40,7 +40,7 @@ It talks to a small server that you run on your own Mac, not to the xiaozhi.me c
 
 | Gesture | Result |
 |---|---|
-| 1 click | Talk (click again to interrupt) |
+| 1 click | Talk (click again to interrupt). With the screen off, the first click only wakes the screen |
 | 2 clicks | Back |
 | 3 clicks | Open or close the app drawer |
 | Turn | Volume on the home screen; navigation in the drawer |
