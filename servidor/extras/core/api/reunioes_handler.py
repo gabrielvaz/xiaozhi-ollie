@@ -152,11 +152,11 @@ def _enviar_ao_claude(rid: str, pasta: Path, titulo: str) -> None:
     if pane:
         adicionar_aviso("concluiu", t("Sessão aberta", "Session opened", "会话已打开", "Sesión abierta"),
                         t(f"Claude Code está estruturando “{titulo}”", f"Claude Code is structuring “{titulo}”",
-                          f"Claude Code 正在整理“{titulo}”", f"Claude Code está estructurando “{titulo}”"), "happy",
+                          f"Claude Code 正在整理“{titulo}”", f"Claude Code está estructurando “{titulo}”"), "rocket",
                         sessao=pane.group(1), nome_sessao=titulo[:50])
     else:
         adicionar_aviso("concluiu", t("Não abri a sessão", "Session not opened", "未能打开会话", "No abrí la sesión"),
-                        resultado[:100], "sad")
+                        resultado[:100], "chateado")
 
 
 class ReunioesHandler(AvisosHandler):

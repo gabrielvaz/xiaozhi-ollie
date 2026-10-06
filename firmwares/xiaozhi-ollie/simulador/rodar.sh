@@ -9,7 +9,8 @@ if [[ ! -d ../xiaozhi-esp32/managed_components/lvgl__lvgl ]]; then
 fi
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release > /dev/null
 cmake --build build -j8 2>&1 | grep -E "error" && exit 1 || true
-rm -rf saida && mkdir saida
+rm -rf saida && mkdir -p saida/medida
+OLLIE_MEDIR=1 ./build/simulador > /dev/null  # rodada de medição: Clawd sem acessórios
 ./build/simulador > /dev/null
 resultado=0
 python3 medir.py || resultado=$?

@@ -34,12 +34,12 @@ public:
                 return false;
             }
             atual_ = i - 1;
-            c.painel.MostrarStatus(itens_[atual_].titulo, PainelWatcher::Status::Carregando, TR("Abrindo…", "Opening…", "正在打开…", "Abriendo…"));
+            c.painel.MostrarStatus(itens_[atual_].titulo, PainelWatcher::Status::Carregando, TR("Abrindo…", "Opening…", "正在打开…", "Abriendo…"), {}, "reading");
             pedido_ = Pedido::Conversa;
             return true;
         }
         if (tela_ == Tela::Conversa && i == 0) {
-            c.painel.MostrarStatus(titulo_, PainelWatcher::Status::Carregando, TR("Preparando o áudio…", "Preparing audio…", "正在准备音频…", "Preparando el audio…"));
+            c.painel.MostrarStatus(titulo_, PainelWatcher::Status::Carregando, TR("Preparando o áudio…", "Preparing audio…", "正在准备音频…", "Preparando el audio…"), {}, "music");
             pedido_ = Pedido::Audio;
             return true;
         }

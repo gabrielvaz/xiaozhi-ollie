@@ -163,7 +163,7 @@ for fonte_c in ("font_noto_sans_pt_24.c", "font_jetbrains_mono_pt_22.c", "font_j
                 "font_ollie_logo_88.c"):
     shutil.copy(AQUI / "fonte" / fonte_c, placa_dir / fonte_c)
 placa = placa_dir / "sensecap_watcher.cc"
-trocar(placa, '#include <iot_knob.h>\n', '#include <iot_knob.h>\n\n#include "abertura_watcher.h"  // tela de abertura com o logo\n#include "fontes_watcher.h"    // Noto Sans ou JetBrains Mono (Configurações)\n#include "layout_mascote.h"    // onde ficam o Clawd e o texto\n')
+trocar(placa, '#include <iot_knob.h>\n', '#include <iot_knob.h>\n\n#include "abertura_watcher.h"  // tela de abertura com o logo\n#include "fontes_watcher.h"    // Noto Sans ou JetBrains Mono (Configurações)\n#include "layout_mascote.h"    // onde ficam o Clawd e o texto\n#include "anel_volume.h"       // anel do volume na borda\n#include "tela_sem_wifi.h"     // modo de configuração de Wi-Fi\n')
 trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.75); // 限制宽度，避免文字贴边
         }
@@ -310,12 +310,14 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             PosicionarMascote();
         }
 
-        // Roda girando (volume): o Clawd mostra "volume_mais" ou "volume_menos" enquanto gira e, 1,2 s depois
-        // do último passo, volta para a emoção de antes (ou a que chegou nesse meio-tempo)
+        // Roda girando (volume): o Clawd mostra "volume_mais" ou "volume_menos" e o anel branco na borda mostra
+        // o volume enquanto gira; 1,2 s depois do último passo o anel some e o Clawd volta para a emoção de
+        // antes (ou a que chegou nesse meio-tempo)
         static constexpr uint32_t kVolumeFimMs = 1200;
         std::string emocao_atual_ = "neutral";
         int volume_sentido_ = 0;  // 0: parado; 1: aumentando; -1: diminuindo
         lv_timer_t* timer_volume_ = nullptr;
+        AnelVolume anel_volume_;
 
         virtual void SetEmotion(const char* emotion) override {
             DisplayLockGuard lock(this);
@@ -325,8 +327,9 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             }
         }
 
-        void MostrarVolume(bool aumentando) {
+        void MostrarVolume(bool aumentando, int volume) {
             DisplayLockGuard lock(this);
+            anel_volume_.Mostrar(volume);
             int sentido = aumentando ? 1 : -1;
             if (sentido != volume_sentido_) {  // só troca o GIF quando muda o sentido (não reinicia a animação)
                 volume_sentido_ = sentido;
@@ -343,7 +346,27 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             auto self = static_cast<CustomLcdDisplay*>(lv_timer_get_user_data(timer));
             lv_timer_pause(timer);
             self->volume_sentido_ = 0;
+            self->anel_volume_.Esconder();
             self->SpiLcdDisplay::SetEmotion(self->emocao_atual_.c_str());
+        }
+
+        // Modo de configuração de Wi-Fi: tela própria (placa/tela_sem_wifi.h) no lugar do alerta do XiaoZhi
+        TelaSemWifi* sem_wifi_ = nullptr;
+
+        virtual bool MostrarSemWifi(const std::string& rede, const std::string& url) override {
+            DisplayLockGuard lock(this);
+            if (sem_wifi_ == nullptr) {
+                sem_wifi_ = new TelaSemWifi(this);
+            }
+            sem_wifi_->Mostrar(rede, url);
+            return true;
+        }
+
+        virtual void EsconderSemWifi() override {
+            DisplayLockGuard lock(this);
+            if (sem_wifi_ != nullptr) {
+                sem_wifi_->Esconder();
+            }
         }
 
         // Percentual da bateria ao lado do ícone (o topo do círculo é estreito: os ícones vão um pouco à esquerda)
@@ -560,7 +583,7 @@ trocar(placa, """    void OnKnobRotate(bool clockwise) {""", """    void OnKnobR
 # Volume na roda: o Clawd anima enquanto gira (horário diminui, anti-horário aumenta, como no original)
 trocar(placa, """        GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + ": "+std::to_string(codec->output_volume()));""",
        """        GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + ": "+std::to_string(codec->output_volume()));
-        static_cast<CustomLcdDisplay*>(display_)->MostrarVolume(!clockwise);""")
+        static_cast<CustomLcdDisplay*>(display_)->MostrarVolume(!clockwise, codec->output_volume());""")
 
 # 15. Palavra de ativação personalizada no build.py: --wake-word "custom:hey ollie|Ollie" --------
 #     MultiNet7 em inglês (fonemas gerados no aparelho pelo flite_g2p do ESP-SR).
@@ -674,6 +697,290 @@ trocar(XZ / "main/boards/sensecap-watcher/sscma_camera.h",
         return (jpeg_data_.buf != nullptr && jpeg_data_.len > 0) ? std::string((const char*)jpeg_data_.buf, jpeg_data_.len)
                                                                   : std::string();
     }""")
+
+# 22. Clawd também sem internet. O original só aplica os assets (onde moram os GIFs do mascote) depois
+#     que a rede conecta: sem Wi-Fi a tela ficava só com ícones de fonte. Agora os assets entram no boot,
+#     antes da rede (o motor de voz só inicia depois, então os modelos da ativação seguem valendo), e a
+#     ativação não aplica de novo se não houver pacote novo para baixar.
+trocar(app_h, "    bool assets_version_checked_ = false;",
+       "    bool assets_version_checked_ = false;\n    bool assets_aplicados_ = false;  // aplicados no boot (Clawd sem rede)")
+trocar(app_cc, """    display->SetupUI();
+""", """    display->SetupUI();
+    {
+        auto& assets = Assets::GetInstance();
+        Settings ajustes_assets("assets", false);
+        if (assets.partition_valid() && ajustes_assets.GetString("download_url").empty() && assets.Apply()) {
+            assets_aplicados_ = true;
+            display->SetEmotion("conectando");
+        }
+    }
+""")
+trocar(app_cc, """    std::string download_url = settings.GetString("download_url");
+
+    if (!download_url.empty()) {""", """    std::string download_url = settings.GetString("download_url");
+
+    if (download_url.empty() && assets_aplicados_) {
+        display->SetEmotion("searching");  // já aplicados no boot; agora procura atualização (lupa)
+        return;
+    }
+
+    if (!download_url.empty()) {""")
+trocar(app_cc, """    display->SetChatMessage("system", "");
+    display->SetEmotion("robot_2");""", """    display->SetChatMessage("system", "");
+    display->SetEmotion("searching");""")
+#     Rede caiu, servidor fora ou Wi-Fi por configurar: Clawd "offline" (tenta encaixar o cabo);
+#     voltou: Clawd contente
+trocar(app_cc, """            Alert(Lang::Strings::ERROR, last_error_message_.c_str(), "cancel",""",
+       """            Alert(Lang::Strings::ERROR, last_error_message_.c_str(), "offline",""")
+trocar(app_cc, """                display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
+""", """                display->ShowNotification(Lang::Strings::SCANNING_WIFI, 30000);
+                display->SetEmotion(GetDeviceState() == kDeviceStateStarting ? "conectando" : "offline");
+""")
+trocar(app_cc, """                display->ShowNotification(msg.c_str(), 30000);
+                xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_CONNECTED);""", """                display->ShowNotification(msg.c_str(), 30000);
+                if (GetDeviceState() == kDeviceStateIdle) {
+                    display->SetEmotion("happy");
+                }
+                xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_CONNECTED);""")
+trocar(app_cc, """            case NetworkEvent::Disconnected:
+                xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);""", """            case NetworkEvent::Disconnected:
+                display->SetEmotion("offline");
+                xEventGroupSetBits(event_group_, MAIN_EVENT_NETWORK_DISCONNECTED);""")
+trocar(app_cc, """        case kDeviceStateWifiConfiguring:
+            audio_service_.EnableVoiceProcessing(false);""", """        case kDeviceStateWifiConfiguring:
+            display->SetEmotion("offline");
+            audio_service_.EnableVoiceProcessing(false);""")
+#     Ícones do sistema pedidos pelo original (cloud_off, cancel, gear...) viram poses do Clawd, e um nome
+#     que a coleção não tem cai no neutro em vez de um ícone de fonte
+trocar(XZ / "main/display/lcd_display.cc", """    auto emoji_collection = static_cast<LvglTheme*>(current_theme_)->emoji_collection();
+    auto image = emoji_collection != nullptr ? emoji_collection->GetEmojiImage(emotion) : nullptr;
+    if (image == nullptr) {""", """    auto emoji_collection = static_cast<LvglTheme*>(current_theme_)->emoji_collection();
+    auto image = emoji_collection != nullptr ? emoji_collection->GetEmojiImage(emotion) : nullptr;
+    if (image == nullptr && emoji_collection != nullptr) {
+        // Só com a coleção do Clawd: sem ela (antes de baixar os assets) o nome original cai no ícone de fonte
+        static const char* const kApelidos[][2] = {
+            {"cloud_off", "offline"}, {"gear", "offline"}, {"cancel", "chateado"}, {"link", "waving"},
+            {"download", "skate"}, {"cloud_download", "skate"}, {"triste", "sad"}, {"pesquisando", "searching"}};
+        for (auto& apelido : kApelidos) {
+            if (strcmp(emotion, apelido[0]) == 0) {
+                image = emoji_collection->GetEmojiImage(apelido[1]);
+                break;
+            }
+        }
+        if (image == nullptr) {
+            image = emoji_collection->GetEmojiImage("neutral");
+        }
+    }
+    if (image == nullptr) {""")
+
+# 23. Pose escolhida pelo servidor (emoji no início da resposta ou ferramenta rodando): aparece na hora
+#     enquanto ele pensa e também nos 3 primeiros segundos da fala; depois a boca volta a mexer ("falando").
+#     "happy" e "neutral" são o padrão de quando não houve escolha: não seguram a fala.
+trocar(app_h, "    bool voz_ligada_ = true;  // Configurações > Respostas faladas",
+       """    bool voz_ligada_ = true;  // Configurações > Respostas faladas
+    std::string emocao_resposta_;   // última pose escolhida pelo servidor neste turno
+    bool emocao_na_fala_ = false;   // a pose está na tela no começo da fala
+    static bool EmocaoExpressiva(const std::string& e) { return !e.empty() && e != "happy" && e != "neutral"; }
+    void MostrarEmocaoResposta(const std::string& emocao);""")
+trocar(app_cc, """                Schedule([this, display, emotion_str = std::string(emotion->valuestring)]() {
+                    if (GetDeviceState() == kDeviceStateSpeaking) return;  // mantém o Clawd falando
+                    display->SetEmotion(emotion_str.c_str());""", """                Schedule([this, display, emotion_str = std::string(emotion->valuestring)]() {
+                    MostrarEmocaoResposta(emotion_str);""")
+trocar(app_cc, "void Application::ToggleChatState() {", """void Application::MostrarEmocaoResposta(const std::string& emocao) {
+    auto display = Board::GetInstance().GetDisplay();
+    if (GetDeviceState() != kDeviceStateSpeaking) {
+        emocao_resposta_ = emocao;  // pensando ou rodando ferramenta: mostra já e guarda para a fala
+        display->SetEmotion(emocao.c_str());
+    } else if (EmocaoExpressiva(emocao) && clock_ticks_ < 2) {  // chegou junto com a fala
+        emocao_resposta_ = emocao;
+        emocao_na_fala_ = true;
+        display->SetEmotion(emocao.c_str());
+    }
+}
+
+void Application::ToggleChatState() {""")
+trocar(app_cc, """            display->SetStatus(Lang::Strings::SPEAKING);
+            display->SetEmotion("falando");""", """            display->SetStatus(Lang::Strings::SPEAKING);
+            emocao_na_fala_ = EmocaoExpressiva(emocao_resposta_);
+            display->SetEmotion(emocao_na_fala_ ? emocao_resposta_.c_str() : "falando");""")
+trocar(app_cc, """            display->SetStatus(Lang::Strings::LISTENING);
+            display->SetEmotion("ouvindo");""", """            display->SetStatus(Lang::Strings::LISTENING);
+            display->SetEmotion("ouvindo");
+            emocao_resposta_.clear();  // turno novo
+            emocao_na_fala_ = false;""")
+trocar(app_cc, """            clock_ticks_++;
+            auto display = Board::GetInstance().GetDisplay();
+            display->UpdateStatusBar();""", """            clock_ticks_++;
+            auto display = Board::GetInstance().GetDisplay();
+            display->UpdateStatusBar();
+            if (emocao_na_fala_ && clock_ticks_ >= 3) {  // 3 s de pose; depois a boca volta a mexer
+                emocao_na_fala_ = false;
+                emocao_resposta_.clear();
+                if (GetDeviceState() == kDeviceStateSpeaking) {
+                    display->SetEmotion("falando");
+                }
+            }""")
+
+# 24. Sem Wi-Fi: tela própria com o Clawd "sem_wifi", rede do Ollie e portal que diz por que não conectou --
+#     Antes: o alerta do XiaoZhi punha "Modo de configuração de rede" rolando no topo, um emoji de
+#     engrenagem por cima e a dica numa frase só, com o endereço quebrando de linha.
+display_h = XZ / "main/display/display.h"
+trocar(display_h, """    virtual void SetEmotion(const char* emotion);""", """    virtual void SetEmotion(const char* emotion);
+    // Modo de configuração de Wi-Fi: a placa pode desenhar uma tela própria (retorna false para o alerta padrão)
+    virtual bool MostrarSemWifi(const std::string& rede, const std::string& url) { return false; }
+    virtual void EsconderSemWifi() {}""")
+wifi_board = XZ / "main/boards/common/wifi_board.cc"
+trocar(wifi_board, """    config.ssid_prefix = "Xiaozhi";""", """    config.ssid_prefix = "Ollie";  // rede do portal e nome no roteador: Ollie-XXXX""")
+trocar(wifi_board, """        Application::GetInstance().Alert(Lang::Strings::WIFI_CONFIG_MODE, hint.c_str(), "gear", Lang::Sounds::OGG_WIFICONFIG);""",
+       """        auto display = Board::GetInstance().GetDisplay();
+        if (display->MostrarSemWifi(wifi_manager.GetApSsid(), wifi_manager.GetApWebUrl())) {
+            Application::GetInstance().PlaySound(Lang::Sounds::OGG_WIFICONFIG);
+            return;
+        }
+        Application::GetInstance().Alert(Lang::Strings::WIFI_CONFIG_MODE, hint.c_str(), "gear", Lang::Sounds::OGG_WIFICONFIG);""")
+trocar(wifi_board, """            ESP_LOGI(TAG, "WiFi config mode exited");""", """            ESP_LOGI(TAG, "WiFi config mode exited");
+            GetDisplay()->EsconderSemWifi();""")
+# A seção 22 mostra "offline" ao entrar no modo de configuração e troca o emoji "gear" por "offline":
+# aqui é o Clawd sem Wi-Fi (o "offline" continua para Wi-Fi caindo, servidor fora e erro de rede)
+trocar(app_cc, """        case kDeviceStateWifiConfiguring:
+            display->SetEmotion("offline");""", """        case kDeviceStateWifiConfiguring:
+            display->SetEmotion("sem_wifi");""")
+trocar(XZ / "main/display/lcd_display.cc", """{"gear", "offline"}""", """{"gear", "sem_wifi"}""")
+
+# Portal: em vez de "Failed to connect to the Access Point", o motivo, no idioma do aparelho.
+#   O Watcher (ESP32-S3) só enxerga Wi-Fi de 2,4 GHz: rede só em 5 GHz aparece como "não encontrada".
+ap_h = WIFI / "include/wifi_configuration_ap.h"
+ap_cc = WIFI / "wifi_configuration_ap.cc"
+trocar(ap_h, """    uint8_t last_connected_channel_ = 0;""", """    uint8_t last_connected_channel_ = 0;
+    int ultimo_motivo_ = 0;  // motivo da última desconexão (wifi_err_reason_t); 0 = não respondeu
+    std::string MotivoFalha(const std::string& ssid);""")
+trocar(ap_cc, """    } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        xEventGroupSetBits(self->event_group_, WIFI_FAIL_BIT);""", """    } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        self->ultimo_motivo_ = static_cast<wifi_event_sta_disconnected_t*>(event_data)->reason;
+        xEventGroupSetBits(self->event_group_, WIFI_FAIL_BIT);""")
+trocar(ap_cc, """    is_connecting_ = true;
+    last_connected_channel_ = 0;""", """    is_connecting_ = true;
+    last_connected_channel_ = 0;
+    ultimo_motivo_ = 0;""")
+trocar(ap_cc, """            if (!this_->ConnectToWifi(ssid_str, password_str)) {
+                cJSON_Delete(json);
+                httpd_resp_send(req, "{\\"success\\":false,\\"error\\":\\"Failed to connect to the Access Point\\"}", HTTPD_RESP_USE_STRLEN);
+                return ESP_OK;""", """            if (!this_->ConnectToWifi(ssid_str, password_str)) {
+                cJSON_Delete(json);
+                auto resposta = cJSON_CreateObject();
+                cJSON_AddBoolToObject(resposta, "success", false);
+                cJSON_AddStringToObject(resposta, "error", this_->MotivoFalha(ssid_str).c_str());
+                char* texto = cJSON_PrintUnformatted(resposta);
+                httpd_resp_send(req, texto, HTTPD_RESP_USE_STRLEN);
+                cJSON_free(texto);
+                cJSON_Delete(resposta);
+                return ESP_OK;""")
+trocar(ap_cc, """void WifiConfigurationAp::Save(const std::string &ssid, const std::string &password)""",
+       """// Por que não conectou, em palavras, no idioma do portal (pt, es, zh; o resto em inglês)
+std::string WifiConfigurationAp::MotivoFalha(const std::string &ssid)
+{
+    auto idioma = language_.substr(0, 2);
+    auto tr = [&](const char* pt, const char* en, const char* zh, const char* es) -> std::string {
+        return idioma == "pt" ? pt : idioma == "zh" ? zh : idioma == "es" ? es : en;
+    };
+    // Mesmo nome com maiúsculas diferentes na lista de redes vistas: o nome tem de ser exato
+    std::string parecida;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const auto& rec : ap_records_) {
+            std::string nome = reinterpret_cast<const char*>(rec.ssid);
+            if (nome != ssid && strcasecmp(nome.c_str(), ssid.c_str()) == 0) {
+                parecida = nome;
+            }
+        }
+    }
+    std::string motivo;
+    switch (ultimo_motivo_) {
+        case WIFI_REASON_NO_AP_FOUND:
+            motivo = tr("Rede não encontrada. O Watcher só enxerga Wi-Fi de 2,4 GHz: se a rede for só de 5 GHz, ele não vê. Confira também se o nome está exato.",
+                        "Network not found. The Watcher only sees 2.4 GHz Wi-Fi: a 5 GHz-only network is invisible to it. Also check the exact name.",
+                        "未找到网络。Watcher 只能看到 2.4 GHz Wi-Fi，仅 5 GHz 的网络它看不到。也请检查名称是否完全一致。",
+                        "Red no encontrada. El Watcher solo ve Wi-Fi de 2,4 GHz: una red solo de 5 GHz no la ve. Revisa también el nombre exacto.");
+            break;
+        case WIFI_REASON_AUTH_FAIL:
+        case WIFI_REASON_AUTH_EXPIRE:
+        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        case WIFI_REASON_HANDSHAKE_TIMEOUT:
+            motivo = tr("A rede recusou a senha. Confira maiúsculas, minúsculas e símbolos.",
+                        "The network rejected the password. Check upper/lower case and symbols.",
+                        "网络拒绝了密码。请检查大小写和符号。",
+                        "La red rechazó la contraseña. Revisa mayúsculas, minúsculas y símbolos.");
+            break;
+        case WIFI_REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY:
+        case WIFI_REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD:
+            motivo = tr("A rede usa uma segurança que o Watcher não aceita (por exemplo, Wi-Fi corporativo com usuário e senha).",
+                        "The network uses security the Watcher does not support (for example, enterprise Wi-Fi with username and password).",
+                        "该网络使用 Watcher 不支持的安全方式（例如需要用户名和密码的企业 Wi-Fi）。",
+                        "La red usa una seguridad que el Watcher no admite (por ejemplo, Wi-Fi corporativo con usuario y contraseña).");
+            break;
+        case WIFI_REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD:
+            motivo = tr("O sinal da rede está fraco demais aqui.", "The network signal is too weak here.",
+                        "这里的网络信号太弱。", "La señal de la red es demasiado débil aquí.");
+            break;
+        case 0:
+            motivo = tr("A rede não respondeu a tempo. Tente de novo mais perto do roteador.",
+                        "The network did not answer in time. Try again closer to the router.",
+                        "网络没有及时响应。请靠近路由器再试。",
+                        "La red no respondió a tiempo. Inténtalo de nuevo más cerca del router.");
+            break;
+        default:
+            motivo = tr("Não conectou", "Could not connect", "无法连接", "No se conectó") + " (" +
+                     std::to_string(ultimo_motivo_) + ").";
+            break;
+    }
+    if (!parecida.empty()) {
+        motivo += tr(" Achei a rede \\"", " Found the network \\"", " 找到了网络 \\"", " Encontré la red \\"") + parecida +
+                  tr("\\": o nome precisa ser igual, com as mesmas maiúsculas.", "\\": the name must match exactly, including case.",
+                     "\\"：名称必须完全一致，包括大小写。", "\\": el nombre debe ser igual, con las mismas mayúsculas.");
+    }
+    return motivo;
+}
+
+void WifiConfigurationAp::Save(const std::string &ssid, const std::string &password)""")
+
+# 25. Atualização pela internet (sem cabo) -----------------------------------------------------------
+#     O OTA do XiaoZhi troca só o programa (servidor/xiaozhi-server/data/bin/sensecap-watcher_<versão>.bin).
+#     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
+#     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
+#     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
+OLLIE_VERSAO_APP = "2.5.2"
+OLLIE_POSE_ASSETS = "sem_wifi"
+OLLIE_ARQUIVO_ASSETS = "ollie-assets_2.bin"
+trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
+trocar(app_cc, '#include "websocket_protocol.h"\n', '#include "websocket_protocol.h"\n#include "lvgl_theme.h"\n')
+trocar(app_cc, """    std::string download_url = settings.GetString("download_url");
+""", f"""    std::string download_url = settings.GetString("download_url");
+    // Ollie: desenhos defasados (atualização só do programa pela internet) ou não aplicados: baixa a
+    // partição de assets do servidor do OTA. Se os desenhos antigos já foram aplicados neste boot (seção
+    // 22), baixar agora desmapearia a partição com o GIF e a fonte ainda lendo dela (LoadProhibited):
+    // grava o pedido e reinicia; no boot seguinte nada é aplicado antes do download. A marca
+    // "ollie_tentou" evita reiniciar de novo se o arquivo faltar no servidor.
+    if (download_url.empty()) {{
+        auto tema = static_cast<LvglTheme*>(display->GetTheme());
+        auto colecao = tema != nullptr ? tema->emoji_collection() : nullptr;
+        if (!assets_aplicados_ || colecao == nullptr || colecao->GetEmojiImage("{OLLIE_POSE_ASSETS}") == nullptr) {{
+            std::string url = std::string(CONFIG_OTA_URL) + "download/{OLLIE_ARQUIVO_ASSETS}";
+            if (!assets_aplicados_) {{
+                download_url = url;  // nada mapeado: dá para baixar já
+                ESP_LOGW(TAG, "Assets não aplicados: baixando %s", url.c_str());
+            }} else if (settings.GetString("ollie_tentou") != "{OLLIE_ARQUIVO_ASSETS}") {{
+                {{
+                    Settings pedido("assets", true);  // o destrutor grava na NVS antes de reiniciar
+                    pedido.SetString("ollie_tentou", "{OLLIE_ARQUIVO_ASSETS}");
+                    pedido.SetString("download_url", url);
+                }}
+                ESP_LOGW(TAG, "Assets sem a pose {OLLIE_POSE_ASSETS}: reiniciando para baixar %s", url.c_str());
+                Reboot();
+                return;
+            }}
+        }}
+    }}
+""")
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))

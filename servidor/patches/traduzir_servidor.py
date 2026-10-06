@@ -296,6 +296,20 @@ TROCAS: list[tuple[str, str, str]] = [
         if device_id:"""),
     ("plugins_func/functions/handle_exit_intent.py", 'result="退出意图已处理"', 'result="Despedida processada"'),
     ("plugins_func/functions/handle_exit_intent.py", 'result="退出意图处理失败"', 'result="Falha ao processar a despedida"'),
+    # Poses extras do Clawd (core/utils/emocoes_clawd.py): o emoji no início da resposta escolhe a animação,
+    # a lista de emojis permitidos no prompt inclui as novas e cada ferramenta mostra uma pose enquanto roda
+    ("core/utils/textUtils.py", '''    "😏": "confident",
+}''', '''    "😏": "confident",
+    **__import__("core.utils.emocoes_clawd", fromlist=["EMOJIS"]).EMOJIS,  # poses extras do Clawd
+}'''),
+    ("core/utils/prompt_manager.py", '''    "🙄",
+]''', '''    "🙄",
+    *__import__("core.utils.emocoes_clawd", fromlist=["EMOJIS"]).EMOJIS,  # poses extras do Clawd
+]'''),
+    ("core/connection.py", """                    enqueue_tool_report(self, tool_call_data['name'], tool_input)
+""", """                    enqueue_tool_report(self, tool_call_data['name'], tool_input)
+                    __import__("core.utils.emocoes_clawd", fromlist=["mostrar_ferramenta"]).mostrar_ferramenta(self, tool_call_data['name'])
+"""),
 ]
 
 

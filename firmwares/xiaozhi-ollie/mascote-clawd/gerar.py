@@ -42,8 +42,13 @@ EMOCOES = [
     # poses extras (o servidor escolhe pelo emoji da resposta ou pelo que está acontecendo)
     "waving", "nerd", "reading", "working", "running", "coffee", "party", "music",
     "searching", "idea", "rocket", "bug", "sunny", "rainy", "recording", "celebrating",
+    # andando de skate (indo buscar algo: atualização, backup), chateado (algo falhou) e
+    # offline (sem Wi-Fi ou sem servidor)
+    "skate", "chateado", "offline",
     # roda girando (volume): aumentando e diminuindo
     "volume_mais", "volume_menos",
+    # sem Wi-Fi configurado (modo de configuração de rede): confuso, com "?" e o Wi-Fi falhando
+    "sem_wifi",
 ]
 
 CINZA_ESCURO = (70, 70, 80)
@@ -236,15 +241,70 @@ def pose(nome, f):
         nota = [".##", ".#.", "##."]
         texto_pixel(t, 0 if par else 17, 0 + f % 2, nota, AMARELO)
         return t.img
-    if nome == "searching":               # lupa, procurando
+    if nome == "searching":               # olhando pela lupa, o olho aparece gigante no vidro
+        t = Tela(dy=(0, 0, -1, 0, 0, 1)[f] * PX // 3)
+        corpo(t, bracos_y=None)
+        t.px(1, 8, LARANJA, 2, 2)
+        dx, dy = (0, -1, -2, -3, -2, -1)[f], (0, 0, 1, 1, 0, 0)[f]
+        x, y = 12 + dx, 2 + dy                                     # canto da lupa
+        t.px(6 + (0, 0, -1, -1, 0, 1)[f], 6, OLHO, 1, 2)            # o outro olho acompanha
+        boca(t, "o" if f in (2, 3) else "reta")
+        t.px(x + 1, y, CINZA_ESCURO, 4, 1); t.px(x + 1, y + 5, CINZA_ESCURO, 4, 1)   # aro
+        t.px(x, y + 1, CINZA_ESCURO, 1, 4); t.px(x + 5, y + 1, CINZA_ESCURO, 1, 4)
+        t.px(x + 1, y + 1, (175, 215, 245), 4, 4)                  # vidro
+        ox = (1, 0, 0, 1, 2, 1)[f]                                 # olho ampliado olhando em volta
+        t.px(x + 1 + ox, y + 2, OLHO, 2, 2); t.px(x + 1 + ox, y + 2, BRANCO)
+        t.px(x + 4, y + 1, BRANCO)                                 # reflexo
+        t.px(x + 6, y + 6, MARROM); t.px(x + 7, y + 7, MARROM)     # cabo
+        t.px(x + 7, y + 8, LARANJA, 2, 2)                          # mão segurando
+        if f == 3:                                                 # achou alguma coisa
+            t.px(2, 1, AMARELO); t.px(1, 2, AMARELO); t.px(3, 2, AMARELO); t.px(2, 3, AMARELO)
+        return t.img
+    if nome == "skate":                   # andando de skate, o chão passando
+        t = Tela(dy=(0, -1, 0, 1, 0, -1)[f] * PX // 3)
+        corpo(t, bracos_y=None)
+        sobe = f % 2                                               # braços em gangorra, equilibrando
+        t.px(1, 6 + sobe, LARANJA, 2, 2); t.px(17, 8 - sobe, LARANJA, 2, 2)
+        olhos(t, "feliz" if f in (2, 3) else "normal", dx=1); boca(t, "sorriso")
+        t.px(2, 15, MARROM, 16, 1); t.px(1, 14, MARROM); t.px(18, 14, MARROM)   # shape com bicos
+        for x in (4, 14):                                          # rodinhas girando
+            t.px(x, 16, CINZA, 2, 1); t.px(x + (f % 2), 16, BRANCO)
+        for k in range(4):                                         # chão passando para trás
+            t.px((k * 6 - f * 2) % 24 - 2, 18, CINZA_ESCURO, 2, 1)
+        for y, w in ((5, 2), (9, 3), (12, 2)):                     # vento
+            t.px(-1 - (f + y) % 2, y, CINZA, w, 1)
+        return t.img
+    if nome == "chateado":                # braços cruzados, bufando, pezinho batendo
         t = Tela()
-        corpo(t)
-        olhos(t, "normal", dx=(-1, 0, 1, 0)[f])
-        boca(t, "reta")
-        t.px(14, 8, CINZA_ESCURO, 4, 1); t.px(14, 11, CINZA_ESCURO, 4, 1)
-        t.px(13, 9, CINZA_ESCURO, 1, 2); t.px(18, 9, CINZA_ESCURO, 1, 2)
-        t.px(14, 9, AZUL, 4, 2); t.px(14, 9, BRANCO)
-        t.px(18, 12, MARROM); t.px(19, 13, MARROM)
+        corpo(t, (226, 108, 82), bracos_y=None, pernas=False)
+        for x in (4, 6, 13):
+            t.px(x, 13, (226, 108, 82), 1, 2)
+        t.px(15, 13 if f % 2 else 14, (226, 108, 82), 1, 2 if f % 2 else 1)   # pé batendo
+        olhos(t, "bravo" if f != 2 else "fechado")
+        t.px(8, 10, OLHO); t.px(9, 9, OLHO, 2, 1); t.px(11, 10, OLHO)          # boca emburrada
+        t.px(1, 10, (226, 108, 82), 2, 2); t.px(17, 11, (226, 108, 82), 2, 2)  # cotovelos
+        t.px(3, 11, LARANJA_ESCURO, 10, 1); t.px(7, 12, LARANJA_ESCURO, 10, 1)  # braços cruzados
+        rabisco = ([(14, 1), (15, 0), (16, 1), (17, 0), (18, 1)], [(14, 0), (15, 1), (16, 0), (17, 1), (18, 0)])
+        for x, y in rabisco[f % 2]:                                # nuvenzinha de raiva
+            t.px(x, y, CINZA_ESCURO)
+        if f in (1, 3):                                            # bufada saindo dos lados
+            t.px(0, 4 - (f == 3), CINZA, 2, 1); t.px(18, 4 - (f == 3), CINZA, 2, 1)
+        return t.img
+    if nome == "offline":                 # sem conexão: tenta encaixar o plugue e não alcança a tomada
+        t = Tela()
+        corpo(t, bracos_y=None)
+        px_ = (5, 6, 7, 8, 7, 6)[f]                                # plugue indo e voltando
+        t.px(1, 7 - (f in (2, 3, 4)), LARANJA, 2, 2); t.px(17, 8, LARANJA, 2, 2)
+        olhos(t, "normal", dx=(-1, -1, 0, 0, 0, -1)[f], dy=-1); boca(t, "o" if f == 3 else "reta")
+        t.px(-1, 1, CINZA_ESCURO, px_ + 1, 1)                      # cabo da esquerda
+        t.px(px_, 0, CINZA, 2, 3)                                  # plugue
+        t.px(px_ + 2, 0, AMARELO); t.px(px_ + 2, 2, AMARELO)       # pinos
+        t.px(12, 0, CINZA, 3, 3); t.px(12, 0, OLHO); t.px(12, 2, OLHO)   # tomada (furos)
+        t.px(15, 1, CINZA_ESCURO, 6, 1)                            # cabo da direita
+        if f == 3:                                                 # quase: faísca no vão
+            t.px(11, -1, AMARELO); t.px(11, 3, VERMELHO)
+        if f in (4, 5):
+            t.px(17, 3 + f - 4, AZUL)                              # gotinha de suor
         return t.img
     if nome in ("volume_mais", "volume_menos"):
         # Medidor de volume em cima da cabeça: 4 barras (alturas 1 a 4) que acendem uma a uma ao aumentar
@@ -267,6 +327,29 @@ def pose(nome, f):
             olhos(t, "fechado" if f in (1, 2, 3) else "meio"); boca(t, "reta")
             if f in (1, 2, 3):                                     # o som indo embora pelos lados
                 t.px(0, 8 - f % 2, CINZA); t.px(19, 8 - f % 2, CINZA)
+        return t.img
+    if nome == "sem_wifi":
+        # O símbolo do Wi-Fi tenta acender (ponto, arco do meio, arco de fora), falha com um risco vermelho
+        # e apaga; o "?" pula e o Clawd coça a cabeça
+        t = Tela()
+        corpo(t, bracos_y=None)
+        t.px(1, 8, LARANJA, 2, 2)                                  # braço esquerdo parado
+        if f % 2:
+            t.px(17, 4, LARANJA, 2, 2); t.px(16, 3, LARANJA, 1, 1)  # coçando a cabeça
+        else:
+            t.px(17, 8, LARANJA, 2, 2)
+        olhos(t, "confuso"); boca(t, "reta")
+        arcos = [  # (desenho, linha de cima, quadros em que acende); o ponto encosta na cabeça
+            (["...#..."], 3, (0, 1, 2, 3, 4)),
+            (["..###..", ".#...#."], 1, (1, 2, 3, 4)),
+            ([".#####.", "#.....#"], -1, (2, 3, 4)),
+        ]
+        for padrao, y, acesos in arcos:
+            texto_pixel(t, 2, y, padrao, BRANCO if f in acesos else CINZA_ESCURO)
+        if f in (3, 4):                                            # falhou: risco vermelho na diagonal
+            for i in range(5):
+                t.px(1 + i + (i > 1), -1 + i, VERMELHO, 2, 1)
+        texto_pixel(t, 13 + (f % 2), -1, INTERROGACAO, AMARELO)    # "?" balançando
         return t.img
     if nome == "idea":                    # lâmpada acendendo
         t = Tela()
@@ -327,7 +410,8 @@ def pose(nome, f):
 
 POSES = set(EMOCOES[EMOCOES.index("waving"):])
 ESTADOS = {"conectando": 180, "ouvindo": 220, "falando": 140, "choque": 90, "codando": 260, "teclando": 120,
-           "volume_mais": 130, "volume_menos": 170}   # ms por quadro (6 quadros)
+           "skate": 140, "chateado": 220, "offline": 260, "sad": 320, "searching": 240,
+           "volume_mais": 130, "volume_menos": 170, "sem_wifi": 330}   # ms por quadro (6 quadros)
 
 
 def quadro(emocao, f):
@@ -348,8 +432,16 @@ def quadro(emocao, f):
         olhos(t, "feliz"); boca(t, "aberta"); bochechas(t)
     elif emocao == "funny":
         olhos(t, "feliz"); boca(t, "lingua")
-    elif emocao == "sad":
-        olhos(t, "triste"); boca(t, "triste")
+    elif emocao == "sad":                # cabisbaixo, nuvenzinha chovendo em cima e uma lágrima
+        t = Tela(dy=(0, 0, 1, 1, 1, 0)[f] * PX // 3)    # suspiro lento
+        corpo(t, bracos_y=10)                            # braços caídos
+        olhos(t, "triste", dy=1 if f in (2, 3, 4) else 0); boca(t, "triste")
+        t.px(7, 0, CINZA_ESCURO, 6, 1); t.px(6, 1, CINZA_ESCURO, 8, 1); t.px(8, -1, CINZA_ESCURO, 3, 1)
+        for x in (7, 10, 12):                            # garoa caindo da nuvem
+            t.px(x, 2 + (f + x) % 2, AZUL)
+        if f >= 3:                                       # lágrima escorrendo
+            t.px(6, 8 + (f - 3) * 1 + (1 if f in (2, 3, 4) else 0), AZUL, 1, 2)
+        return t.img
     elif emocao == "angry":
         olhos(t, "bravo"); boca(t, "reta")
         if f % 2:

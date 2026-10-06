@@ -72,7 +72,7 @@ public:
                     atual_ = i - 3;
                     tela_ = Tela::Carregando;
                     c.painel.MostrarStatus(issues_[atual_].id, PainelWatcher::Status::Carregando,
-                                           TR("Lendo a issue…", "Reading the issue…", "正在读取 issue…", "Leyendo la issue…"));
+                                           TR("Lendo a issue…", "Reading the issue…", "正在读取 issue…", "Leyendo la issue…"), {}, "reading");
                     pedido_ = Pedido::Issue;
                     return true;
                 }
@@ -129,7 +129,7 @@ public:
                                            PainelWatcher::Status::Carregando,
                                            daemon ? (daemon_ ? TR("Desligando…", "Turning off…", "正在关闭…", "Desactivando…")
                                                              : TR("Ligando…", "Turning on…", "正在开启…", "Activando…"))
-                                                  : TR("Disparando…", "Starting…", "正在运行…", "Lanzando…"));
+                                                  : TR("Disparando…", "Starting…", "正在运行…", "Lanzando…"), {}, "rocket");
                     pedido_ = daemon ? Pedido::Daemon : Pedido::Autopilot;
                 } else {
                     MostrarLista(c);

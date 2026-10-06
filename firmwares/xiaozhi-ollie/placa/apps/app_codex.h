@@ -70,7 +70,7 @@ public:
                     atual_ = i - 3;
                     tela_ = Tela::Carregando;
                     c.painel.MostrarStatus(sessoes_[atual_].titulo, PainelWatcher::Status::Carregando,
-                                           TR("Lendo as mensagens…", "Reading messages…", "正在读取消息…", "Leyendo los mensajes…"));
+                                           TR("Lendo as mensagens…", "Reading messages…", "正在读取消息…", "Leyendo los mensajes…"), {}, "reading");
                     pedido_ = Pedido::Sessao;
                     return true;
                 }
@@ -103,7 +103,7 @@ public:
                     tela_ = Tela::Carregando;
                     c.painel.MostrarStatus(TR("Controle remoto", "Remote control", "远程控制", "Control remoto"), PainelWatcher::Status::Carregando,
                                            remoto_ ? TR("Desligando…", "Turning off…", "正在关闭…", "Desactivando…")
-                                                   : TR("Ligando…", "Turning on…", "正在开启…", "Activando…"));
+                                                   : TR("Ligando…", "Turning on…", "正在开启…", "Activando…"), {}, "rocket");
                     pedido_ = Pedido::Remoto;
                 } else {
                     MostrarLista(c);

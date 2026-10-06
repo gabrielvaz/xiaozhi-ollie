@@ -15,6 +15,7 @@ add_executable(simulador
     main.cc
     ${XZ}/main/display/lvgl_display/gif/gifdec.c
     ${XZ}/main/display/lvgl_display/gif/lvgl_gif.cc
+    ${XZ}/main/display/lvgl_display/emoji_collection.cc
     ${FONTES}/src/font_noto_sans_basic_30_4.c
     ${FONTES}/src/font_noto_sans_basic_20_4.c
     ${FONTES}/src/font_material_symbols_20_4.c

@@ -16,7 +16,7 @@ public:
     std::string Detalhe() const override { return TR("Conversas e reuniões do microSD", "Chats and meetings on microSD", "microSD 上的对话和会议", "Chats y reuniones de la microSD"); }
 
     void Abrir(ContextoApps& c) override {
-        c.painel.MostrarStatus(TR("Fazer backup", "Back up", "备份", "Copia de seguridad"), PainelWatcher::Status::Carregando, TR("Fazendo backup no Mac…", "Backing up to the Mac…", "正在备份到 Mac…", "Copiando al Mac…"));
+        c.painel.MostrarStatus(TR("Fazer backup", "Back up", "备份", "Copia de seguridad"), PainelWatcher::Status::Carregando, TR("Fazendo backup no Mac…", "Backing up to the Mac…", "正在备份到 Mac…", "Copiando al Mac…"), {}, "skate");
         enviar_ = true;
     }
 

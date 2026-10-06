@@ -1,7 +1,7 @@
 // Serviço (sem tela na gaveta): saudação com o nome do usuário na tela de espera.
 // Aparece ao ligar (depois do logo) e ao voltar para a espera, e troca a cada 15 min ao longo do dia,
 // com frases do período (bom dia, boa tarde...). O Clawd troca de expressão/pose a cada 40–90 s,
-// com poses que combinam com a hora do dia. Também informa ao servidor o nome do agente.
+// com poses que combinam com a hora do dia (sem Wi-Fi: "offline"; bateria no fim: "sad"). Também informa ao servidor o nome do agente.
 #pragma once
 
 #include <algorithm>
@@ -116,8 +116,16 @@ private:
 
     // Pose do Clawd para a espera: um conjunto comum mais poses do período, sem repetir a anterior
     std::string Pose() {
+        if (!RedeWatcher::Online()) {
+            return "offline";  // sem Wi-Fi: Clawd tentando encaixar o cabo
+        }
+        int nivel = 100;
+        bool carregando = false, descarregando = false;
+        if (Board::GetInstance().GetBatteryLevel(nivel, carregando, descarregando) && descarregando && nivel <= 10) {
+            return "sad";  // bateria quase no fim
+        }
         std::vector<const char*> poses = {"neutral", "happy", "winking", "cool", "relaxed", "waving",
-                                          "confident", "thinking", "idea", "music", "nerd"};
+                                          "confident", "thinking", "idea", "music", "nerd", "skate"};
         time_t t = time(nullptr);
         struct tm agora;
         localtime_r(&t, &agora);
@@ -126,7 +134,7 @@ private:
             if (h >= 5 && h < 12) {
                 poses.insert(poses.end(), {"coffee", "coffee", "sunny", "running"});
             } else if (h >= 12 && h < 18) {
-                poses.insert(poses.end(), {"reading", "working", "searching", "rocket"});
+                poses.insert(poses.end(), {"reading", "working", "searching", "rocket", "skate"});
             } else if (h >= 18) {
                 poses.insert(poses.end(), {"music", "relaxed", "party", "sleepy"});
             } else {

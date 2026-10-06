@@ -182,7 +182,7 @@ def _loop(ponte) -> None:
                         time.sleep(3)  # dá tempo de o histórico registrar a fala final
                         info = ponte._historico_claude(a.get("_sessao_id", ""), a.get("_cwd", "")) if a.get("_sessao_id") else {}
                         fala = info.get("ultima_fala") or a.get("ultima_fala", "")
-                        adicionar_aviso("concluiu", t("Tarefa concluída", "Task done", "任务完成", "Tarea completada"), _frase_curta(_titulo_curto(a), fala), "happy",
+                        adicionar_aviso("concluiu", t("Tarefa concluída", "Task done", "任务完成", "Tarea completada"), _frase_curta(_titulo_curto(a), fala), "celebrating",
                                         sessao=a.get("sessao", ""), nome_sessao=_titulo_curto(a))
                 estados[chave], conclusoes[chave] = estado, feitas
             primeira = False

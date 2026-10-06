@@ -46,7 +46,7 @@ public:
                 tela_ = Tela::Carregando;
                 c.painel.MostrarStatus(Nome(), PainelWatcher::Status::Carregando,
                                        TR("Tirando a foto e perguntando à IA…", "Taking the photo and asking the AI…",
-                                          "正在拍照并询问 AI…", "Haciendo la foto y preguntando a la IA…"));
+                                          "正在拍照并询问 AI…", "Haciendo la foto y preguntando a la IA…"), {}, "thinking");
                 pedido_ = Pedido::Foto;
                 return true;
             }

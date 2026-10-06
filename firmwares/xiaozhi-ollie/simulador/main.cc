@@ -6,6 +6,7 @@
 #include <dirent.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <map>
@@ -25,11 +26,22 @@ LV_FONT_DECLARE(font_material_symbols_16_4);
 
 #include "abertura_watcher.h"  // tela de abertura (placa/)
 #include "fontes_watcher.h"    // Noto Sans ou JetBrains Mono (OLLIE_FONTE=mono)
+#include "painel_watcher.h"    // telas dos apps (placa/), com o Clawd no carregamento
+#include "anel_volume.h"       // anel do volume na borda
+#include "tela_sem_wifi.h"     // modo de configuração de Wi-Fi
 
 static constexpr int kLado = 412;
 static uint16_t g_fb[kLado * kLado];
 static uint32_t g_ms = 0;
 static lv_obj_t* g_caixa_texto = nullptr;  // bottom_bar_
+static bool g_painel_aberto = false;
+// OLLIE_MEDIR=1: toda pose vira o Clawd parado e sem acessórios ("staticstate") e as cenas vão para
+// saida/medida/; o medir.py mede o layout nelas (a posição não depende da pose)
+static const bool g_medir = std::getenv("OLLIE_MEDIR") != nullptr;
+static std::string Gif(const std::string& pose) {
+    return "../mascote-clawd/emocoes/" + (g_medir ? std::string("staticstate") : pose) + ".gif";
+}
+static std::string Saida() { return g_medir ? "saida/medida/" : "saida/"; }       // painel dos apps por cima: a caixa da tela principal não conta
 
 static void Flush(lv_display_t* disp, const lv_area_t*, uint8_t*) { lv_display_flush_ready(disp); }
 
@@ -45,7 +57,7 @@ static void Avancar(uint32_t ms) {
 static void SalvarPng(const std::string& nome) {
     lv_refr_now(nullptr);
     // PPM (RGB888); o medir.py converte para PNG
-    std::string caminho = "saida/" + nome + ".ppm";
+    std::string caminho = Saida() + nome + ".ppm";
     FILE* f = fopen(caminho.c_str(), "wb");
     fprintf(f, "P6\n%d %d\n255\n", kLado, kLado);
     for (int i = 0; i < kLado * kLado; i++) {
@@ -56,8 +68,8 @@ static void SalvarPng(const std::string& nome) {
     }
     fclose(f);
     // Caixa do texto (se visível): o medir.py usa a caixa reservada, não só os pixels do texto
-    FILE* g = fopen(("saida/" + nome + ".txt").c_str(), "w");
-    if (g_caixa_texto != nullptr && !lv_obj_has_flag(g_caixa_texto, LV_OBJ_FLAG_HIDDEN)) {
+    FILE* g = fopen((Saida() + nome + ".txt").c_str(), "w");
+    if (!g_painel_aberto && g_caixa_texto != nullptr && !lv_obj_has_flag(g_caixa_texto, LV_OBJ_FLAG_HIDDEN)) {
         lv_area_t a;
         lv_obj_get_coords(g_caixa_texto, &a);
         fprintf(g, "%d %d %d %d\n", (int)a.x1, (int)a.x2, (int)a.y1, (int)a.y2);
@@ -358,8 +370,11 @@ public:
         }
     }
 
+    AnelVolume anel_volume_;
+
     void MostrarVolume(bool aumentando, int volume) {
         lv_label_set_text_fmt(status_label_, "Volume: %d", volume);  // no aparelho é a notificação do topo
+        anel_volume_.Mostrar(volume);
         int sentido = aumentando ? 1 : -1;
         if (sentido != volume_sentido_) {
             volume_sentido_ = sentido;
@@ -371,6 +386,7 @@ public:
                     auto self = static_cast<Tela*>(lv_timer_get_user_data(timer));
                     lv_timer_pause(timer);
                     self->volume_sentido_ = 0;
+                    self->anel_volume_.Esconder();
                     self->TrocarGif(self->emocao_atual_);
                 },
                 1200, this);
@@ -383,7 +399,7 @@ public:
     void TrocarGif(const std::string& emocao) {
         auto it = dscs_.find(emocao);
         if (it == dscs_.end()) {
-            std::ifstream f("../mascote-clawd/emocoes/" + emocao + ".gif", std::ios::binary);
+            std::ifstream f(Gif(emocao), std::ios::binary);
             if (!f) {
                 gif_controller_.reset();
                 lv_label_set_text(emoji_label_, MATERIAL_SYMBOLS_ROBOT_2);
@@ -427,6 +443,24 @@ static std::vector<std::string> Poses() {
     std::sort(r.begin(), r.end());
     return r;
 }
+
+// GIF do mascote-clawd lido do disco (no aparelho vem da partição de assets)
+class GifArquivo : public LvglImage {
+public:
+    explicit GifArquivo(const std::string& caminho) {
+        std::ifstream f(caminho, std::ios::binary);
+        dados_.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+        dsc_ = {};
+        dsc_.data = dados_.data();
+        dsc_.data_size = dados_.size();
+    }
+    const lv_img_dsc_t* image_dsc() const override { return &dsc_; }
+    bool IsGif() const override { return true; }
+
+private:
+    std::vector<uint8_t> dados_;
+    lv_image_dsc_t dsc_;
+};
 
 int main() {
     lv_init();
@@ -521,6 +555,53 @@ int main() {
     Avancar(1300);
     t.SetStatus("Seg, 05/10 · 16:22");
     SalvarPng("14-volume-parou");
+
+    // Telas de carregamento dos apps: o Clawd no lugar do spinner (o mesmo PainelWatcher do firmware)
+    LvglTheme tema;
+    auto colecao = std::make_shared<EmojiCollection>();
+    for (auto& pose : Poses()) {
+        colecao->AddEmoji(pose, new GifArquivo(Gif(pose)));
+    }
+    tema.set_emoji_collection(colecao);
+    Display tela_apps;
+    tela_apps.current_theme_ = &tema;
+    PainelWatcher painel(&tela_apps);
+    g_painel_aberto = true;
+    painel.MostrarStatus("Conversas", PainelWatcher::Status::Carregando, "Buscando conversas…");
+    Avancar(300);
+    SalvarPng("15-app-buscando");
+    painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando, "Lendo as mensagens…", {}, "reading");
+    Avancar(300);
+    SalvarPng("16-app-lendo");
+    painel.MostrarStatus("Fazer backup", PainelWatcher::Status::Carregando, "Fazendo backup no Mac…", {}, "skate");
+    Avancar(300);
+    SalvarPng("17-app-backup");
+    painel.MostrarStatus("Gravador", PainelWatcher::Status::Carregando, "Salvando a gravação…", {"Cancelar"}, "recording");
+    Avancar(300);
+    SalvarPng("18-app-com-botoes");
+    painel.MostrarStatus("Fazer backup", PainelWatcher::Status::Sucesso, "Backup concluído");
+    Avancar(300);
+    SalvarPng("19-app-sucesso");
+    // Configurações > Atualização (placa/apps/app_configuracoes.h)
+    painel.MostrarStatus("Atualização", PainelWatcher::Status::Carregando, "Procurando atualização…", {}, "searching");
+    Avancar(300);
+    SalvarPng("21-atualizacao-procurando");
+    painel.MostrarTexto("Atualização",
+                        "Versão nova: 2.5.1 (você está na 2.5.0).\n\nO Watcher baixa, instala e reinicia sozinho. "
+                        "Não desligue até terminar.",
+                        {"Atualizar agora", "Agora não"});
+    Avancar(300);
+    SalvarPng("22-atualizacao-pronta-sucesso");  // "-sucesso": tela sem Clawd, o medir.py não mede
+    painel.Fechar();
+
+    // Modo de configuração de Wi-Fi (o firmware chama MostrarSemWifi com a rede e o endereço do portal)
+    TelaSemWifi sem_wifi(&tela_apps);
+    sem_wifi.Mostrar("Ollie-AC40", "http://192.168.4.1");
+    Avancar(1100);  // quadro com o Wi-Fi riscado
+    SalvarPng("20-sem-wifi");
+    sem_wifi.Esconder();
+    g_painel_aberto = false;
+    Avancar(100);
 
     // Cada pose na espera, para conferir as animações novas (folha à parte, sem medir)
     for (auto& pose : Poses()) {

@@ -1,8 +1,9 @@
 """Mede o Clawd em cada cena do simulador e monta a folha de conferência.
 
-- Corpo do Clawd: as linhas em que o laranja (D97757) tem a largura mais comum (o corpo, sem braços
-  nem acessórios), até a ponta das perninhas. Texto: a caixa reservada (bottom_bar_), que o
-  simulador grava em saida/<cena>.txt.
+- O simulador roda duas vezes: em saida/medida/ toda pose vira o Clawd parado e sem acessórios
+  (OLLIE_MEDIR=1), e é ali que o corpo é medido (laranja D97757); em saida/ ficam as cenas com as
+  poses de verdade, onde os retângulos são desenhados. Texto: a caixa reservada (bottom_bar_), que o
+  simulador grava em saida/medida/<cena>.txt.
 - Regra (placa/layout_mascote.h): corpo do Clawd no centro da tela em todos os fluxos, e a caixa do
   texto inteira dentro do círculo. Tolerância: 2 px (RGB565 e arredondamento).
 Gera saida/*.png (com o círculo da tela e as guias do centro), saida/folha.png com os fluxos e
@@ -26,23 +27,31 @@ def laranja(p):
 
 
 def corpo(img):
+    """Retângulo do corpo do Clawd parado (staticstate): a largura mais comum entre as linhas com laranja,
+    só acima de y=300 (embaixo ficam botões laranja), no maior bloco contínuo (o título dos apps é laranja)."""
     px = img.load()
     faixas = {}
-    for y in range(LADO):
+    for y in range(300):
         xs = [x for x in range(LADO) if laranja(px[x, y])]
         if len(xs) >= 10:
             faixas[y] = (xs[0], xs[-1])
     if not faixas:
         return None
-    # a largura mais comum é a do corpo (braços e acessórios aparecem em poucas linhas)
-    larguras = collections.Counter(x1 - x0 for x0, x1 in faixas.values())
-    largura = larguras.most_common(1)[0][0]
-    linhas = [y for y, (x0, x1) in faixas.items() if abs((x1 - x0) - largura) <= 1]
-    x0 = min(faixas[y][0] for y in linhas)
-    x1 = max(faixas[y][1] for y in linhas)
-    topo = min(linhas)
-    base = max(y for y in range(topo, LADO) if any(laranja(px[x, y]) for x in range(x0, x1 + 1)))
-    return x0, x1, topo, base
+    largura = collections.Counter(f[1] - f[0] for f in faixas.values()).most_common(1)[0][0]
+    linhas = sorted(y for y, f in faixas.items() if abs((f[1] - f[0]) - largura) <= 1)
+    blocos, atual = [], [linhas[0]]
+    for y in linhas[1:]:
+        if y - atual[-1] <= 6:
+            atual.append(y)
+        else:
+            blocos.append(atual)
+            atual = [y]
+    blocos.append(atual)
+    bloco = max(blocos, key=len)
+    x0 = min(faixas[y][0] for y in bloco)
+    x1 = max(faixas[y][1] for y in bloco)
+    base = max(y for y in range(bloco[0], 300) if any(laranja(px[x, y]) for x in range(x0, x1 + 1)))
+    return x0, x1, bloco[0], base
 
 
 def folha(imagens, caminho, col):
@@ -62,13 +71,17 @@ def main():
     for c in sorted(glob.glob("saida/*.ppm")):
         nome = os.path.basename(c)[:-4]
         img = Image.open(c).convert("RGB")
-        m = None if nome.startswith("p-") else corpo(img)  # poses: só para ver (acessórios cobrem o corpo)
+        medida = f"saida/medida/{nome}.ppm"
+        # mede na rodada sem acessórios; poses (só para ver) e sucesso/erro dos apps não têm o que medir
+        m = None
+        if os.path.exists(medida) and not nome.startswith("p-") and not nome.endswith("-sucesso"):
+            m = corpo(Image.open(medida).convert("RGB"))
         d = ImageDraw.Draw(img)
         linha = f"{nome:30s} "
         if m:
             x0, x1, y0, y1 = m
             cx = (x0 + x1 + 1) / 2
-            caixa = open(c[:-4] + ".txt").read().split()
+            caixa = open(medida[:-4] + ".txt").read().split()
             t = tuple(int(v) for v in caixa) if caixa else None  # x1 x2 y1 y2
             # centro pelo topo do corpo e pela largura (as perninhas podem estar cobertas: notebook, livro)
             altura = round((x1 - x0 + 1) * 66 / 84)  # corpo 84x66 no GIF (gerar.py)
@@ -81,6 +94,8 @@ def main():
                     falhas.append(nome + " (texto sai do círculo)")
             dx, dy = cx - C, cy - C
             ok_x = abs(dx) <= TOL
+            if nome.endswith("-com-botoes"):  # painel com botões: ícone 40 px acima do centro
+                dy += 40
             ok_y = abs(dy) <= TOL or nome.startswith("00-")  # abertura: Clawd em cima do logo
             if not (ok_x and ok_y):
                 falhas.append(nome)

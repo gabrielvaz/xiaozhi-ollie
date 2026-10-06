@@ -44,7 +44,7 @@ public:
             ir_para_ = resto.substr(0, quebra);
             ir_titulo_ = quebra == std::string::npos ? "" : resto.substr(quebra + 1);
             tela_ = Tela::Carregando;
-            c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
+            c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"), {}, "reading");
             pedido_ = Pedido::Lista;
             return;
         }
@@ -73,7 +73,7 @@ public:
             case Tela::Aviso:
                 if (i == 0) {  // Ir para a sessão: carrega a lista e abre a sessão do aviso
                     tela_ = Tela::Carregando;
-                    c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
+                    c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"), {}, "reading");
                     pedido_ = Pedido::Lista;
                     return true;
                 }
@@ -301,7 +301,7 @@ private:
     void AbrirSessao(ContextoApps& c, int indice) {
         atual_ = indice;
         tela_ = Tela::Carregando;
-        c.painel.MostrarStatus(sessoes_[atual_].titulo, PainelWatcher::Status::Carregando, TR("Lendo as mensagens…", "Reading messages…", "正在读取消息…", "Leyendo los mensajes…"));
+        c.painel.MostrarStatus(sessoes_[atual_].titulo, PainelWatcher::Status::Carregando, TR("Lendo as mensagens…", "Reading messages…", "正在读取消息…", "Leyendo los mensajes…"), {}, "reading");
         pedido_ = Pedido::Sessao;
     }
 
@@ -431,7 +431,7 @@ private:
         escolhas_ = escolhas;
         tela_ = Tela::Carregando;
         c.painel.MostrarStatus(TR("Respondendo", "Answering", "正在回答", "Respondiendo"), PainelWatcher::Status::Carregando,
-                               TR("Enviando a resposta à sessão…", "Sending answer to session…", "正在向会话发送回答…", "Enviando la respuesta…"));
+                               TR("Enviando a resposta à sessão…", "Sending answer to session…", "正在向会话发送回答…", "Enviando la respuesta…"), {}, "teclando");
         pedido_ = Pedido::Responder;
     }
 

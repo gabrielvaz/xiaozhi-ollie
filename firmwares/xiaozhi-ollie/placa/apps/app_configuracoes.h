@@ -1,4 +1,5 @@
 // App "Configurações": a roda escolhe o item, o clique troca para a próxima opção (aplica e salva na hora).
+// "Atualização" consulta o servidor do OTA e, se houver versão nova, baixa e instala (o aparelho reinicia).
 #pragma once
 
 #include <atomic>
@@ -8,6 +9,7 @@
 #include <esp_system.h>
 
 #include "lvgl_theme.h"
+#include "ota.h"
 #include "../abertura_watcher.h"
 #include "../agente_watcher.h"
 #include "../fontes_watcher.h"
@@ -23,12 +25,13 @@ public:
 
     void Abrir(ContextoApps& c) override {
         sobre_ = false;
+        ota_ = EstadoOta::Nada;
         Desenhar(c, 0);
     }
 
     void Girar(ContextoApps& c, int passo) override {
-        if (!sobre_) {
-            c.painel.Mover(passo);
+        if (!sobre_ && ota_ != EstadoOta::Buscando) {
+            c.painel.Mover(passo);  // na lista, os itens; na versão nova, os botões
         }
     }
 
@@ -38,6 +41,11 @@ public:
             Desenhar(c, kSobre);
             return true;
         }
+        if (ota_ != EstadoOta::Nada) {
+            ota_ = EstadoOta::Nada;  // a busca em andamento é descartada (o Fundo não desenha mais)
+            Desenhar(c, kAtualizar);
+            return true;
+        }
         return false;
     }
 
@@ -45,6 +53,37 @@ public:
         if (sobre_) {
             sobre_ = false;
             Desenhar(c, kSobre);
+            return true;
+        }
+        if (ota_ == EstadoOta::Buscando) {
+            return true;
+        }
+        if (ota_ == EstadoOta::Pronta) {
+            if (c.painel.Selecionado() == 0) {  // "Atualizar agora": a tela principal mostra o progresso
+                ota_ = EstadoOta::Nada;
+                if (c.fechar) {
+                    c.fechar();
+                }
+                // Tarefa própria, como a de ativação do XiaoZhi: no laço principal (Schedule) o download o
+                // bloquearia e o progresso ("37% 120KB/s"), que também vai pelo Schedule, só apareceria no fim
+                auto* pedido = new std::pair<std::string, std::string>(url_, versao_nova_);
+                xTaskCreate(
+                    [](void* arg) {
+                        auto* p = static_cast<std::pair<std::string, std::string>*>(arg);
+                        ContextoApps::App().UpgradeFirmware(p->first, p->second);  // sucesso: reinicia
+                        delete p;
+                        vTaskDelete(NULL);
+                    },
+                    "ollie_ota", 4096 * 2, pedido, 2, nullptr);
+                return true;
+            }
+            ota_ = EstadoOta::Nada;
+            Desenhar(c, kAtualizar);
+            return true;
+        }
+        if (ota_ == EstadoOta::Resultado) {
+            ota_ = EstadoOta::Nada;
+            Desenhar(c, kAtualizar);
             return true;
         }
         int i = c.painel.Selecionado();
@@ -109,6 +148,12 @@ public:
             case kAvisos:
                 ConfigWatcher::SetInt("avisos", ConfigWatcher::Int("avisos", 1) ? 0 : 1);
                 break;
+            case kAtualizar:
+                ota_ = EstadoOta::Buscando;
+                c.painel.MostrarStatus(TR("Atualização", "Update", "更新", "Actualización"), PainelWatcher::Status::Carregando,
+                                       TR("Procurando atualização…", "Checking for updates…", "正在检查更新…", "Buscando actualizaciones…"),
+                                       {}, "searching");
+                return true;
             case kSobre:
                 sobre_ = true;
                 MostrarSobre(c);
@@ -121,7 +166,11 @@ public:
     }
 
 private:
-    enum { kAgente, kVoz, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kSobre };
+    enum { kAgente, kVoz, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kAtualizar, kSobre };
+    // Atualização: Buscando (consulta no Fundo), Pronta (versão nova, botões), Resultado (já na mais nova ou erro)
+    enum class EstadoOta { Nada, Buscando, Pronta, Resultado };
+    std::atomic<EstadoOta> ota_{EstadoOta::Nada};
+    std::string url_, versao_nova_;
     inline static const std::vector<int> kOpcoesTela = {30, 60, 120, 300, 900, -1};
     inline static const std::vector<int> kOpcoesBrilho = {25, 50, 75, 100};
     inline static const std::vector<int> kOpcoesVolume = {0, 20, 40, 60, 80, 100};
@@ -161,13 +210,58 @@ private:
              {TR("Volume", "Volume", "音量", "Volumen"), std::to_string(board.GetAudioCodec()->output_volume()) + "%"},
              {TR("Desliga na bateria após", "Battery off after", "电池关机时间", "Apagar con batería"), Tempo(ConfigWatcher::Int("desliga_s", 300))},
              {TR("Avisos na tela", "On-screen alerts", "屏幕提醒", "Avisos en pantalla"), ConfigWatcher::Int("avisos", 1) ? TR("Ligados", "On", "开启", "Activados") : TR("Desligados", "Off", "关闭", "Desactivados")},
+             {TR("Atualização", "Update", "更新", "Actualización"),
+              TR("Versão ", "Version ", "版本 ", "Versión ") + std::string(esp_app_get_description()->version) +
+                  TR(" · procurar nova", " · check for new", " · 检查新版本", " · buscar nueva")},
              {TR("Sobre o Watcher", "About Watcher", "关于 Watcher", "Acerca de Watcher"), TR("Versão, rede e cartão", "Version, network, SD card", "版本、网络和存储卡", "Versión, red y tarjeta")},
              {TR("Voltar", "Back", "返回", "Volver"), ""}},
             selecionado);
     }
 
+    // Consulta ao servidor do OTA (rede: fica fora do clique, que roda com a tela travada)
+    void BuscarAtualizacao(ContextoApps& c) {
+        ::Ota ota;
+        auto resultado = ota.CheckVersion();
+        if (ota_ != EstadoOta::Buscando || (c.gaveta_aberta && !c.gaveta_aberta())) {
+            return;  // a pessoa voltou ou fechou a gaveta enquanto procurava
+        }
+        const char* titulo = TR("Atualização", "Update", "更新", "Actualización");
+        std::vector<std::string> voltar = {TR("Voltar", "Back", "返回", "Volver")};
+        if (!resultado) {
+            ota_ = EstadoOta::Resultado;
+            c.painel.MostrarStatus(titulo, PainelWatcher::Status::Erro,
+                                   TR("Não consegui falar com o servidor. Confira a internet e tente de novo.",
+                                      "Could not reach the server. Check the internet and try again.",
+                                      "无法连接服务器。请检查网络后重试。",
+                                      "No pude hablar con el servidor. Revisa internet e inténtalo de nuevo."),
+                                   voltar);
+        } else if (ota.HasNewVersion() && !ota.GetFirmwareUrl().empty()) {
+            url_ = ota.GetFirmwareUrl();
+            versao_nova_ = ota.GetFirmwareVersion();
+            ota_ = EstadoOta::Pronta;
+            c.painel.MostrarTexto(titulo,
+                                  TR("Versão nova: ", "New version: ", "新版本：", "Versión nueva: ") + versao_nova_ +
+                                      TR(" (você está na ", " (you have ", "（当前 ", " (tienes la ") + ota.GetCurrentVersion() +
+                                      TR(").\n\nO Watcher baixa, instala e reinicia sozinho. Não desligue até terminar.",
+                                         ").\n\nThe Watcher downloads, installs and restarts by itself. Don't turn it off until it's done.",
+                                         "）。\n\nWatcher 会自动下载、安装并重启。完成前请勿关机。",
+                                         ").\n\nEl Watcher descarga, instala y se reinicia solo. No lo apagues hasta que termine."),
+                                  {TR("Atualizar agora", "Update now", "立即更新", "Actualizar ahora"),
+                                   TR("Agora não", "Not now", "暂不", "Ahora no")});
+        } else {
+            ota_ = EstadoOta::Resultado;
+            c.painel.MostrarStatus(titulo, PainelWatcher::Status::Sucesso,
+                                   TR("Você já está na versão mais nova (", "You have the latest version (", "已是最新版本（",
+                                      "Ya tienes la versión más nueva (") + ota.GetCurrentVersion() + ").",
+                                   voltar);
+        }
+    }
+
     // Reinício depois de trocar o nome do agente: avisa o servidor e reinicia para a nova ativação
     void Fundo(ContextoApps& c) override {
+        if (ota_ == EstadoOta::Buscando) {
+            BuscarAtualizacao(c);
+        }
         int quando = reiniciar_em_;
         if (quando == 0 || ContextoApps::Agora() < quando) {
             return;

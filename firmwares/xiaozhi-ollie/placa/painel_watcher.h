@@ -16,6 +16,8 @@
 
 #include "display.h"
 #include "fontes_watcher.h"
+#include "clawd_animado.h"
+#include "layout_mascote.h"
 #include "idioma_watcher.h"
 #include "material_symbols.h"
 
@@ -37,7 +39,7 @@ public:
         const char* icone = nullptr;  // MATERIAL_SYMBOLS_* (opcional)
     };
 
-    explicit PainelWatcher(Display* display) : display_(display) {}
+    explicit PainelWatcher(Display* display) : display_(display), clawd_(display) {}
 
     bool Aberto() const { return raiz_ != nullptr; }
     int Selecionado() const { return selecionado_; }
@@ -205,9 +207,9 @@ public:
     static constexpr const char* kIconeClaude = "\x01claude";        // asterisco do Claude (app Claude Code)
     static constexpr const char* kIconeCodex = "\x01codex";          // prompt ">_" do Codex
 
-    // Status com ícone: spinner girando (carregando), check verde (sucesso) ou X vermelho (erro)
+    // Status com ícone: Clawd animado (carregando, na pose pedida), check verde (sucesso) ou X vermelho (erro)
     void MostrarStatus(const std::string& cabecalho, Status status, const std::string& texto,
-                       const std::vector<std::string>& botoes = {}) {
+                       const std::vector<std::string>& botoes = {}, const char* pose = "searching") {
         DisplayLockGuard lock(display_);
         Recriar();
         modo_ = Modo::Texto;
@@ -215,9 +217,12 @@ public:
         selecionado_ = 0;
         Cabecalho(cabecalho);
         bool carregando = status == Status::Carregando;
+        // Corpo do Clawd no centro da tela (o GIF tem o corpo um pouco abaixo do meio: placa/layout_mascote.h)
+        int dy_mascote = 0;
         if (carregando) {
-            auto arco = Spinner(raiz_, 110, 12, 0x2A2A2A);
-            lv_obj_align(arco, LV_ALIGN_CENTER, 0, 0);  // no centro da tela, na altura também
+            auto mascote = Mascote(raiz_, pose);
+            dy_mascote = mascote.second ? LayoutMascote::Calcular(LayoutMascote::kEscalaCheia).mascote_dy : 0;
+            lv_obj_align(mascote.first, LV_ALIGN_CENTER, 0, dy_mascote);
         } else {
             // Check ou X desenhado em vetor (o ícone da fonte ampliado ficava borrado)
             bool ok = status == Status::Sucesso;
@@ -250,7 +255,7 @@ public:
         // Com botões, ícone e texto sobem um pouco e os botões descem, para não sobrepor a mensagem
         bool com_botoes = !botoes.empty();
         if (com_botoes) {
-            lv_obj_set_y(lv_obj_get_child(raiz_, -1), -40);
+            lv_obj_set_y(lv_obj_get_child(raiz_, -1), -40 + dy_mascote);
         }
         auto r = Rotulo(Fontes::Pequena(), 0xEDEDED, texto);
         lv_obj_set_width(r, 290);
@@ -531,6 +536,7 @@ public:
     void Fechar() {
         DisplayLockGuard lock(display_);
         PararRapido();
+        PararMascote();
         if (raiz_ != nullptr) {
             lv_obj_delete(raiz_);
         }
@@ -569,6 +575,7 @@ private:
 
     Display* display_;
     lv_obj_t* raiz_ = nullptr;
+    ClawdAnimado clawd_;                    // Clawd da tela de carregamento
     lv_obj_t* conteudo_ = nullptr;
     lv_obj_t* barra_botoes_ = nullptr;
     lv_obj_t* cronometro_ = nullptr;
@@ -680,6 +687,17 @@ private:
         return std::to_string(s / 60) + TR(" min", " min", " 分钟", " min");
     }
 
+    // Clawd animado no lugar do spinner das telas de carregamento. Retorna o objeto e se é o Clawd;
+    // sem o GIF (assets ainda não carregados), cai no spinner de antes
+    std::pair<lv_obj_t*, bool> Mascote(lv_obj_t* pai, const char* pose) {
+        if (auto img = clawd_.Criar(pai, pose)) {
+            return {img, true};
+        }
+        return {Spinner(pai, 110, 12, 0x2A2A2A), false};
+    }
+
+    void PararMascote() { clawd_.Parar(); }
+
     // Spinner (arco laranja girando) reaproveitado nas telas de carregamento e nas listas
     static lv_obj_t* Spinner(lv_obj_t* pai, int tamanho, int espessura, uint32_t cor_fundo,
                              uint32_t cor = 0xD97757) {
@@ -730,6 +748,7 @@ private:
 
     void Recriar() {
         PararRapido();
+        PararMascote();
         if (raiz_ != nullptr) {
             lv_obj_delete(raiz_);
         }

@@ -11,14 +11,15 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 | Idiomas | Interface em vários idiomas; assistente na nuvem do xiaozhi.me | **4 idiomas de ponta a ponta**: português do Brasil, inglês, chinês simplificado e espanhol (tela, apps, avisos, voz e respostas). Escolha no build: `compilar.sh --idioma en-US` (padrão: `IDIOMA` do `servidor/.env`). Textos do firmware em `TR(pt, en, zh, es)` (`placa/idioma_watcher.h`); em chinês o texto usa a fonte CJK do tema |
 | Ativação | "你好小智" (WakeNet chinês) | **"Hey Ollie"** (MultiNet7 em inglês; fonemas gerados no aparelho). O nome do agente é escolhido em Configurações: Ollie, Clawd, Jarvis, Nova, Atlas, Luna, Max ou Iris, e muda a ativação e a apresentação |
 | Servidor | xiaozhi.me | **Servidor próprio no Mac** (endereço OTA embutido, Tailscale Funnel com caminho secreto) |
-| Mascote | Emojis Noto | **Clawd**, o mascote do Claude Code, em GIFs animados, com animações próprias para **conectando, ouvindo e falando** |
+| Mascote | Emojis Noto | **Clawd**, o mascote do Claude Code, em GIFs animados, com animações próprias para **conectando, ouvindo e falando**, **offline** (sem Wi-Fi ou sem servidor, inclusive no boot), **lupa** (procurando atualização), **skate** (baixando atualização), **chateado** (algo falhou) e **triste** (bateria no fim) |
 | Fala na tela | Uma linha rolando de lado | **Streaming em até 3 linhas**, que rola para cima, com fonte própria de 24 px com acentos |
 | Abertura | Logo do XiaoZhi | **Clawd acenando, logo "Ollie" e versão** por ~3 s |
 | Fonte | Noto Sans | **Noto Sans ou JetBrains Mono** (estilo terminal), escolhida em Configurações |
 | Ao ligar | Logo XiaoZhi | **Logo do Ollie** e depois uma **saudação com o seu nome**, que muda ao longo do dia ("Bom dia, Ana! Café já tomado?") |
 | Tela inicial | Hora | **Dia da semana, data e hora** ("Seg, 05/10 · 16:20") |
 | Tema | Claro | **Escuro** por padrão (ajustável) |
-| Roda | Volume e conversa | Volume, conversa e **gaveta de apps em mosaico** (2 cliques abrem; 2 cliques voltam; 3 cliques fecham) |
+| Roda | Volume e conversa | Volume (com **anel branco na borda** do tamanho do volume e o Clawd animado), conversa e **gaveta de apps em mosaico** (2 cliques abrem; 2 cliques voltam; 3 cliques fecham) |
+| Sem Wi-Fi | Alerta com engrenagem e a dica numa frase | **Tela própria**: Clawd confuso com o Wi-Fi riscado, a rede **Ollie-XXXX** e o endereço do portal; o portal diz **por que** a rede não conectou (só 2,4 GHz, senha recusada, Wi-Fi corporativo, nome com maiúsculas diferentes) |
 | Reset de fábrica | Segurar 10 s | **Segurar 20 s** |
 | microSD | Não usado | **Registro das conversas, cópia das reuniões e memória offline** |
 | Avisos | — | **Avisos do Mac na tela**: sessão esperando você, tarefa concluída, reunião pronta |
@@ -62,7 +63,7 @@ Para criar um app: veja [`placa/README.md`](placa/README.md). Cada app é um arq
 | `placa/` | Plataforma de apps, telas, microSD e os apps |
 | `mascote-clawd/` | `gerar.py` desenha o Clawd; `previa.png` |
 | `placa/layout_mascote.h` | Onde ficam o Clawd e o texto: o corpo do Clawd sempre no centro exato da tela, e o texto logo abaixo dele |
-| `simulador/` | Tela do Watcher no Mac (LVGL 9.5 e decodificador de GIF do firmware, mesmo layout). `./rodar.sh --abrir` gera as cenas (abertura, carregando, espera, saudação, trabalhando, ouvindo, falando), confere se o Clawd está centrado e abre `saida/folha.png` e `saida/poses.png`. Precisa de um `compilar.sh` antes (usa os componentes baixados) |
+| `simulador/` | Tela do Watcher no Mac (LVGL 9.5 e decodificador de GIF do firmware, mesmo layout). `./rodar.sh --abrir` gera as cenas (abertura, carregando, espera, saudação, trabalhando, ouvindo, falando, volume e as telas de carregamento dos apps), confere se o Clawd está centrado e abre `saida/folha.png` e `saida/poses.png`. Precisa de um `compilar.sh` antes (usa os componentes baixados) |
 | `fonte/` | Noto Sans 24 px, JetBrains Mono (opção nas Configurações) e o logo da abertura; como gerar em `fonte/README.md` |
 | `../gravar-xiaozhi.sh` | Primeira gravação, com backup e sem tocar na partição de fábrica |
 | `../atualizar-firmware.sh` | Atualizações seguintes (mantém o Wi-Fi) |

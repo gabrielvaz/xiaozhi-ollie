@@ -137,7 +137,7 @@ class GravadorReuniao:
             minutos = f"{self.minutos:.0f}"
             adicionar_aviso("reuniao", t("Gravação pronta", "Recording ready", "录音已就绪", "Grabación lista"),
                             t(f"Resumo de {minutos} min salvo no Notas", f"{minutos}-min summary saved to Notes",
-                              f"{minutos} 分钟的摘要已保存到备忘录", f"Resumen de {minutos} min guardado en Notas"), "happy")
+                              f"{minutos} 分钟的摘要已保存到备忘录", f"Resumen de {minutos} min guardado en Notas"), "reading")
         except Exception as e:
             self._log(f"ERRO: {e}")
             self._notificar(t("Gravação salva, mas o processamento falhou", "Recording saved, but processing failed",

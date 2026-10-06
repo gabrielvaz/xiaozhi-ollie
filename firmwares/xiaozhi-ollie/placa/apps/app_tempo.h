@@ -17,7 +17,7 @@ public:
 
     void Abrir(ContextoApps& c) override {
         c.painel.MostrarStatus(TR("Previsão do tempo", "Forecast", "天气预报", "Previsión"), PainelWatcher::Status::Carregando,
-                               TR("Consultando…", "Checking…", "正在查询…", "Consultando…"));
+                               TR("Consultando…", "Checking…", "正在查询…", "Consultando…"), {}, "sunny");
         buscar_ = true;
     }
 

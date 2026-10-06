@@ -23,7 +23,7 @@ public:
         tela_ = Tela::Carregando;
         buscar_em_ = 0;
         c.painel.MostrarStatus(TR("Gravador", "Recorder", "录音机", "Grabadora"), PainelWatcher::Status::Carregando,
-                               TR("Carregando gravações…", "Loading recordings…", "正在加载录音…", "Cargando grabaciones…"));
+                               TR("Carregando gravações…", "Loading recordings…", "正在加载录音…", "Cargando grabaciones…"), {}, "recording");
     }
 
     void IniciarGravacao(ContextoApps& c) {
@@ -86,7 +86,7 @@ public:
             tela_ = Tela::Carregando;
             buscar_detalhe_ = true;
             c.painel.MostrarStatus(lista_[atual_].titulo, PainelWatcher::Status::Carregando,
-                                   TR("Abrindo a gravação…", "Opening recording…", "正在打开录音…", "Abriendo la grabación…"));
+                                   TR("Abrindo a gravação…", "Opening recording…", "正在打开录音…", "Abriendo la grabación…"), {}, "reading");
             return true;
         }
         if (tela_ == Tela::Item && vendo_texto_ && c.painel.Selecionado() == 0) {  // botão "Claude Code"
@@ -94,7 +94,7 @@ public:
             tela_ = Tela::Carregando;
             enviar_claude_ = true;
             c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando,
-                                   TR("Enviando a transcrição…", "Sending the transcript…", "正在发送转写…", "Enviando la transcripción…"));
+                                   TR("Enviando a transcrição…", "Sending the transcript…", "正在发送转写…", "Enviando la transcripción…"), {}, "teclando");
             return true;
         }
         if (tela_ == Tela::Item) {
@@ -252,7 +252,7 @@ private:
         tela_ = Tela::Carregando;
         buscar_em_ = ContextoApps::Agora() + 2;
         c.painel.MostrarStatus(TR("Gravador", "Recorder", "录音机", "Grabadora"), PainelWatcher::Status::Carregando,
-                               TR("Salvando a gravação…", "Saving recording…", "正在保存录音…", "Guardando la grabación…"));
+                               TR("Salvando a gravação…", "Saving recording…", "正在保存录音…", "Guardando la grabación…"), {}, "recording");
     }
 
     void BuscarLista(ContextoApps& c) {
