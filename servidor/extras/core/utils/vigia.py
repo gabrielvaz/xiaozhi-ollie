@@ -16,6 +16,8 @@ from pathlib import Path
 
 import requests
 
+from core.utils.idioma import IDIOMA, NOME, t
+
 INTERVALO_S = 10
 MAX_AVISOS = 50
 MAX_HISTORICO = 200
@@ -53,6 +55,21 @@ def _guardar_historico(aviso: dict) -> None:
     tmp.replace(HISTORICO)
 
 
+DIAS_SEMANA = t("Seg Ter Qua Qui Sex Sáb Dom", "Mon Tue Wed Thu Fri Sat Sun", "周一 周二 周三 周四 周五 周六 周日",
+                "Lun Mar Mié Jue Vie Sáb Dom").split()
+
+
+def rotulo_dia(d) -> str:
+    """Dia curto para listas da tela: "Hoje", "Ontem" ou "Seg 05/10" (mês/dia em en-US e zh-CN)."""
+    from datetime import datetime
+    hoje = datetime.now().date()
+    if d.date() == hoje:
+        return t("Hoje", "Today", "今天", "Hoy")
+    if (hoje - d.date()).days == 1:
+        return t("Ontem", "Yesterday", "昨天", "Ayer")
+    return f"{DIAS_SEMANA[d.weekday()]} {d:%m/%d}" if IDIOMA in ("en-US", "zh-CN") else f"{DIAS_SEMANA[d.weekday()]} {d:%d/%m}"
+
+
 def historico(limite: int = 60) -> list[dict]:
     """Avisos mais recentes primeiro, com "detalhe" de quando ("Hoje 19:30", "Ontem 08:10", "Seg 05/10 14:00")."""
     import json
@@ -62,14 +79,10 @@ def historico(limite: int = 60) -> list[dict]:
             itens = json.loads(HISTORICO.read_text(encoding="utf-8")) if HISTORICO.exists() else []
         except (OSError, ValueError):
             itens = []
-    hoje = datetime.now().date()
-    dias = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
     saida = []
     for a in reversed(itens[-limite:]):
         q = datetime.fromtimestamp(a.get("quando", 0))
-        dia = ("Hoje" if q.date() == hoje else "Ontem" if (hoje - q.date()).days == 1
-               else f"{dias[q.weekday()]} {q:%d/%m}")
-        saida.append({**a, "detalhe": f"{dia} {q:%H:%M}"})
+        saida.append({**a, "detalhe": f"{rotulo_dia(q)} {q:%H:%M}"})
     return saida
 
 
@@ -83,7 +96,7 @@ def avisos_desde(ultimo: int) -> dict:
 def _frase_curta(titulo: str, fala: str) -> str:
     """Uma linha para a tela redonda: "Projeto: resultado" (até ~70 caracteres). Fallback: corta."""
     fala = (fala or "").strip()
-    reserva = f"{titulo[:24]}: {fala[:44]}…" if fala else f"{titulo[:40]} terminou"
+    reserva = f"{titulo[:24]}: {fala[:44]}…" if fala else f"{titulo[:40]} " + t("terminou", "finished", "已完成", "terminó")
     if not fala:
         return reserva
     try:
@@ -92,7 +105,7 @@ def _frase_curta(titulo: str, fala: str) -> str:
                           json={"model": os.environ.get("MODELO_LLM", "openai/gpt-6-luna"), "max_tokens": 400,
                                 "reasoning": {"effort": "minimal"},
                                 "messages": [{"role": "system", "content":
-                                              "Escreva UMA linha de no máximo 70 caracteres, português do Brasil, sem markdown, "
+                                              f"Escreva UMA linha de no máximo 70 caracteres, em {NOME}, sem markdown, "
                                               "no formato 'Projeto curto: resultado'. Projeto curto = 1 a 3 palavras do título. "
                                               "Resultado = o que o agente concluiu, começando pelo resultado."},
                                              {"role": "user", "content": f"Título: {titulo}\nÚltima mensagem do agente: {fala[:1500]}"}]})
@@ -104,7 +117,7 @@ def _frase_curta(titulo: str, fala: str) -> str:
 
 
 def _titulo_curto(a: dict) -> str:
-    return a.get("titulo") or a.get("workspace") or a.get("pasta") or "Sessão"
+    return a.get("titulo") or a.get("workspace") or a.get("pasta") or t("Sessão", "Session", "会话", "Sesión")
 
 
 def _loop(ponte) -> None:
@@ -117,14 +130,16 @@ def _loop(ponte) -> None:
                 chave, estado, feitas = a["sessao"], a["status"], a.get("_conclusoes", 0)
                 if not primeira:
                     if estado == "blocked" and estados.get(chave) != "blocked":
-                        adicionar_aviso("esperando", "Esperando você", f"{_titulo_curto(a)[:50]} precisa da sua resposta", "warning",
+                        adicionar_aviso("esperando", t("Esperando você", "Waiting for you", "等待你回复", "Esperándote"),
+                                        f"{_titulo_curto(a)[:50]} " + t("precisa da sua resposta", "needs your answer",
+                                                                        "需要你的回复", "necesita tu respuesta"), "warning",
                                         sessao=chave)
                     # herdr soma completion_seq a cada tarefa terminada (pega até as que duram menos que o intervalo)
                     elif feitas > conclusoes.get(chave, feitas) and estado in ("idle", "done"):
                         time.sleep(3)  # dá tempo de o histórico registrar a fala final
                         info = ponte._historico_claude(a.get("_sessao_id", ""), a.get("_cwd", "")) if a.get("_sessao_id") else {}
                         fala = info.get("ultima_fala") or a.get("ultima_fala", "")
-                        adicionar_aviso("concluiu", "Tarefa concluída", _frase_curta(_titulo_curto(a), fala), "happy")
+                        adicionar_aviso("concluiu", t("Tarefa concluída", "Task done", "任务完成", "Tarea completada"), _frase_curta(_titulo_curto(a), fala), "happy")
                 estados[chave], conclusoes[chave] = estado, feitas
             primeira = False
         except Exception:

@@ -7,17 +7,18 @@
 #include <cctype>
 #include <vector>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppCodex : public AppWatcher {
 public:
     const char* Nome() const override { return "Codex"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_KEYBOARD_DOUBLE_ARROW_RIGHT; }
-    std::string Detalhe() const override { return "Sessões, nuvem e controle remoto"; }
+    std::string Detalhe() const override { return TR("Sessões, nuvem e controle remoto", "Sessions, cloud, remote control", "会话、云端与远程控制", "Sesiones, nube y control remoto"); }
 
     void Abrir(ContextoApps& c) override {
         tela_ = Tela::Carregando;
-        c.painel.MostrarStatus("Codex", PainelWatcher::Status::Carregando, "Consultando o Codex…");
+        c.painel.MostrarStatus("Codex", PainelWatcher::Status::Carregando, TR("Consultando o Codex…", "Checking Codex…", "正在查询 Codex…", "Consultando Codex…"));
         pedido_ = Pedido::Resumo;
     }
 
@@ -40,30 +41,43 @@ public:
                     return false;  // Voltar
                 }
                 if (i == 1) {  // tarefa nova por voz
-                    c.Perguntar("Quero começar uma tarefa nova no Codex do Mac. Pergunte em qual projeto e o que devo pedir; "
-                                "depois confirme e use codex_nova_sessao.");
+                    c.Perguntar(TR("Quero começar uma tarefa nova no Codex do Mac. Pergunte em qual projeto e o que devo pedir; "
+                                   "depois confirme e use codex_nova_sessao.",
+                                   "I want to start a new task in Codex on the Mac. Ask me which project and what to request; "
+                                   "then confirm and use codex_nova_sessao.",
+                                   "我想在 Mac 上的 Codex 里开始一个新任务。问我是哪个项目、要提什么需求；"
+                                   "然后确认并使用 codex_nova_sessao。",
+                                   "Quiero empezar una tarea nueva en Codex del Mac. Pregúntame en qué proyecto y qué debo pedir; "
+                                   "luego confirma y usa codex_nova_sessao."));
                     return true;
                 }
                 if (i == 2) {  // controle remoto
                     tela_ = Tela::Remoto;
-                    c.painel.MostrarTexto("Controle remoto",
-                                          std::string(remoto_ ? "Está ligado. " : "Está desligado. ") + remoto_detalhe_ +
-                                              (remoto_ ? "\n\nDesligar o controle remoto do Codex?"
-                                                       : "\n\nLigar o controle remoto do Codex?"),
-                                          {remoto_ ? "Desligar" : "Ligar", "Voltar"});
+                    c.painel.MostrarTexto(TR("Controle remoto", "Remote control", "远程控制", "Control remoto"),
+                                          std::string(remoto_ ? TR("Está ligado. ", "It's on. ", "已开启。", "Está activado. ")
+                                                              : TR("Está desligado. ", "It's off. ", "已关闭。", "Está desactivado. ")) +
+                                              remoto_detalhe_ +
+                                              (remoto_ ? TR("\n\nDesligar o controle remoto do Codex?", "\n\nTurn off Codex remote control?",
+                                                            "\n\n关闭 Codex 远程控制？", "\n\n¿Desactivar el control remoto de Codex?")
+                                                       : TR("\n\nLigar o controle remoto do Codex?", "\n\nTurn on Codex remote control?",
+                                                            "\n\n开启 Codex 远程控制？", "\n\n¿Activar el control remoto de Codex?")),
+                                          {remoto_ ? TR("Desligar", "Turn off", "关闭", "Desactivar") : TR("Ligar", "Turn on", "开启", "Activar"),
+                                           TR("Voltar", "Back", "返回", "Volver")});
                     return true;
                 }
                 if (i >= 3 && i < 3 + ns) {
                     atual_ = i - 3;
                     tela_ = Tela::Carregando;
-                    c.painel.MostrarStatus(sessoes_[atual_].titulo, PainelWatcher::Status::Carregando, "Lendo as mensagens…");
+                    c.painel.MostrarStatus(sessoes_[atual_].titulo, PainelWatcher::Status::Carregando,
+                                           TR("Lendo as mensagens…", "Reading messages…", "正在读取消息…", "Leyendo los mensajes…"));
                     pedido_ = Pedido::Sessao;
                     return true;
                 }
                 if (i >= 3 + ns && i < 3 + ns + (int)nuvem_.size()) {
                     atual_ = i - 3 - ns;
                     tela_ = Tela::Carregando;
-                    c.painel.MostrarStatus(nuvem_[atual_].titulo, PainelWatcher::Status::Carregando, "Consultando a tarefa…");
+                    c.painel.MostrarStatus(nuvem_[atual_].titulo, PainelWatcher::Status::Carregando,
+                                           TR("Consultando a tarefa…", "Checking task…", "正在查询任务…", "Consultando la tarea…"));
                     pedido_ = Pedido::Nuvem;
                     return true;
                 }
@@ -72,8 +86,13 @@ public:
             case Tela::Sessao:
                 if (i == 0) {
                     const auto& s = sessoes_[atual_];
-                    c.Perguntar("Quero mandar uma mensagem para a sessão do Codex \"" + s.titulo + "\" (id " + s.id +
-                                "). Pergunte o que devo enviar e, depois que eu responder, confirme e use codex_enviar nessa sessão.");
+                    c.Perguntar(TR("Quero mandar uma mensagem para a sessão do Codex \"", "I want to send a message to the Codex session \"",
+                                   "我想给 Codex 会话\"", "Quiero enviar un mensaje a la sesión de Codex \"") +
+                                s.titulo + "\" (id " + s.id +
+                                TR("). Pergunte o que devo enviar e, depois que eu responder, confirme e use codex_enviar nessa sessão.",
+                                   "). Ask me what to send and, after I answer, confirm and use codex_enviar on that session.",
+                                   "）发送一条消息。问我要发送什么，我回答后先确认，再对该会话使用 codex_enviar。",
+                                   "). Pregúntame qué debo enviar y, cuando responda, confirma y usa codex_enviar en esa sesión."));
                 } else {
                     MostrarLista(c);
                 }
@@ -81,8 +100,9 @@ public:
             case Tela::Remoto:
                 if (i == 0) {
                     tela_ = Tela::Carregando;
-                    c.painel.MostrarStatus("Controle remoto", PainelWatcher::Status::Carregando,
-                                           remoto_ ? "Desligando…" : "Ligando…");
+                    c.painel.MostrarStatus(TR("Controle remoto", "Remote control", "远程控制", "Control remoto"), PainelWatcher::Status::Carregando,
+                                           remoto_ ? TR("Desligando…", "Turning off…", "正在关闭…", "Desactivando…")
+                                                   : TR("Ligando…", "Turning on…", "正在开启…", "Activando…"));
                     pedido_ = Pedido::Remoto;
                 } else {
                     MostrarLista(c);
@@ -92,7 +112,7 @@ public:
             case Tela::Resultado:
                 pedido_ = Pedido::Resumo;  // volta à lista atualizada
                 tela_ = Tela::Carregando;
-                c.painel.MostrarStatus("Codex", PainelWatcher::Status::Carregando, "Atualizando…");
+                c.painel.MostrarStatus("Codex", PainelWatcher::Status::Carregando, TR("Atualizando…", "Updating…", "正在更新…", "Actualizando…"));
                 return true;
         }
         return false;
@@ -161,7 +181,8 @@ private:
         std::string corpo;
         if (!RedeWatcher::Pedir("GET", "/watcher/codex", "", corpo)) {
             tela_ = Tela::Erro;
-            c.painel.MostrarStatus("Codex", PainelWatcher::Status::Erro, "Não consegui falar com o Mac agora.", {"Voltar"});
+            c.painel.MostrarStatus("Codex", PainelWatcher::Status::Erro, TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "现在无法连接 Mac。", "No he podido hablar con el Mac."),
+                                   {TR("Voltar", "Back", "返回", "Volver")});
             return;
         }
         cJSON* raiz = cJSON_Parse(corpo.c_str());
@@ -178,9 +199,12 @@ private:
     void MostrarLista(ContextoApps& c) {
         tela_ = Tela::Lista;
         std::vector<PainelWatcher::Item> itens = {
-            {"Voltar", "", MATERIAL_SYMBOLS_ARROW_BACK},
-            {"Nova tarefa", "Diga o que o Codex deve fazer", MATERIAL_SYMBOLS_MIC},
-            {"Controle remoto", remoto_ ? "Ligado" : "Desligado", remoto_ ? MATERIAL_SYMBOLS_LOCK_OPEN : MATERIAL_SYMBOLS_LOCK}};
+            {TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK},
+            {TR("Nova tarefa", "New task", "新任务", "Nueva tarea"),
+             TR("Diga o que o Codex deve fazer", "Say what Codex should do", "说出 Codex 要做什么", "Di qué debe hacer Codex"),
+             MATERIAL_SYMBOLS_MIC},
+            {TR("Controle remoto", "Remote control", "远程控制", "Control remoto"), remoto_ ? TR("Ligado", "On", "已开启", "Activado") : TR("Desligado", "Off", "已关闭", "Desactivado"),
+             remoto_ ? MATERIAL_SYMBOLS_LOCK_OPEN : MATERIAL_SYMBOLS_LOCK}};
         for (const auto& s : sessoes_) {
             itens.push_back({s.titulo, s.detalhe, MATERIAL_SYMBOLS_ROBOT_2});
         }
@@ -188,7 +212,7 @@ private:
             itens.push_back({t.titulo, t.detalhe, MATERIAL_SYMBOLS_CLOUD_UPLOAD});
         }
         if (sessoes_.empty() && nuvem_.empty()) {
-            itens.push_back({"Nenhuma sessão do Codex", erro_nuvem_, MATERIAL_SYMBOLS_INFO});
+            itens.push_back({TR("Nenhuma sessão do Codex", "No Codex sessions", "没有 Codex 会话", "Sin sesiones de Codex"), erro_nuvem_, MATERIAL_SYMBOLS_INFO});
         }
         c.painel.MostrarLista("Codex", itens, 1);
     }
@@ -209,8 +233,8 @@ private:
         }
         tela_ = Tela::Sessao;
         c.painel.MostrarTexto(s.titulo, (s.detalhe.empty() ? "" : s.detalhe + "\n\n") +
-                                            (texto.empty() ? "Sem mensagens registradas." : texto),
-                              {"Enviar mensagem", "Voltar"});
+                                            (texto.empty() ? TR("Sem mensagens registradas.", "No messages recorded.", "没有记录的消息。", "Sin mensajes registrados.") : texto),
+                              {TR("Enviar mensagem", "Send message", "发送消息", "Enviar mensaje"), TR("Voltar", "Back", "返回", "Volver")});
         c.painel.RolarTextoParaFim();
     }
 
@@ -223,7 +247,8 @@ private:
             cJSON_Delete(raiz);
         }
         tela_ = Tela::Texto;
-        c.painel.MostrarTexto(t.titulo, texto.empty() ? "Não consegui ler a tarefa agora." : texto, {"Voltar"});
+        c.painel.MostrarTexto(t.titulo, texto.empty() ? TR("Não consegui ler a tarefa agora.", "Couldn't read the task right now.", "现在无法读取任务。", "No he podido leer la tarea.") : texto,
+                              {TR("Voltar", "Back", "返回", "Volver")});
     }
 
     void AlternarRemoto(ContextoApps& c) {
@@ -237,7 +262,10 @@ private:
             remoto_ = !remoto_;
         }
         tela_ = Tela::Resultado;
-        c.painel.MostrarStatus("Controle remoto", ok ? PainelWatcher::Status::Sucesso : PainelWatcher::Status::Erro,
-                               mensagem.empty() ? (ok ? "Pronto." : "Não consegui mudar agora.") : mensagem, {"Voltar"});
+        c.painel.MostrarStatus(TR("Controle remoto", "Remote control", "远程控制", "Control remoto"), ok ? PainelWatcher::Status::Sucesso : PainelWatcher::Status::Erro,
+                               mensagem.empty() ? (ok ? TR("Pronto.", "Done.", "完成。", "Listo.")
+                                                      : TR("Não consegui mudar agora.", "Couldn't change it now.", "现在无法更改。", "No he podido cambiarlo."))
+                                                : mensagem,
+                               {TR("Voltar", "Back", "返回", "Volver")});
     }
 };

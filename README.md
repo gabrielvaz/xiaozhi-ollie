@@ -12,7 +12,7 @@ It talks to a small server that you run on your own Mac, not to the xiaozhi.me c
 
 **Works with:** Claude Code · Codex · [herdr](https://herdr.dev) · macOS · Multica (optional)
 
-> The interface and the voice are in **Brazilian Portuguese** today. The code is ready for other languages, but no translation has been done yet.
+**4 languages:** English · Português (Brasil) · 简体中文 · Español. The whole experience follows the language you pick: screen, apps, alerts, voice and the assistant's answers. Set `IDIOMA` in `servidor/.env`; the firmware build uses the same value. The wake word is “Hey Ollie” in every language.
 
 ## What it does
 
@@ -87,11 +87,11 @@ Short version, on a Mac:
 
 ```sh
 servidor/instalar.sh                   # server, Python env and .env with fresh secrets
-#   fill API_KEY, HOST_PUBLICO and NOME_USUARIO in servidor/.env
+#   fill API_KEY, HOST_PUBLICO, NOME_USUARIO and IDIOMA in servidor/.env
 servidor/testar-api.sh                 # real chat, voice and transcription calls
 servidor/configurar-funnel.sh ligar    # public secret path through Tailscale Funnel
 servidor/instalar-servico.sh instalar  # starts at login, restarts if it crashes
-firmwares/xiaozhi-ollie/compilar.sh    # builds the firmware with your server address
+firmwares/xiaozhi-ollie/compilar.sh    # builds the firmware with your server address and language
 firmwares/gravar-xiaozhi.sh            # first flash, with a full backup
 ```
 

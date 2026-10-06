@@ -5,18 +5,22 @@
 #include <atomic>
 #include <vector>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppAvisos : public AppWatcher {
 public:
-    const char* Nome() const override { return "Avisos"; }
+    const char* Nome() const override { return TR("Avisos", "Notices", "通知", "Avisos"); }
     const char* Id() const override { return "avisos"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_NOTIFICATIONS; }
-    std::string Detalhe() const override { return "Histórico de notificações"; }
+    std::string Detalhe() const override {
+        return TR("Histórico de notificações", "Notification history", "通知记录", "Historial de avisos");
+    }
 
     void Abrir(ContextoApps& c) override {
         tela_ = Tela::Carregando;
-        c.painel.MostrarStatus("Avisos", PainelWatcher::Status::Carregando, "Carregando avisos…");
+        c.painel.MostrarStatus(TR("Avisos", "Notices", "通知", "Avisos"), PainelWatcher::Status::Carregando,
+                             TR("Carregando avisos…", "Loading notices…", "正在加载通知…", "Cargando avisos…"));
         buscar_ = true;
     }
 
@@ -39,8 +43,9 @@ public:
             const auto& a = avisos_[atual_];
             tela_ = Tela::Item;
             c.painel.MostrarTexto(a.titulo, a.detalhe + "\n\n" + a.texto,
-                                  a.sessao.empty() ? std::vector<std::string>{"Voltar"}
-                                                   : std::vector<std::string>{"Ir para a sessão", "Voltar"});
+                                  a.sessao.empty() ? std::vector<std::string>{TR("Voltar", "Back", "返回", "Volver")}
+                                                   : std::vector<std::string>{TR("Ir para a sessão", "Go to session", "前往会话", "Ir a la sesión"),
+                                                                            TR("Voltar", "Back", "返回", "Volver")});
             return true;
         }
         if (tela_ == Tela::Item && i == 0 && !avisos_[atual_].sessao.empty() && c.abrir_app) {
@@ -97,13 +102,13 @@ private:
 
     void MostrarLista(ContextoApps& c) {
         tela_ = Tela::Lista;
-        std::vector<PainelWatcher::Item> itens = {{"Voltar", "", MATERIAL_SYMBOLS_ARROW_BACK}};
+        std::vector<PainelWatcher::Item> itens = {{TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK}};
         for (const auto& a : avisos_) {
             itens.push_back({a.titulo, a.detalhe + " · " + a.texto, IconeTipo(a.tipo)});
         }
         if (avisos_.empty()) {
-            itens.push_back({"Nenhum aviso ainda", "", MATERIAL_SYMBOLS_NOTIFICATIONS});
+            itens.push_back({TR("Nenhum aviso ainda", "No notices yet", "暂无通知", "Aún no hay avisos"), "", MATERIAL_SYMBOLS_NOTIFICATIONS});
         }
-        c.painel.MostrarLista("Avisos", itens, avisos_.empty() ? 0 : 1);
+        c.painel.MostrarLista(TR("Avisos", "Notices", "通知", "Avisos"), itens, avisos_.empty() ? 0 : 1);
     }
 };

@@ -1,5 +1,5 @@
 // App "Enviar cartão ao Mac": conversas e reuniões do microSD vão para iCloud Drive/Watcher/Do cartão.
-// Em segundo plano, reuniões que ficaram só no cartão (queda de conexão) são enviadas a cada hora.
+// Também copia as conversas do Mac para o iCloud (POST /watcher/backup): é o único momento em que isso acontece.
 #pragma once
 
 #include <atomic>
@@ -27,6 +27,10 @@ public:
         }
         enviando_ = true;
         int n = Enviar(true);
+        if (n >= 0) {  // conversas do Mac para o iCloud (só acontece aqui, no backup)
+            std::string resposta;
+            RedeWatcher::Pedir("POST", "/watcher/backup", "{}", resposta);
+        }
         enviando_ = false;
         if (n < 0) {
             c.painel.MostrarStatus(TR("Fazer backup", "Back up", "备份", "Copia de seguridad"), PainelWatcher::Status::Erro, TR("Sem microSD ou sem conexão agora.", "No microSD or no connection right now.", "没有 microSD 卡或暂时无法连接。", "Sin microSD o sin conexión ahora."), {TR("Voltar", "Back", "返回", "Volver")});
@@ -37,20 +41,10 @@ public:
         }
     }
 
-    void Fundo(ContextoApps& c) override {
-        int agora = ContextoApps::Agora();
-        if (agora - ultimo_envio_ < 3600 || ContextoApps::App().GetDeviceState() != kDeviceStateIdle) {
-            return;
-        }
-        ultimo_envio_ = agora;
-        Enviar(false);
-    }
-
 private:
     static constexpr size_t kParte = 32 * 1024;
     std::atomic<bool> enviar_{false};
     std::atomic<bool> enviando_{false};
-    int ultimo_envio_ = 0;
 
     static bool EnviarArquivo(const std::string& tipo, const std::string& pasta, const std::string& nome) {
         std::string caminho = pasta + nome;

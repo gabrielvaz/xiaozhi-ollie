@@ -2,7 +2,7 @@
 
 GET  /watcher/codex                       -> {"remoto": {"ligado", "detalhe"}, "sessoes": [{"id", "titulo", "detalhe"}],
                                               "nuvem": [{"id", "titulo", "detalhe"}], "erro_nuvem": str | null}
-GET  /watcher/codex/sessoes/{id}          -> {"titulo", "situacao", "mensagens": [{"quem": "Você"|"Codex", "hora", "texto"}]}
+GET  /watcher/codex/sessoes/{id}          -> {"titulo", "situacao", "mensagens": [{"quem": "Você" (no idioma)|"Codex", "hora", "texto"}]}
 POST /watcher/codex/sessoes/{id}/enviar   {"texto", "modo"?: "auto"|"fila"|"executar", "escrita"?, "confirmado"?}
                                           -> {"ok", "mensagem", "precisa_confirmar"?}
 POST /watcher/codex/nova                  {"texto", "pasta"?, "escrita"?, "confirmado"?} -> {"ok", "mensagem", "id"?}
@@ -93,5 +93,5 @@ class CodexHandler(AvisosHandler):
             return _negado()
         dados = await asyncio.to_thread(codex_remoto.ler_nuvem, _id(request))
         if "erro" in dados:
-            return web.json_response(dados, status=404 if "não encontrada" in dados["erro"] else 502)
+            return web.json_response(dados, status=404 if dados["erro"] == codex_remoto.NUVEM_NAO_ENCONTRADA else 502)
         return web.json_response(dados)

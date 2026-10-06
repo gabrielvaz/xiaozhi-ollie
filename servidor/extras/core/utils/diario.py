@@ -1,6 +1,8 @@
 """Registro de todas as conversas com o Ollie, organizado para servir de memória.
 
-Destino: iCloud Drive/Watcher/Conversas (ou WATCHER_PASTA_CONVERSAS)
+Grava numa pasta LOCAL do servidor (xiaozhi-server/data/conversas), sem esperar disco nem rede: a
+conversa só põe a fala numa fila. A cópia para o iCloud Drive/Watcher/Conversas (ou
+WATCHER_PASTA_CONVERSAS) só acontece quando o app Backup do Watcher roda (POST /watcher/backup).
   AAAA/MM/AAAA-MM-DD HHhMM.md   uma conversa por arquivo (nova conexão ou 10 min de silêncio)
   indice.json                   id, arquivo, início, fim, falas, título e resumo de cada conversa
 
@@ -9,8 +11,10 @@ título e resumo às conversas encerradas; os resumos recentes entram no bloco <
 Nunca derruba a conversa.
 """
 
+import errno
 import json
 import os
+import queue
 import threading
 import time
 from datetime import datetime, timedelta
@@ -21,10 +25,12 @@ import requests
 from core.utils.icloud import ler_texto
 from core.utils.idioma import IDIOMA, NOME, t
 
-PASTA = Path(os.environ.get(
+PASTA = Path(__file__).resolve().parents[2] / "data/conversas"   # local: rápido, a conversa nunca espera o iCloud
+ESPELHO = Path(os.environ.get(
     "WATCHER_PASTA_CONVERSAS",
     Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Watcher/Conversas",
 ))
+MARCA_ESPELHO = PASTA / ".ultimo_backup"   # quando foi a última cópia para o iCloud
 INDICE = PASTA / "indice.json"
 LIMITE_FERRAMENTA = 600
 SILENCIO_NOVA_S = 600        # 10 min sem falas: próxima fala abre outra conversa
@@ -137,8 +143,12 @@ def _nova_conversa(agora: datetime) -> dict:
             "fim": agora.isoformat(timespec="seconds"), "falas": 0, "titulo": "", "resumo": ""}
 
 
+_fila: "queue.Queue" = queue.Queue()
+
+
 def registrar(message, dono=None) -> None:
-    """dono: o Dialogue da conexão (uma conexão nova abre uma conversa nova)."""
+    """dono: o Dialogue da conexão (uma conexão nova abre uma conversa nova). Só enfileira: quem grava é
+    um fio em segundo plano, então a conversa nunca espera o disco."""
     try:
         if getattr(message, "is_temporary", False) or getattr(message, "role", "") == "system":
             return
@@ -147,24 +157,87 @@ def registrar(message, dono=None) -> None:
         if not linha:
             return
         _iniciar_fio()
-        with _trava:
-            itens = _ler_indice()
-            cid = getattr(dono, "_conversa_watcher", None)
-            atual = next((c for c in itens if c["id"] == cid), None) if cid else None
-            if atual is None or (agora - datetime.fromisoformat(atual["fim"])).total_seconds() > SILENCIO_NOVA_S:
-                atual = _nova_conversa(agora)
-                itens.append(atual)
-                if dono is not None:
-                    dono._conversa_watcher = atual["id"]
-            with open(PASTA / atual["arquivo"], "a", encoding="utf-8") as f:
-                f.write(linha + "\n\n")
-            atual["fim"] = agora.isoformat(timespec="seconds")
-            if linha.startswith("**"):
-                atual["falas"] += 1
-            atual["resumo"] = ""  # fala nova: o resumo é refeito quando a conversa encerrar
-            _gravar_indice(itens)
+        _fila.put((linha, dono, agora))
     except Exception:
         pass
+
+
+def _gravador() -> None:
+    while True:
+        linha, dono, agora = _fila.get()
+        try:
+            _gravar(linha, dono, agora)
+        except Exception:
+            pass
+
+
+def _gravar(linha: str, dono, agora: datetime) -> None:
+    with _trava:
+        itens = _ler_indice()
+        cid = getattr(dono, "_conversa_watcher", None)
+        atual = next((c for c in itens if c["id"] == cid), None) if cid else None
+        if atual is None or (agora - datetime.fromisoformat(atual["fim"])).total_seconds() > SILENCIO_NOVA_S:
+            atual = _nova_conversa(agora)
+            itens.append(atual)
+            if dono is not None:
+                dono._conversa_watcher = atual["id"]
+        with open(PASTA / atual["arquivo"], "a", encoding="utf-8") as f:
+            f.write(linha + "\n\n")
+        atual["fim"] = agora.isoformat(timespec="seconds")
+        if linha.startswith("**"):
+            atual["falas"] += 1
+        atual["resumo"] = ""  # fala nova: o resumo é refeito quando a conversa encerrar
+        _gravar_indice(itens)
+
+
+# ---------------------------------------------------------------- cópia no iCloud (segundo plano)
+
+def _trazer_do_icloud() -> None:
+    """Primeira vez com a pasta local: traz as conversas que já estavam no iCloud."""
+    if (PASTA / "indice.json").exists() or not (ESPELHO / "indice.json").exists():
+        return
+    import shutil
+    for origem in ESPELHO.rglob("*"):
+        if origem.is_file():
+            destino = PASTA / origem.relative_to(ESPELHO)
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(origem, destino)
+            except OSError:
+                pass
+
+
+def espelhar() -> int:
+    """Backup: copia para o iCloud o que mudou na pasta local desde o último backup. Devolve quantos arquivos."""
+    import shutil
+    try:
+        desde = float(MARCA_ESPELHO.read_text())
+    except (OSError, ValueError):
+        desde = 0.0
+    inicio = time.time()
+    copiados = 0
+    falhas: list[str] = []
+    with _trava:
+        for origem in PASTA.rglob("*"):
+            if (not origem.is_file() or origem.suffix == ".tmp" or origem.name.startswith(".")
+                    or origem.stat().st_mtime < desde):
+                continue
+            destino = ESPELHO / origem.relative_to(PASTA)
+            for tentativa in range(10):  # o iCloud devolve EDEADLK enquanto sincroniza: tenta de novo
+                try:
+                    destino.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(origem, destino)
+                    copiados += 1
+                    break
+                except OSError as e:
+                    if e.errno != errno.EDEADLK or tentativa == 9:
+                        falhas.append(origem.name)
+                        break
+                    time.sleep(0.5)
+    if falhas:  # não marca o backup como feito: os que falharam vão na próxima vez
+        raise OSError(f"{len(falhas)} arquivo(s) não copiados para o iCloud: {', '.join(falhas[:3])}")
+    MARCA_ESPELHO.write_text(str(inicio))
+    return copiados
 
 
 # ---------------------------------------------------------------- título e resumo
@@ -245,6 +318,7 @@ def _migrar_antigos() -> None:
 
 def _loop() -> None:
     try:
+        _trazer_do_icloud()
         _migrar_antigos()
     except Exception:
         pass
@@ -263,6 +337,7 @@ def iniciar() -> None:
 def _iniciar_fio() -> None:
     if not _fio["iniciado"]:
         _fio["iniciado"] = True
+        threading.Thread(target=_gravador, daemon=True, name="diario-gravador").start()
         threading.Thread(target=_loop, daemon=True, name="diario-conversas").start()
 
 

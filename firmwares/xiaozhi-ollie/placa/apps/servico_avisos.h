@@ -5,11 +5,12 @@
 
 #include "assets/lang_config.h"
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class ServicoAvisos : public AppWatcher {
 public:
-    const char* Nome() const override { return "Avisos"; }
+    const char* Nome() const override { return TR("Avisos", "Notices", "通知", "Avisos"); }
     bool Visivel() const override { return false; }
     void Abrir(ContextoApps& c) override {}
     bool Clicar(ContextoApps& c) override { return false; }

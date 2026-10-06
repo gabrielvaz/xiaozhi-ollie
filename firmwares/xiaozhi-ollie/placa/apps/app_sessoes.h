@@ -8,19 +8,21 @@
 #include <cctype>
 #include <vector>
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class AppSessoes : public AppWatcher {
 public:
-    const char* Nome() const override { return "Sessões"; }
+    const char* Nome() const override { return TR("Sessões", "Sessions", "会话", "Sesiones"); }
     const char* Id() const override { return "sessoes"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_ROBOT_2; }
-    std::string Detalhe() const override { return "Ver, ler e mandar pedidos"; }
+    std::string Detalhe() const override { return TR("Ver, ler e mandar pedidos", "View, read and send requests", "查看、阅读和发送请求", "Ver, leer y enviar peticiones"); }
 
     void Abrir(ContextoApps& c) override {
         ir_para_.clear();
         tela_ = Tela::Carregando;
-        c.painel.MostrarStatus("Sessões", PainelWatcher::Status::Carregando, "Carregando sessões…");
+        c.painel.MostrarStatus(TR("Sessões", "Sessions", "会话", "Sesiones"), PainelWatcher::Status::Carregando,
+                               TR("Carregando sessões…", "Loading sessions…", "正在加载会话…", "Cargando sesiones…"));
         pedido_ = Pedido::Lista;
     }
 
@@ -39,7 +41,7 @@ public:
         if (argumento.rfind("ir\n", 0) == 0) {  // "ir\n<id>": abre direto a sessão (ex.: do histórico de avisos)
             ir_para_ = argumento.substr(3);
             tela_ = Tela::Carregando;
-            c.painel.MostrarStatus("Sessões", PainelWatcher::Status::Carregando, "Abrindo a sessão…");
+            c.painel.MostrarStatus(TR("Sessões", "Sessions", "会话", "Sesiones"), PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
             pedido_ = Pedido::Lista;
             return;
         }
@@ -49,7 +51,7 @@ public:
         }
         ir_para_ = partes[1];
         tela_ = Tela::Aviso;
-        c.painel.MostrarTexto(partes[2], argumento.substr(ini), {"Ir para a sessão", "Fechar"});
+        c.painel.MostrarTexto(partes[2], argumento.substr(ini), {TR("Ir para a sessão", "Go to session", "前往会话", "Ir a la sesión"), TR("Fechar", "Close", "关闭", "Cerrar")});
     }
 
     void Girar(ContextoApps& c, int passo) override {
@@ -68,7 +70,7 @@ public:
             case Tela::Aviso:
                 if (i == 0) {  // Ir para a sessão: carrega a lista e abre a sessão do aviso
                     tela_ = Tela::Carregando;
-                    c.painel.MostrarStatus("Sessões", PainelWatcher::Status::Carregando, "Abrindo a sessão…");
+                    c.painel.MostrarStatus(TR("Sessões", "Sessions", "会话", "Sesiones"), PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
                     pedido_ = Pedido::Lista;
                     return true;
                 }
@@ -76,8 +78,14 @@ public:
                 return true;
             case Tela::Lista:
                 if (i == 1) {  // resumo falado de todas as sessões ativas
-                    c.Perguntar("Me dá uma atualização de todas as sessões ativas do Claude Code e do herdr: quantas estão "
-                                "trabalhando, quais esperam aprovação, quais têm subagentes e o que cada uma concluiu ou está fazendo.");
+                    c.Perguntar(TR("Me dá uma atualização de todas as sessões ativas do Claude Code e do herdr: quantas estão "
+                                   "trabalhando, quais esperam aprovação, quais têm subagentes e o que cada uma concluiu ou está fazendo.",
+                                   "Give me an update on all active Claude Code and herdr sessions: how many are working, "
+                                   "which are waiting for approval, which have subagents, and what each one finished or is doing.",
+                                   "给我汇报一下 Claude Code 和 herdr 的所有活跃会话：有几个正在工作，哪些在等待批准，"
+                                   "哪些有子代理，以及每个会话完成了什么或正在做什么。",
+                                   "Dame un resumen de todas las sesiones activas de Claude Code y de herdr: cuántas están "
+                                   "trabajando, cuáles esperan aprobación, cuáles tienen subagentes y qué ha terminado o está haciendo cada una."));
                     return true;
                 }
                 if (i <= 0 || i > (int)sessoes_.size() + 1) {  // item 0 = Voltar
@@ -92,8 +100,13 @@ public:
                     MostrarPergunta(c, 2);
                 } else if (b == 1) {
                     const auto& s = sessoes_[atual_];
-                    c.Perguntar("Quero mandar um pedido para a sessão \"" + s.titulo + "\" (id " + s.id +
-                                "). Pergunte o que devo enviar e, depois que eu responder, confirme e use sessao_instruir nessa sessão.");
+                    c.Perguntar(TR("Quero mandar um pedido para a sessão \"", "I want to send a request to the session \"",
+                                   "我想给会话\"", "Quiero enviar una petición a la sesión \"") +
+                                s.titulo + "\" (id " + s.id +
+                                TR("). Pergunte o que devo enviar e, depois que eu responder, confirme e use sessao_instruir nessa sessão.",
+                                   "). Ask me what to send and, after I answer, confirm and use sessao_instruir on that session.",
+                                   "）发送一个请求。问我要发送什么，我回答后先确认，再对该会话使用 sessao_instruir。",
+                                   "). Pregúntame qué debo enviar y, cuando responda, confirma y usa sessao_instruir en esa sesión."));
                 } else {
                     MostrarLista(c, atual_);
                 }
@@ -105,9 +118,16 @@ public:
                     MostrarDetalhe(c);
                 } else if (i == 1) {  // o agente lê as opções e responde por voz
                     const auto& s = sessoes_[atual_];
-                    c.Perguntar("A sessão \"" + s.titulo + "\" (id " + s.id + ") está me fazendo uma pergunta. Use "
-                                "sessao_pergunta nessa sessão, leia a pergunta e as opções numeradas para mim, espere eu "
-                                "responder, confirme a escolha e use sessao_escolher.");
+                    c.Perguntar(TR("A sessão \"", "The session \"", "会话\"", "La sesión \"") + s.titulo + "\" (id " + s.id +
+                                TR(") está me fazendo uma pergunta. Use "
+                                   "sessao_pergunta nessa sessão, leia a pergunta e as opções numeradas para mim, espere eu "
+                                   "responder, confirme a escolha e use sessao_escolher.",
+                                   ") is asking me a question. Use sessao_pergunta on that session, read me the question and "
+                                   "the numbered options, wait for my answer, confirm the choice and use sessao_escolher.",
+                                   "）在问我一个问题。请对该会话使用 sessao_pergunta，把问题和编号选项读给我听，等我回答，"
+                                   "确认选择后使用 sessao_escolher。",
+                                   ") me está haciendo una pregunta. Usa sessao_pergunta en esa sesión, léeme la pregunta y "
+                                   "las opciones numeradas, espera mi respuesta, confirma la elección y usa sessao_escolher."));
                 } else if (i >= 2 && i < 2 + n) {
                     auto& op = pergunta_.opcoes[i - 2];
                     if (pergunta_.multipla) {
@@ -157,6 +177,16 @@ public:
         } else if (p == Pedido::Responder) {
             EnviarResposta(c);
         }
+    }
+
+    // O servidor manda a situação em português (é o valor comparado aqui e em IconeSituacao); a tela mostra no idioma do build
+    static std::string RotuloSituacao(const std::string& s) {
+        if (s == "Esperando você") return TR("Esperando você", "Waiting for you", "等你回复", "Esperándote");
+        if (s == "Trabalhando") return TR("Trabalhando", "Working", "工作中", "Trabajando");
+        if (s == "Subagentes") return TR("Subagentes", "Subagents", "子代理运行中", "Subagentes");
+        if (s == "Concluída") return TR("Concluída", "Done", "已完成", "Terminada");
+        if (s == "Parada") return TR("Parada", "Idle", "空闲", "Parada");
+        return s;
     }
 
     static const char* IconeSituacao(const std::string& s) {
@@ -211,7 +241,8 @@ private:
         std::string corpo;
         if (!RedeWatcher::Pedir("GET", "/watcher/sessoes", "", corpo)) {
             tela_ = Tela::Erro;
-            c.painel.MostrarStatus("Sessões", PainelWatcher::Status::Erro, "Não consegui falar com o Mac agora.", {"Voltar"});
+            c.painel.MostrarStatus(TR("Sessões", "Sessions", "会话", "Sesiones"), PainelWatcher::Status::Erro, TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "现在无法连接 Mac。", "No he podido hablar con el Mac."),
+                                   {TR("Voltar", "Back", "返回", "Volver")});
             return;
         }
         sessoes_.clear();
@@ -240,7 +271,7 @@ private:
     void AbrirSessao(ContextoApps& c, int indice) {
         atual_ = indice;
         tela_ = Tela::Carregando;
-        c.painel.MostrarStatus(sessoes_[atual_].titulo, PainelWatcher::Status::Carregando, "Lendo as mensagens…");
+        c.painel.MostrarStatus(sessoes_[atual_].titulo, PainelWatcher::Status::Carregando, TR("Lendo as mensagens…", "Reading messages…", "正在读取消息…", "Leyendo los mensajes…"));
         pedido_ = Pedido::Sessao;
     }
 
@@ -262,7 +293,7 @@ private:
             cJSON_Delete(raiz);
         }
         if (mensagens_.empty()) {
-            mensagens_ = s.ultima.empty() ? "Sem mensagem registrada." : s.ultima;
+            mensagens_ = s.ultima.empty() ? TR("Sem mensagem registrada.", "No messages recorded.", "没有记录的消息。", "Sin mensajes registrados.") : s.ultima;
         }
         LerPergunta(base);
         MostrarDetalhe(c);
@@ -287,7 +318,7 @@ private:
                 pergunta_.opcoes.push_back({RedeWatcher::Numero(op, "n", 0), RedeWatcher::Campo(op, "texto")});
             }
             if (pergunta_.texto.empty()) {
-                pergunta_.texto = "Pergunta da sessão";
+                pergunta_.texto = TR("Pergunta da sessão", "Session question", "会话提问", "Pregunta de la sesión");
             }
             if (pergunta_.opcoes.empty()) {
                 pergunta_ = Pergunta();
@@ -298,23 +329,25 @@ private:
 
     void MostrarLista(ContextoApps& c, int selecionar) {
         tela_ = Tela::Lista;
-        std::vector<PainelWatcher::Item> itens = {{"Voltar", "", MATERIAL_SYMBOLS_ARROW_BACK},
-                                                  {"Resumir todas", "O Ollie fala o estado de cada sessão",
+        std::vector<PainelWatcher::Item> itens = {{TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK},
+                                                  {TR("Resumir todas", "Summarize all", "全部汇总", "Resumir todas"),
+                                                   TR("O Ollie fala o estado de cada sessão", "Ollie reads each session's status",
+                                                      "Ollie 播报每个会话的状态", "Ollie dice el estado de cada sesión"),
                                                    MATERIAL_SYMBOLS_HEADPHONES}};
         for (const auto& s : sessoes_) {
-            itens.push_back({s.titulo, s.situacao + (s.ha.empty() ? "" : " · há " + s.ha), IconeSituacao(s.situacao)});
+            itens.push_back({s.titulo, RotuloSituacao(s.situacao) + (s.ha.empty() ? std::string() : TR(" · há ", " · ", " · ", " · hace ") + s.ha + TR("", " ago", "前", "")), IconeSituacao(s.situacao)});
         }
-        c.painel.MostrarLista("Sessões", itens, selecionar + 2);
+        c.painel.MostrarLista(TR("Sessões", "Sessions", "会话", "Sesiones"), itens, selecionar + 2);
     }
 
     void MostrarDetalhe(ContextoApps& c) {
         tela_ = Tela::Detalhe;
         const auto& s = sessoes_[atual_];
-        std::string texto = s.situacao + (s.ha.empty() ? "" : " · há " + s.ha) + "\n\n" + mensagens_;
-        std::vector<std::string> botoes = {"Enviar pedido", "Voltar"};
+        std::string texto = RotuloSituacao(s.situacao) + (s.ha.empty() ? std::string() : TR(" · há ", " · ", " · ", " · hace ") + s.ha + TR("", " ago", "前", "")) + "\n\n" + mensagens_;
+        std::vector<std::string> botoes = {TR("Enviar pedido", "Send request", "发送请求", "Enviar petición"), TR("Voltar", "Back", "返回", "Volver")};
         if (!pergunta_.texto.empty()) {
-            texto += "\n\nPergunta: " + pergunta_.texto;
-            botoes.insert(botoes.begin(), "Responder");
+            texto += TR("\n\nPergunta: ", "\n\nQuestion: ", "\n\n提问：", "\n\nPregunta: ") + pergunta_.texto;
+            botoes.insert(botoes.begin(), TR("Responder", "Answer", "回答", "Responder"));
         }
         c.painel.MostrarTexto(s.titulo, texto, botoes);
         c.painel.RolarTextoParaFim();
@@ -324,12 +357,15 @@ private:
     void MostrarPergunta(ContextoApps& c, int selecionar) {
         tela_ = Tela::Pergunta;
         std::vector<PainelWatcher::Item> itens = {
-            {"Voltar", "", MATERIAL_SYMBOLS_ARROW_BACK},
-            {"Ouvir e responder", "O Ollie lê as opções", MATERIAL_SYMBOLS_HEADPHONES}};
+            {TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK},
+            {TR("Ouvir e responder", "Listen and answer", "收听并回答", "Escuchar y responder"),
+             TR("O Ollie lê as opções", "Ollie reads the options", "Ollie 朗读选项", "Ollie lee las opciones"),
+             MATERIAL_SYMBOLS_HEADPHONES}};
         for (const auto& op : pergunta_.opcoes) {
             const char* icone = !pergunta_.multipla ? MATERIAL_SYMBOLS_ARROW_FORWARD
                                                     : (op.marcada ? MATERIAL_SYMBOLS_CHECK_CIRCLE : MATERIAL_SYMBOLS_STOP);
-            itens.push_back({op.texto, pergunta_.multipla ? (op.marcada ? "Marcada" : "Clique para marcar") : "",
+            itens.push_back({op.texto, pergunta_.multipla ? (op.marcada ? TR("Marcada", "Selected", "已选", "Marcada")
+                                                                   : TR("Clique para marcar", "Click to select", "点击选择", "Pulsa para marcar")) : "",
                              icone});
         }
         if (pergunta_.multipla) {
@@ -337,7 +373,9 @@ private:
             for (const auto& op : pergunta_.opcoes) {
                 marcadas += op.marcada ? 1 : 0;
             }
-            itens.push_back({"Enviar", marcadas ? std::to_string(marcadas) + " marcada(s)" : "Marque ao menos uma",
+            itens.push_back({TR("Enviar", "Send", "发送", "Enviar"),
+                             marcadas ? std::to_string(marcadas) + TR(" marcada(s)", " selected", " 项已选", " marcada(s)")
+                                      : TR("Marque ao menos uma", "Select at least one", "至少选择一项", "Marca al menos una"),
                              MATERIAL_SYMBOLS_CHECK});
         }
         c.painel.MostrarLista(pergunta_.texto, itens, selecionar);
@@ -346,7 +384,8 @@ private:
     void Responder(ContextoApps& c, const std::vector<int>& escolhas) {
         escolhas_ = escolhas;
         tela_ = Tela::Carregando;
-        c.painel.MostrarStatus("Respondendo", PainelWatcher::Status::Carregando, "Enviando a resposta à sessão…");
+        c.painel.MostrarStatus(TR("Respondendo", "Answering", "正在回答", "Respondiendo"), PainelWatcher::Status::Carregando,
+                               TR("Enviando a resposta à sessão…", "Sending answer to session…", "正在向会话发送回答…", "Enviando la respuesta…"));
         pedido_ = Pedido::Responder;
     }
 
@@ -366,8 +405,9 @@ private:
             pergunta_ = Pergunta();  // respondida
         }
         tela_ = Tela::Resultado;
-        c.painel.MostrarStatus("Resposta", ok ? PainelWatcher::Status::Sucesso : PainelWatcher::Status::Erro,
-                               mensagem.empty() ? (ok ? "Resposta enviada." : "Não consegui responder agora.") : mensagem,
-                               {"Voltar"});
+        c.painel.MostrarStatus(TR("Resposta", "Answer", "回答", "Respuesta"), ok ? PainelWatcher::Status::Sucesso : PainelWatcher::Status::Erro,
+                               mensagem.empty() ? (ok ? TR("Resposta enviada.", "Answer sent.", "回答已发送。", "Respuesta enviada.")
+                                                     : TR("Não consegui responder agora.", "Couldn't answer right now.", "现在无法回答。", "No he podido responder ahora.")) : mensagem,
+                               {TR("Voltar", "Back", "返回", "Volver")});
     }
 };

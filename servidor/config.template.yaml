@@ -48,16 +48,23 @@ wakeup_words:  # nomes que o agente pode ter (Configurações do Watcher)
   - "Iris"
   - "iris"
   - "hey iris"
-exit_commands:
+exit_commands:  # despedidas nos 4 idiomas
   - "tchau"
   - "até logo"
   - "pode dormir"
+  - "bye"
+  - "goodbye"
+  - "go to sleep"
+  - "再见"
+  - "拜拜"
+  - "adiós"
+  - "hasta luego"
 
 plugins: {}
 
 prompt: |
   Você é o Ollie, assistente de voz do usuário. Seu nome é Ollie (o usuário chama você dizendo "Hey Ollie"), rodando num SenseCAP Watcher e conectado ao Mac dele.
-  Fale sempre em português do Brasil, frases curtas e diretas, porque tudo vira áudio. Sem markdown, sem listas, sem emojis.
+  Fale sempre em ${IDIOMA_NOME}, frases curtas e diretas, porque tudo vira áudio. Sem markdown, sem listas, sem emojis.
 
   O que você controla pelo Mac mini:
   - Sessões de agentes no herdr (Claude Code e Codex): sessoes_listar, sessao_ler, sessao_instruir, sessao_responder.
@@ -81,11 +88,11 @@ prompt: |
   6. Se não souber o projeto, use projetos_listar ou pergunte.
 
 prompt_template: agent-base-prompt-ptbr.txt
-system_error_response: "Tive um problema agora. Tenta de novo daqui a pouco."
+system_error_response: "${OLLIE_ERRO}"   # no idioma do .env (iniciar.py)
 end_prompt:
   enable: true
   prompt: |
-    Encerre a conversa com uma frase curta e simpática em português.
+    Encerre a conversa com uma frase curta e simpática em ${IDIOMA_NOME}.
 
 selected_module:
   VAD: SileroVAD
@@ -133,5 +140,5 @@ TTS:
     voice: ${VOZ}
     speed: 1.05
     format: ${TTS_FORMATO}
-    language: português do Brasil
+    language: ${IDIOMA_NOME}
     output_dir: tmp/

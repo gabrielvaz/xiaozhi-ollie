@@ -45,8 +45,9 @@ Rules:
   herdr, multica). If something is missing, show me the install command and ask before running it.
 - Secrets: never print, log or commit the contents of servidor/.env. When the API key is needed,
   ask me to paste it into servidor/.env myself, then just confirm the line is filled.
-- Ask me for HOST_PUBLICO (my Tailscale machine name, ending in .ts.net), NOME_USUARIO and
-  PONTE_RAIZES (the folders where my code projects live) and write them to servidor/.env.
+- Ask me which language I want (IDIOMA: en-US, pt-BR, zh-CN or es-ES), my HOST_PUBLICO (Tailscale
+  machine name, ending in .ts.net), NOME_USUARIO and PONTE_RAIZES (the folders where my code
+  projects live) and write them to servidor/.env.
 - Stop and wait for me before: turning on Tailscale Funnel, installing the background service,
   flashing the Watcher, and any command that erases data.
 - To flash, ask me to connect the Watcher with the USB-C port on the bottom. Use
@@ -72,19 +73,20 @@ Everything below runs from this folder.
 servidor/instalar.sh
 ```
 
-This downloads the xiaozhi-esp32-server at a tested commit, applies the Portuguese translations and fixes, creates the Python environment and writes `servidor/.env` with a fresh secret path and signing key.
+This downloads the xiaozhi-esp32-server at a tested commit, applies the translations and fixes, creates the Python environment and writes `servidor/.env` with a fresh secret path and signing key.
 
 Now open `servidor/.env` and fill in:
 
 | Variable | What to put |
 |---|---|
+| `IDIOMA` | `en-US`, `pt-BR`, `zh-CN` or `es-ES`. Screen, voice and answers follow it, and the firmware build reads it too |
 | `API_KEY` | Your OpenRouter (or other OpenAI-compatible) key |
 | `HOST_PUBLICO` | Your Mac's Tailscale name, such as `my-mac.tail1234.ts.net` (no `https://`). Find it with `tailscale status` or in the Tailscale admin console |
 | `NOME_USUARIO` | Your first name, used in greetings |
 | `PONTE_RAIZES` | Folders where your projects live, separated by `:` |
 | `WATCHER_VOCABULARIO` | Optional: names the meeting transcription should spell right |
 
-Leave `SEGREDO` and `AUTH_KEY` as generated. The models and the voice have working defaults.
+Leave `SEGREDO` and `AUTH_KEY` as generated. The models have working defaults, and when `VOZ` is empty the server picks a voice for your language.
 
 Test the provider with real calls:
 
@@ -134,7 +136,7 @@ export IDF_TOOLS_PATH=/path/to/.espressif
 firmwares/xiaozhi-ollie/compilar.sh
 ```
 
-It downloads XiaoZhi v2.5.0, applies the Ollie patches, embeds your server address from `servidor/.env` and builds. The first build takes several minutes. The result is `firmwares/xiaozhi-ollie/saida/merged-binary.bin`.
+It downloads XiaoZhi v2.5.0, applies the Ollie patches, embeds your server address from `servidor/.env` and builds in the language set by `IDIOMA`. To build another language without changing `.env`, pass it: `firmwares/xiaozhi-ollie/compilar.sh --idioma en-US`. The first build takes several minutes. The result is `firmwares/xiaozhi-ollie/saida/merged-binary.bin`.
 
 ## Step 7: flash the Watcher
 

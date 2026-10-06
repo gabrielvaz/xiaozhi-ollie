@@ -26,6 +26,15 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+try:
+    from core.utils.idioma import IDIOMA, t as _t
+except ImportError:  # carregado pela ponte MCP (fora do pacote core): lê o idioma.py ao lado
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location("idioma", Path(__file__).resolve().with_name("idioma.py"))
+    _idioma = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_idioma)
+    IDIOMA, _t = _idioma.IDIOMA, _idioma.t
+
 CODEX_HOME = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
 LIMITE_SESSOES = 12
 LIMITE_MSGS = 12
@@ -33,7 +42,36 @@ MAX_MSG = 500
 MAX_TOTAL = 5000
 MAX_ENVIO = 4000
 PRAZO_TAREFA_S = 30 * 60  # tarefa em segundo plano é encerrada depois disso
-DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+DIAS = _t("Seg Ter Qua Qui Sex Sáb Dom", "Mon Tue Wed Thu Fri Sat Sun", "周一 周二 周三 周四 周五 周六 周日",
+          "Lun Mar Mié Jue Vie Sáb Dom").split()
+VOCE = _t("Você", "You", "你", "Tú")
+SEM_CLI = _t("A CLI do Codex não foi encontrada neste Mac.", "The Codex CLI was not found on this Mac.",
+             "这台 Mac 上没有找到 Codex CLI。", "No se encontró la CLI de Codex en este Mac.")
+NUVEM_NAO_ENCONTRADA = _t("Tarefa não encontrada no Codex Cloud.", "Task not found in Codex Cloud.",
+                          "Codex Cloud 中没有找到该任务。", "Tarea no encontrada en Codex Cloud.")
+# _estado devolve estes valores em português (comparados no código); a tela recebe o rótulo do idioma
+ROTULOS_ESTADO = {
+    "Trabalhando": _t("Trabalhando", "Working", "工作中", "Trabajando"),
+    "Concluída": _t("Concluída", "Done", "已完成", "Completada"),
+    "Limite de uso": _t("Limite de uso", "Usage limit", "达到用量上限", "Límite de uso"),
+    "Erro": _t("Erro", "Error", "错误", "Error"),
+    "Interrompida": _t("Interrompida", "Interrupted", "已中断", "Interrumpida"),
+    "Parada": _t("Parada", "Idle", "已停止", "Detenida"),
+}
+NA_FILA = _t("[na fila] ", "[queued] ", "[排队中] ", "[en cola] ")
+SOMENTE_LEITURA = _t(" (somente leitura).", " (read-only).", "（只读）。", " (solo lectura).")
+FILA_AO_TERMINAR = _t("Na fila: o Codex lê ao terminar o que está fazendo.",
+                     "Queued: Codex reads it when it finishes what it is doing.",
+                     "已排队：Codex 完成当前工作后会读取。",
+                     "En cola: Codex lo lee al terminar lo que está haciendo.")
+FILA_PROXIMA_VEZ = _t("Na fila: o Codex lê quando a sessão rodar de novo.",
+                      "Queued: Codex reads it when the session runs again.",
+                      "已排队：会话再次运行时 Codex 会读取。",
+                      "En cola: Codex lo lee cuando la sesión vuelva a ejecutarse.")
+LIGADO = _t("Ligado", "On", "已开启", "Activado")
+DESLIGADO = _t("Desligado", "Off", "已关闭", "Desactivado")
+TAREFA = _t("Tarefa", "Task", "任务", "Tarea")
+PODE_ALTERAR = _t(" (pode alterar arquivos).", " (may change files).", "（可以修改文件）。", " (puede modificar archivos).")
 
 # tarefas em segundo plano lançadas por este servidor: id da sessão -> dados
 _tarefas: dict[str, dict] = {}
@@ -65,19 +103,20 @@ def _rodar(args: list[str], prazo: float = 25, cwd: str | None = None) -> tuple[
     """Roda `codex <args>` sem stdin; devolve (código, stdout, stderr). Código 127 = sem codex, 124 = prazo."""
     exe = _codex()
     if not exe:
-        return 127, "", "A CLI do Codex não foi encontrada neste Mac."
+        return 127, "", SEM_CLI
     try:
         p = subprocess.Popen([exe, *args], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, cwd=cwd, env=_ambiente(),
                              start_new_session=True)
     except OSError as e:
-        return 127, "", f"Não consegui rodar o Codex: {e}"
+        return 127, "", _t("Não consegui rodar o Codex", "Couldn't run Codex", "无法运行 Codex", "No pude ejecutar Codex") + f": {e}"
     try:
         out, err = p.communicate(timeout=prazo)
         return p.returncode, out, err
     except subprocess.TimeoutExpired:
         _matar(p)
-        return 124, "", "O Codex demorou demais para responder."
+        return 124, "", _t("O Codex demorou demais para responder.", "Codex took too long to respond.",
+                          "Codex 响应超时。", "Codex tardó demasiado en responder.")
 
 
 def _matar(p: subprocess.Popen) -> None:
@@ -98,7 +137,7 @@ def _matar(p: subprocess.Popen) -> None:
 def _limpar(texto: str) -> str:
     """Tira cores ANSI, nome do computador e a pasta pessoal do texto que vai para a tela."""
     texto = re.sub(r"\x1b\[[0-9;]*m", "", texto or "")
-    texto = re.sub(r"\bon [\w.-]+\.local\b", "neste Mac", texto)
+    texto = re.sub(r"\bon [\w.-]+\.local\b", _t("neste Mac", "on this Mac", "在这台 Mac 上", "en este Mac"), texto)
     return texto.replace(str(Path.home()), "~").strip()
 
 
@@ -113,10 +152,10 @@ def _quando(ts: float | None) -> str:
     d = datetime.fromtimestamp(ts)
     hoje = datetime.now().date()
     if d.date() == hoje:
-        return f"hoje {d:%H:%M}"
+        return _t("hoje", "today", "今天", "hoy") + f" {d:%H:%M}"
     if (hoje - d.date()).days == 1:
-        return f"ontem {d:%H:%M}"
-    return f"{DIAS[d.weekday()]} {d:%d/%m}"
+        return _t("ontem", "yesterday", "昨天", "ayer") + f" {d:%H:%M}"
+    return f"{DIAS[d.weekday()]} {d:%m/%d}" if IDIOMA in ("en-US", "zh-CN") else f"{DIAS[d.weekday()]} {d:%d/%m}"
 
 
 def _hora_iso(iso: str) -> str:
@@ -190,7 +229,7 @@ def _sessao(thread_id: str) -> dict | None:
                                 "from threads where id = ?", (thread_id,))
     if linhas:
         r = dict(linhas[0])
-        r["titulo"] = r.get("name") or _nomes_indice().get(thread_id) or r.get("title") or "Sessão"
+        r["titulo"] = r.get("name") or _nomes_indice().get(thread_id) or r.get("title") or _t("Sessão", "Session", "会话", "Sesión")
         return r
     # sem banco: procura o arquivo rollout pelo id
     if not re.fullmatch(r"[0-9a-fA-F-]{8,64}", thread_id or ""):
@@ -200,7 +239,7 @@ def _sessao(thread_id: str) -> dict | None:
         return None
     meta = _meta(achados[-1])
     return {"id": thread_id, "rollout_path": str(achados[-1]), "cwd": meta.get("cwd", ""),
-            "titulo": _nomes_indice().get(thread_id) or "Sessão", "source": meta.get("source", ""),
+            "titulo": _nomes_indice().get(thread_id) or _t("Sessão", "Session", "会话", "Sesión"), "source": meta.get("source", ""),
             "recency_at_ms": int(achados[-1].stat().st_mtime * 1000)}
 
 
@@ -286,14 +325,14 @@ def listar_sessoes(limite: int = LIMITE_SESSOES) -> list[dict]:
             m = re.search(r"([0-9a-f]{8}-[0-9a-f-]{27})\.jsonl$", a.name)
             if m:
                 meta = _meta(a)
-                candidatos.append((m.group(1), nomes.get(m.group(1)) or "Sessão", str(a), meta.get("cwd", ""),
+                candidatos.append((m.group(1), nomes.get(m.group(1)) or _t("Sessão", "Session", "会话", "Sesión"), str(a), meta.get("cwd", ""),
                                    a.stat().st_mtime))
     fila = _na_fila()
     sessoes = []
     for tid, titulo, rollout, cwd, ts in candidatos:
-        partes = [_estado(Path(rollout), tid), _pasta_curta(cwd), _quando(ts)]
+        partes = [ROTULOS_ESTADO[_estado(Path(rollout), tid)], _pasta_curta(cwd), _quando(ts)]
         if fila.get(tid):
-            partes.append(f"{len(fila[tid])} na fila")
+            partes.append(f"{len(fila[tid])} " + _t("na fila", "queued", "条排队中", "en cola"))
         sessoes.append({"id": tid, "titulo": _corta(titulo, 40), "detalhe": " · ".join(p for p in partes if p)})
     return sessoes
 
@@ -329,7 +368,7 @@ def ler_sessao(thread_id: str) -> dict | None:
         if o.get("type") != "response_item" or p.get("type") != "message":
             continue
         if p.get("role") == "user":
-            texto, quem = _texto_usuario(p.get("content")), "Você"
+            texto, quem = _texto_usuario(p.get("content")), VOCE
         elif p.get("role") == "assistant":
             texto = "\n".join(c.get("text", "") for c in p.get("content") or [] if c.get("type") == "output_text")
             quem = "Codex"
@@ -338,20 +377,20 @@ def ler_sessao(thread_id: str) -> dict | None:
         if texto.strip():
             msgs.append({"quem": quem, "hora": _hora_iso(o.get("timestamp", "")), "texto": _corta(texto, MAX_MSG)})
     for item in _na_fila(thread_id).get(thread_id, []):
-        msgs.append({"quem": "Você", "hora": datetime.fromtimestamp(item["ms"] / 1000).strftime("%H:%M"),
-                     "texto": _corta("[na fila] " + item["texto"], MAX_MSG)})
+        msgs.append({"quem": VOCE, "hora": datetime.fromtimestamp(item["ms"] / 1000).strftime("%H:%M"),
+                     "texto": _corta(NA_FILA + item["texto"], MAX_MSG)})
     with _trava:
         t = _tarefas.get(thread_id)
         for texto in (t or {}).get("pendentes", []):
-            msgs.append({"quem": "Você", "hora": "", "texto": _corta("[na fila] " + texto, MAX_MSG)})
+            msgs.append({"quem": VOCE, "hora": "", "texto": _corta(NA_FILA + texto, MAX_MSG)})
     msgs = msgs[-LIMITE_MSGS:]
     while len(msgs) > 1 and sum(len(m["texto"]) for m in msgs) > MAX_TOTAL:
         msgs.pop(0)
     with _trava:
         t = _tarefas.get(thread_id)
         if t and t["proc"].poll() is not None and t.get("erro"):
-            msgs.append({"quem": "Codex", "hora": "", "texto": _corta("Erro: " + t["erro"], MAX_MSG)})
-    return {"titulo": _corta(s["titulo"].splitlines()[0], 40), "situacao": _estado(arq, thread_id), "mensagens": msgs}
+            msgs.append({"quem": "Codex", "hora": "", "texto": _corta(_t("Erro: ", "Error: ", "错误：", "Error: ") + t["erro"], MAX_MSG)})
+    return {"titulo": _corta(s["titulo"].splitlines()[0], 40), "situacao": ROTULOS_ESTADO[_estado(arq, thread_id)], "mensagens": msgs}
 
 
 # ---------------------------------------------------------------- execução em segundo plano
@@ -362,13 +401,13 @@ def _lancar(args: list[str], cwd: str, sandbox: str, chave: str | None = None, p
     (um `codex queue` no meio da vez seria descartado: o exec encerra e aborta a vez seguinte)."""
     exe = _codex()
     if not exe:
-        return {"ok": False, "mensagem": "A CLI do Codex não foi encontrada neste Mac."}
+        return {"ok": False, "mensagem": SEM_CLI}
     try:
         p = subprocess.Popen([exe, *args], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=subprocess.DEVNULL, text=True, cwd=cwd, env=_ambiente(),
                              start_new_session=True)
     except OSError as e:
-        return {"ok": False, "mensagem": f"Não consegui iniciar o Codex: {e}"}
+        return {"ok": False, "mensagem": _t("Não consegui iniciar o Codex", "Couldn't start Codex", "无法启动 Codex", "No pude iniciar Codex") + f": {e}"}
     tarefa = {"proc": p, "inicio": time.time(), "thread_id": chave, "erro": "", "ultima": "",
               "pendentes": [], "sandbox": sandbox, "cwd": cwd}
     pronto = threading.Event()
@@ -395,7 +434,9 @@ def _lancar(args: list[str], cwd: str, sandbox: str, chave: str | None = None, p
         try:
             p.wait(timeout=PRAZO_TAREFA_S)
         except subprocess.TimeoutExpired:
-            tarefa["erro"] = "Tempo esgotado: a tarefa foi encerrada pelo servidor."
+            tarefa["erro"] = _t("Tempo esgotado: a tarefa foi encerrada pelo servidor.",
+                                "Timed out: the server stopped the task.", "超时：服务器已结束该任务。",
+                                "Tiempo agotado: el servidor detuvo la tarea.")
             _matar(p)
         with _trava:
             pendentes, tarefa["pendentes"] = tarefa["pendentes"], []
@@ -410,7 +451,10 @@ def _lancar(args: list[str], cwd: str, sandbox: str, chave: str | None = None, p
     if prazo_id:
         pronto.wait(prazo_id)
         if p.poll() is not None and not tarefa["thread_id"]:
-            return {"ok": False, "mensagem": tarefa["erro"] or "O Codex encerrou sem criar a sessão."}
+            return {"ok": False, "mensagem": tarefa["erro"] or _t("O Codex encerrou sem criar a sessão.",
+                                                                  "Codex exited without creating the session.",
+                                                                  "Codex 未创建会话就退出了。",
+                                                                  "Codex terminó sin crear la sesión.")}
     return {"ok": True, "id": tarefa["thread_id"]}
 
 
@@ -423,7 +467,10 @@ def _sandbox(escrita: bool, confirmado: bool) -> tuple[str | None, str]:
     if not escrita:
         return "read-only", ""
     if not confirmado:
-        return None, "Alterar arquivos precisa de confirmação: reenvie com \"confirmado\": true."
+        return None, _t("Alterar arquivos precisa de confirmação: reenvie com \"confirmado\": true.",
+                        "Changing files needs confirmation: resend with \"confirmado\": true.",
+                        "修改文件需要确认：请带上 \"confirmado\": true 重新发送。",
+                        "Modificar archivos necesita confirmación: reenvía con \"confirmado\": true.")
     return "workspace-write", ""
 
 
@@ -436,29 +483,34 @@ def enviar(thread_id: str, texto: str, modo: str = "auto", escrita: bool = False
     "auto": fila se a sessão está trabalhando, senão executar."""
     texto = (texto or "").strip()
     if not texto:
-        return {"ok": False, "mensagem": "Mensagem vazia."}
+        return {"ok": False, "mensagem": _t("Mensagem vazia.", "Empty message.", "消息为空。", "Mensaje vacío.")}
     if len(texto) > MAX_ENVIO:
-        return {"ok": False, "mensagem": f"Mensagem longa demais (máx. {MAX_ENVIO} caracteres)."}
+        return {"ok": False, "mensagem": _t(f"Mensagem longa demais (máx. {MAX_ENVIO} caracteres).",
+                                                f"Message too long (max. {MAX_ENVIO} characters).",
+                                                f"消息过长（最多 {MAX_ENVIO} 个字符）。",
+                                                f"Mensaje demasiado largo (máx. {MAX_ENVIO} caracteres).")}
     s = _sessao(thread_id)
     if not s:
-        return {"ok": False, "mensagem": "Sessão não encontrada."}
+        return {"ok": False, "mensagem": _t("Sessão não encontrada.", "Session not found.", "没有找到会话。",
+                                             "Sesión no encontrada.")}
     with _trava:  # tarefa lançada por aqui ainda rodando: guarda e envia quando ela terminar
         t = _tarefas.get(thread_id)
         if t and t["proc"].poll() is None:
             t["pendentes"].append(texto)
-            return {"ok": True, "modo": "fila", "mensagem": "Na fila: o Codex lê ao terminar o que está fazendo."}
+            return {"ok": True, "modo": "fila", "mensagem": FILA_AO_TERMINAR}
     estado = _estado(Path(s["rollout_path"]), thread_id)
     if modo not in ("fila", "executar"):
         modo = "fila" if estado == "Trabalhando" else "executar"
     if modo == "fila":
         rc, out, err = _rodar(["queue", "--thread", thread_id, "--message", texto], prazo=20)
         if rc != 0:
-            return {"ok": False, "mensagem": _corta(_limpar(err or out) or "Falha ao enfileirar.", 300)}
+            return {"ok": False, "mensagem": _corta(_limpar(err or out) or _t("Falha ao enfileirar.", "Failed to queue.", "排队失败。", "Error al poner en cola."), 300)}
         return {"ok": True, "modo": "fila",
-                "mensagem": "Na fila: o Codex lê quando a sessão rodar de novo." if estado != "Trabalhando"
-                else "Na fila: o Codex lê ao terminar o que está fazendo."}
+                "mensagem": FILA_PROXIMA_VEZ if estado != "Trabalhando"
+                else FILA_AO_TERMINAR}
     if estado == "Trabalhando":
-        return {"ok": False, "mensagem": "A sessão está trabalhando agora; use a fila."}
+        return {"ok": False, "mensagem": _t("A sessão está trabalhando agora; use a fila.", "The session is working now; use the queue.",
+                                            "会话正在工作；请使用排队。", "La sesión está trabajando ahora; usa la cola.")}
     sandbox, erro = _sandbox(escrita, confirmado)
     if not sandbox:
         return {"ok": False, "precisa_confirmar": True, "mensagem": erro}
@@ -467,8 +519,8 @@ def enviar(thread_id: str, texto: str, modo: str = "auto", escrita: bool = False
     if not r["ok"]:
         return r
     return {"ok": True, "modo": "executar",
-            "mensagem": "Enviado: o Codex está trabalhando" + (" (pode alterar arquivos)." if sandbox != "read-only"
-                                                               else " (somente leitura).")}
+            "mensagem": _t("Enviado: o Codex está trabalhando", "Sent: Codex is working", "已发送：Codex 正在工作",
+                           "Enviado: Codex está trabajando") + (PODE_ALTERAR if sandbox != "read-only" else SOMENTE_LEITURA)}
 
 
 # ---------------------------------------------------------------- d) tarefa nova
@@ -477,12 +529,16 @@ def iniciar_tarefa(texto: str, pasta: str | None = None, escrita: bool = False, 
     """Nova sessão `codex exec` em segundo plano. Devolve {ok, id, mensagem}."""
     texto = (texto or "").strip()
     if not texto:
-        return {"ok": False, "mensagem": "Tarefa vazia."}
+        return {"ok": False, "mensagem": _t("Tarefa vazia.", "Empty task.", "任务为空。", "Tarea vacía.")}
     if len(texto) > MAX_ENVIO:
-        return {"ok": False, "mensagem": f"Tarefa longa demais (máx. {MAX_ENVIO} caracteres)."}
+        return {"ok": False, "mensagem": _t(f"Tarefa longa demais (máx. {MAX_ENVIO} caracteres).",
+                                                f"Task too long (max. {MAX_ENVIO} characters).",
+                                                f"任务过长（最多 {MAX_ENVIO} 个字符）。",
+                                                f"Tarea demasiado larga (máx. {MAX_ENVIO} caracteres).")}
     pasta = os.path.expanduser(pasta or os.environ.get("WATCHER_CODEX_PASTA") or "~")
     if not Path(pasta).is_dir():
-        return {"ok": False, "mensagem": "Pasta não encontrada."}
+        return {"ok": False, "mensagem": _t("Pasta não encontrada.", "Folder not found.", "没有找到文件夹。",
+                                             "Carpeta no encontrada.")}
     sandbox, erro = _sandbox(escrita, confirmado)
     if not sandbox:
         return {"ok": False, "precisa_confirmar": True, "mensagem": erro}
@@ -490,8 +546,8 @@ def iniciar_tarefa(texto: str, pasta: str | None = None, escrita: bool = False, 
                 cwd=pasta, sandbox=sandbox, prazo_id=30)
     if not r["ok"]:
         return r
-    return {"ok": True, "id": r["id"], "mensagem": "Tarefa iniciada" + (" (somente leitura)." if sandbox == "read-only"
-                                                                         else " (pode alterar arquivos).")}
+    return {"ok": True, "id": r["id"], "mensagem": _t("Tarefa iniciada", "Task started", "任务已开始", "Tarea iniciada")
+            + (SOMENTE_LEITURA if sandbox == "read-only" else PODE_ALTERAR)}
 
 
 # ---------------------------------------------------------------- e) controle remoto
@@ -517,15 +573,18 @@ def status_remoto() -> dict:
     if rc == 0 and isinstance(dados, dict):
         st = str(dados.get("status") or dados.get("state") or "")
         ligado = st.lower() not in ("", "notrunning", "stopped", "disabled", "off")
-        return {"ligado": ligado, "detalhe": {"running": "Ligado", "connected": "Ligado e conectado",
-                                              "notRunning": "Desligado"}.get(st, st or "Desconhecido")}
+        return {"ligado": ligado, "detalhe": {"running": LIGADO, "connected": _t("Ligado e conectado", "On and connected",
+                                                                                "已开启并已连接", "Activado y conectado"),
+                                              "notRunning": DESLIGADO}.get(st, st or _t("Desconhecido", "Unknown",
+                                                                                         "未知", "Desconocido"))}
     if rc == 124 or rc == 127:
         return {"ligado": False, "detalhe": texto}
     msg = texto.removeprefix("Error:").strip()
     if "errored" in msg:
-        return {"ligado": False, "detalhe": "Habilitado na conta, mas sem conexão"
-                + ("" if _daemon_vivo() else " (serviço parado)") + "."}
-    return {"ligado": rc == 0, "detalhe": _corta(msg, 120) or ("Ligado" if rc == 0 else "Desligado")}
+        return {"ligado": False, "detalhe": _t("Habilitado na conta, mas sem conexão", "Enabled on the account, but not connected",
+                                               "账户已启用，但未连接", "Habilitado en la cuenta, pero sin conexión")
+                + ("" if _daemon_vivo() else _t(" (serviço parado)", " (service stopped)", "（服务已停止）", " (servicio detenido)")) + "."}
+    return {"ligado": rc == 0, "detalhe": _corta(msg, 120) or (LIGADO if rc == 0 else DESLIGADO)}
 
 
 def definir_remoto(ligar: bool, confirmado: bool = False) -> dict:
@@ -533,8 +592,13 @@ def definir_remoto(ligar: bool, confirmado: bool = False) -> dict:
     Ligar expõe este Mac ao Codex da sua conta em outros aparelhos: exige confirmação."""
     if ligar and not confirmado:
         return {"ok": False, "precisa_confirmar": True,
-                "mensagem": "Ligar deixa o Codex desta conta controlar o Mac de outros aparelhos. "
-                            "Confirme no app para continuar."}
+                "mensagem": _t("Ligar deixa o Codex desta conta controlar o Mac de outros aparelhos. "
+                               "Confirme no app para continuar.",
+                               "Turning it on lets this account's Codex control the Mac from other devices. "
+                               "Confirm in the app to continue.",
+                               "开启后，此账户的 Codex 可以从其他设备控制这台 Mac。请在应用中确认以继续。",
+                               "Activarlo permite que el Codex de esta cuenta controle el Mac desde otros dispositivos. "
+                               "Confirma en la app para continuar.")}
     rc, out, err = _rodar(["remote-control", "start" if ligar else "stop", "--json"], prazo=60)
     texto = _limpar(out or err)
     try:
@@ -543,12 +607,18 @@ def definir_remoto(ligar: bool, confirmado: bool = False) -> dict:
         dados = None
     if rc != 0:
         if "standalone" in texto:
-            texto = "Precisa da instalação oficial do Codex (instalador da OpenAI) para o serviço remoto."
-        return {"ok": False, "mensagem": _corta(texto or "Falhou.", 300)}
+            texto = _t("Precisa da instalação oficial do Codex (instalador da OpenAI) para o serviço remoto.",
+                       "The remote service needs the official Codex install (OpenAI installer).",
+                       "远程服务需要官方安装的 Codex（OpenAI 安装程序）。",
+                       "El servicio remoto necesita la instalación oficial de Codex (instalador de OpenAI).")
+        return {"ok": False, "mensagem": _corta(texto or _t("Falhou.", "Failed.", "失败。", "Falló."), 300)}
     st = str((dados or {}).get("status", ""))
     if ligar:
-        return {"ok": True, "mensagem": "Controle remoto ligado." + (f" ({st})" if st else "")}
-    return {"ok": True, "mensagem": "Já estava desligado." if st == "notRunning" else "Controle remoto desligado."}
+        return {"ok": True, "mensagem": _t("Controle remoto ligado.", "Remote control on.", "远程控制已开启。",
+                                           "Control remoto activado.") + (f" ({st})" if st else "")}
+    return {"ok": True, "mensagem": _t("Já estava desligado.", "It was already off.", "本来就是关闭的。", "Ya estaba desactivado.")
+            if st == "notRunning" else _t("Controle remoto desligado.", "Remote control off.", "远程控制已关闭。",
+                                          "Control remoto desactivado.")}
 
 
 # ---------------------------------------------------------------- f) Codex Cloud
@@ -556,10 +626,12 @@ def definir_remoto(ligar: bool, confirmado: bool = False) -> dict:
 def _erro_nuvem(texto: str) -> str:
     texto = _limpar(texto)
     if "Not signed in" in texto or "codex login" in texto:
-        return "Codex Cloud: entre na conta no Mac (codex login)."
+        return _t("Codex Cloud: entre na conta no Mac (codex login).", "Codex Cloud: sign in on the Mac (codex login).",
+                  "Codex Cloud：请在 Mac 上登录（codex login）。", "Codex Cloud: inicia sesión en el Mac (codex login).")
     if "404" in texto:
-        return "Tarefa não encontrada no Codex Cloud."
-    return _corta(texto.removeprefix("Error:").strip() or "Codex Cloud indisponível.", 200)
+        return NUVEM_NAO_ENCONTRADA
+    return _corta(texto.removeprefix("Error:").strip() or _t("Codex Cloud indisponível.", "Codex Cloud unavailable.",
+                                                              "Codex Cloud 不可用。", "Codex Cloud no disponible."), 200)
 
 
 def listar_nuvem(limite: int = 10) -> tuple[list[dict], str | None]:
@@ -570,7 +642,8 @@ def listar_nuvem(limite: int = 10) -> tuple[list[dict], str | None]:
     try:
         tarefas = json.loads(out).get("tasks") or []
     except (ValueError, AttributeError):
-        return [], "Resposta inesperada do Codex Cloud."
+        return [], _t("Resposta inesperada do Codex Cloud.", "Unexpected response from Codex Cloud.",
+                      "Codex Cloud 返回了意外的响应。", "Respuesta inesperada de Codex Cloud.")
     itens = []
     for t in tarefas:
         if not isinstance(t, dict) or not t.get("id"):
@@ -590,8 +663,8 @@ def listar_nuvem(limite: int = 10) -> tuple[list[dict], str | None]:
                 pass
         resumo = t.get("summary") or t.get("diff_stats") or {}
         if isinstance(resumo, dict) and resumo.get("files_changed"):
-            partes.append(f"{resumo['files_changed']} arquivos")
-        itens.append({"id": str(t["id"]), "titulo": _corta(str(t.get("title") or "Tarefa"), 40),
+            partes.append(f"{resumo['files_changed']} " + _t("arquivos", "files", "个文件", "archivos"))
+        itens.append({"id": str(t["id"]), "titulo": _corta(str(t.get("title") or TAREFA), 40),
                       "detalhe": " · ".join(p for p in partes if p)})
     return itens, None
 
@@ -599,13 +672,13 @@ def listar_nuvem(limite: int = 10) -> tuple[list[dict], str | None]:
 def ler_nuvem(task_id: str) -> dict:
     """{titulo, texto}: status da tarefa + arquivos do diff. {"erro"} se falhar."""
     if not re.fullmatch(r"[\w-]{4,100}", task_id or ""):
-        return {"erro": "Id de tarefa inválido."}
+        return {"erro": _t("Id de tarefa inválido.", "Invalid task id.", "任务 ID 无效。", "Id de tarea no válido.")}
     rc, out, err = _rodar(["cloud", "status", task_id], prazo=30)
     if rc != 0:
         return {"erro": _erro_nuvem(err or out)}
     status = _limpar(out)
     linhas = [l for l in status.splitlines() if l.strip()]
-    titulo = linhas[0] if linhas else "Tarefa"
+    titulo = linhas[0] if linhas else TAREFA
     texto = status
     rc, diff, _ = _rodar(["cloud", "diff", task_id], prazo=30)
     if rc == 0 and diff.strip():
@@ -613,6 +686,7 @@ def ler_nuvem(task_id: str) -> dict:
         mais = sum(1 for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++"))
         menos = sum(1 for l in diff.splitlines() if l.startswith("-") and not l.startswith("---"))
         if arquivos:
-            texto += f"\n\nAlterações: {len(arquivos)} arquivos, +{mais} −{menos}\n" + "\n".join(
+            texto += ("\n\n" + _t("Alterações", "Changes", "修改", "Cambios") + f": {len(arquivos)} "
+                      + _t("arquivos", "files", "个文件", "archivos") + f", +{mais} −{menos}\n") + "\n".join(
                 "• " + a for a in arquivos[:15]) + ("\n…" if len(arquivos) > 15 else "")
     return {"titulo": _corta(titulo, 40), "texto": _corta(texto, MAX_TOTAL)}

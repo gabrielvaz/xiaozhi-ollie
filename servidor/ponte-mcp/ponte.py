@@ -38,6 +38,29 @@ TECLAS_PERMITIDAS = {"enter", "esc", "tab", "up", "down", "left", "right", "y", 
 mcp = FastMCP("mac-mini")
 
 
+def _carregar_idioma():
+    """idioma.py de extras/core/utils, carregado pelo caminho (a ponte roda fora do pacote core).
+    O processo MCP recebe só PONTE_RAIZES e HOME no env: sem IDIOMA, lê a linha IDIOMA= do servidor/.env."""
+    if not os.environ.get("IDIOMA"):
+        try:
+            m = re.search(r"^IDIOMA=(.*)$", (Path(__file__).resolve().parents[1] / ".env").read_text(encoding="utf-8"), re.M)
+            if m:
+                os.environ["IDIOMA"] = m.group(1).strip().strip('"')
+        except OSError:
+            pass
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "idioma", Path(__file__).resolve().parents[1] / "extras/core/utils/idioma.py")
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+_idioma = _carregar_idioma()
+t, NOME = _idioma.t, _idioma.NOME
+VOCE = t("Você", "You", "你", "Tú")
+
+
 # ---------------------------------------------------------------- utilitários
 
 def _run(cmd: list[str], timeout: int = 30, cwd: str | None = None) -> tuple[int, str]:
@@ -205,7 +228,7 @@ def mensagens_claude(sessao_id: str, cwd: str, n: int = 12, limite: int = 500, t
             hora = _dt.fromisoformat(d["timestamp"].replace("Z", "+00:00")).astimezone().strftime("%H:%M")
         except (KeyError, ValueError, AttributeError):
             pass
-        msgs.append({"quem": "Você" if tipo == "user" else "Claude", "hora": hora, "texto": texto})
+        msgs.append({"quem": VOCE if tipo == "user" else "Claude", "hora": hora, "texto": texto})
     msgs.reverse()
     while len(msgs) > 1 and sum(len(m["texto"]) for m in msgs) > total:
         msgs.pop(0)
@@ -217,13 +240,13 @@ def mensagens_tela(sessao: str, agente: str = "", n: int = 12, limite: int = 500
     code, recente = _run(["herdr", "agent", "read", sessao, "--source", "recent-unwrapped", "--lines", "300"])
     if code != 0:
         return []
-    quem_ag = {"claude": "Claude", "codex": "Codex"}.get(agente or "", (agente or "Agente").capitalize())
+    quem_ag = {"claude": "Claude", "codex": "Codex"}.get(agente or "", (agente or t("Agente", "Agent", "智能体", "Agente")).capitalize())
     msgs: list[dict] = []
     atual = None
     for l in recente.splitlines():
         m = re.match(r"^\s*(⏺|•|›|❯|>)\s+(.*)", l)
         if m:
-            quem = "Você" if m.group(1) in ("›", "❯", ">") else quem_ag
+            quem = VOCE if m.group(1) in ("›", "❯", ">") else quem_ag
             atual = {"quem": quem, "hora": "", "texto": m.group(2)}
             msgs.append(atual)
         elif atual and l.startswith("  ") and l.strip() and not re.match(r"^\s*[└⎿│]", l):
@@ -476,7 +499,7 @@ def _parse_pergunta(tela: str) -> dict | None:
         elif l and not _SEPARADOR.match(linhas[j]) and not l.lower().startswith("tip:"):
             contexto.insert(0, l)
         j -= 1
-    texto = " ".join(acima) or "Pergunta da sessão"
+    texto = " ".join(acima) or t("Pergunta da sessão", "Session question", "会话提问", "Pregunta de la sesión")
     if rodape == len(linhas) and not texto.endswith("?"):
         return None
     r: dict = {"texto": texto[:400], "multipla": multipla, "opcoes": finais}
@@ -525,21 +548,28 @@ def responder_pergunta(sessao: str, escolhas: list[int]) -> dict:
     """Seleciona as opções na pergunta aberta e confirma. Devolve {"ok", "mensagem", "proxima"?}."""
     p = pergunta_tela(sessao)
     if p is None:
-        return {"ok": False, "mensagem": "Não há pergunta aberta nessa sessão."}
+        return {"ok": False, "mensagem": t("Não há pergunta aberta nessa sessão.", "There is no open question in this session.",
+                                             "这个会话没有待回答的问题。", "No hay ninguna pregunta abierta en esta sesión.")}
     try:
         escolhas = sorted({int(e) for e in escolhas})
     except (TypeError, ValueError):
-        return {"ok": False, "mensagem": "Escolhas inválidas (use números)."}
+        return {"ok": False, "mensagem": t("Escolhas inválidas (use números).", "Invalid choices (use numbers).",
+                                             "选项无效（请使用数字）。", "Opciones no válidas (usa números).")}
     por_n = {o["n"]: o for o in p["opcoes"]}
     if not escolhas:
-        return {"ok": False, "mensagem": "Nenhuma opção escolhida."}
+        return {"ok": False, "mensagem": t("Nenhuma opção escolhida.", "No option chosen.", "没有选择任何选项。",
+                                             "No se eligió ninguna opción.")}
     fora = [e for e in escolhas if e not in por_n]
     if fora:
-        return {"ok": False, "mensagem": f"Opção inexistente: {', '.join(map(str, fora))}."}
+        return {"ok": False, "mensagem": t("Opção inexistente", "No such option", "选项不存在", "Opción inexistente") + f": {', '.join(map(str, fora))}."}
     if any(por_n[e].get("livre") for e in escolhas):
-        return {"ok": False, "mensagem": "Resposta livre só pela própria sessão (digitando)."}
+        return {"ok": False, "mensagem": t("Resposta livre só pela própria sessão (digitando).",
+                                             "Free-text answers only in the session itself (typing).",
+                                             "自由回答只能在会话中输入。",
+                                             "Respuesta libre solo en la propia sesión (escribiendo).")}
     if not p["multipla"] and len(escolhas) > 1:
-        return {"ok": False, "mensagem": "Essa pergunta aceita uma opção só."}
+        return {"ok": False, "mensagem": t("Essa pergunta aceita uma opção só.", "This question accepts only one option.",
+                                             "这个问题只能选一个选项。", "Esta pregunta solo acepta una opción.")}
     nomes = ", ".join(por_n[e]["texto"] for e in escolhas)
     if p["multipla"]:
         # Número alterna a caixa sem mover o cursor; só alterna o que difere do desejado. Depois tab = Next/confirmar.
@@ -548,24 +578,29 @@ def responder_pergunta(sessao: str, escolhas: list[int]) -> dict:
                 continue
             if (o["n"] in escolhas) != bool(o.get("marcada")):
                 if o["n"] > 9 or not _teclas(sessao, str(o["n"])):
-                    return {"ok": False, "mensagem": "Não consegui marcar as opções."}
+                    return {"ok": False, "mensagem": t("Não consegui marcar as opções.", "Couldn't select the options.",
+                                                     "无法勾选这些选项。", "No pude marcar las opciones.")}
                 time.sleep(0.15)
         ok = _teclas(sessao, "tab")
     else:
         n = escolhas[0]
         ok = _teclas(sessao, str(n)) if n <= 9 else _ir_para(sessao, n)
     if not ok:
-        return {"ok": False, "mensagem": "Não consegui enviar as teclas à sessão."}
+        return {"ok": False, "mensagem": t("Não consegui enviar as teclas à sessão.", "Couldn't send the keys to the session.",
+                                             "无法向会话发送按键。", "No pude enviar las teclas a la sesión.")}
     depois = _espera_mudar(sessao, p)
     if _revisao(depois):  # várias perguntas: última respondida, envia a revisão
         _teclas(sessao, "1")
         depois = _espera_mudar(sessao, depois)
     if depois is not None and depois.get("texto") == p.get("texto") and depois.get("opcoes") == p.get("opcoes"):
-        return {"ok": False, "mensagem": f"Enviei {nomes}, mas a pergunta continua na tela."}
-    r = {"ok": True, "mensagem": f"Respondido: {nomes}"}
+        return {"ok": False, "mensagem": t(f"Enviei {nomes}, mas a pergunta continua na tela.",
+                                             f"Sent {nomes}, but the question is still on screen.",
+                                             f"已发送 {nomes}，但问题仍在屏幕上。",
+                                             f"Envié {nomes}, pero la pregunta sigue en pantalla.")}
+    r = {"ok": True, "mensagem": t("Respondido", "Answered", "已回答", "Respondido") + f": {nomes}"}
     if depois is not None:
         r["proxima"] = depois
-        r["mensagem"] += f". Próxima pergunta: {depois['texto']}"
+        r["mensagem"] += ". " + t("Próxima pergunta", "Next question", "下一个问题", "Siguiente pregunta") + f": {depois['texto']}"
     return r
 
 
@@ -661,7 +696,7 @@ def claude_perguntar(pergunta: str, projeto: str = "") -> str:
     if not pasta:
         return f"Projeto '{projeto}' não encontrado. Use projetos_listar."
     cmd = [
-        "claude", "-p", pergunta + "\n\nResponda em português, em no máximo 5 frases curtas, para ser lido em voz alta. Sem markdown.",
+        "claude", "-p", pergunta + f"\n\nResponda em {NOME}, em no máximo 5 frases curtas, para ser lido em voz alta. Sem markdown.",
         "--permission-mode", "default",
         "--disallowedTools", "Edit,Write,NotebookEdit,Bash(rm:*),Bash(git push:*),Bash(git commit:*)",
         "--allowedTools", "Read,Grep,Glob,LS,WebSearch,WebFetch,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr checks:*)",
@@ -678,7 +713,7 @@ def codex_perguntar(pergunta: str, projeto: str = "") -> str:
     saida = tempfile.mktemp(prefix="codex-", suffix=".txt")
     cmd = [
         "codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "-C", str(pasta), "-o", saida,
-        pergunta + "\n\nResponda em português, em no máximo 5 frases curtas, para ser lido em voz alta. Sem markdown.",
+        pergunta + f"\n\nResponda em {NOME}, em no máximo 5 frases curtas, para ser lido em voz alta. Sem markdown.",
     ]
     return _em_segundo_plano(f"codex: {pergunta[:40]}", cmd, str(pasta), saida)
 
@@ -773,11 +808,17 @@ def uso_claude_dados(idade_max_s: int = 120) -> dict:
         return _uso_cache["dados"]
     code, saida = _run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"], 10)
     if code != 0:
-        return {"ok": False, "erro": "Credencial do Claude Code não encontrada no Keychain."}
+        return {"ok": False, "erro": t("Credencial do Claude Code não encontrada no Keychain.",
+                                         "Claude Code credential not found in the Keychain.",
+                                         "钥匙串中没有找到 Claude Code 凭据。",
+                                         "No se encontró la credencial de Claude Code en el Llavero.")}
     try:
         token = json.loads(saida.strip())["claudeAiOauth"]["accessToken"]
     except (json.JSONDecodeError, KeyError, TypeError):
-        return {"ok": False, "erro": "Credencial do Claude Code em formato inesperado."}
+        return {"ok": False, "erro": t("Credencial do Claude Code em formato inesperado.",
+                                         "Claude Code credential in an unexpected format.",
+                                         "Claude Code 凭据格式异常。",
+                                         "Credencial de Claude Code con un formato inesperado.")}
     import urllib.request
     _, versao = _run(["claude", "--version"], 10)
     req = urllib.request.Request(
@@ -792,7 +833,10 @@ def uso_claude_dados(idade_max_s: int = 120) -> dict:
             h = r.headers
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            return {"ok": False, "erro": "Token do Claude Code expirado. Abra o Claude Code no Mac para renovar."}
+            return {"ok": False, "erro": t("Token do Claude Code expirado. Abra o Claude Code no Mac para renovar.",
+                                             "Claude Code token expired. Open Claude Code on the Mac to renew it.",
+                                             "Claude Code 令牌已过期。请在 Mac 上打开 Claude Code 以续期。",
+                                             "El token de Claude Code caducó. Abre Claude Code en el Mac para renovarlo.")}
         h = e.headers  # 429 também traz os cabeçalhos de limite
     def pct(nome):
         v = h.get(f"anthropic-ratelimit-unified-{nome}-utilization")
@@ -808,7 +852,8 @@ def uso_claude_dados(idade_max_s: int = 120) -> dict:
              "reinicio_5h_s": reinicio("5h"), "reinicio_7d_s": reinicio("7d"),
              "status": h.get("anthropic-ratelimit-unified-status", "")}
     if not dados["ok"]:
-        dados["erro"] = "A API não devolveu os limites."
+        dados["erro"] = t("A API não devolveu os limites.", "The API did not return the limits.",
+                          "API 没有返回用量上限。", "La API no devolvió los límites.")
     _uso_cache.update(quando=time.time(), dados=dados)
     return dados
 

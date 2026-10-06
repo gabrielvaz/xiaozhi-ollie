@@ -1,6 +1,7 @@
 """Rotas do microSD do Watcher (mesmo token do WebSocket):
 
 POST /watcher/upload?tipo=conversas|reunioes&nome=ARQ&offset=N[&fim=1]  envio em partes
+POST /watcher/backup                                                    copia as conversas para o iCloud
 GET  /watcher/memoria                                                   itens da memória offline
 GET  /watcher/memoria/audio/{nome}                                      áudio .ogg de um item
 """
@@ -43,6 +44,17 @@ class CartaoHandler(AvisosHandler):
         if request.query.get("fim") == "1" and tipo == "reunioes":
             resultado = await asyncio.to_thread(processar_backup, arq)
         return web.json_response({"tamanho": arq.stat().st_size, "resultado": resultado})
+
+    async def handle_backup(self, request: web.Request) -> web.Response:
+        """App Backup do Watcher: o único momento em que as conversas são copiadas para o iCloud."""
+        if not self._autorizado(request):
+            return web.json_response({"erro": "não autorizado"}, status=401)
+        from core.utils import diario
+        try:
+            copiados = await asyncio.to_thread(diario.espelhar)
+        except OSError as e:
+            return web.json_response({"ok": False, "copiados": 0, "erro": str(e)[:200]})
+        return web.json_response({"ok": True, "copiados": copiados})
 
     async def handle_memoria(self, request: web.Request) -> web.Response:
         if not self._autorizado(request):

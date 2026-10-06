@@ -24,6 +24,10 @@ sys.path.insert(0, os.path.join(sys.argv[3], "extras/core/utils"))
 import idioma  # IDIOMA do .env: nome para os prompts e voz padrão
 os.environ["IDIOMA"] = idioma.IDIOMA
 os.environ["IDIOMA_NOME"] = idioma.NOME
+os.environ["OLLIE_ERRO"] = idioma.t("Tive um problema agora. Tenta de novo daqui a pouco.",
+                                    "Something went wrong. Please try again in a moment.",
+                                    "刚才出了点问题，请稍后再试。",
+                                    "He tenido un problema. Inténtalo de nuevo en un momento.")
 if not os.environ.get("VOZ"):
     os.environ["VOZ"] = idioma.VOZES[idioma.IDIOMA]
 texto = open(sys.argv[1], encoding="utf-8").read()

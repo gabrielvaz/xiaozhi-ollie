@@ -10,6 +10,7 @@
 #include <mutex>
 #include <vector>
 
+#include "idioma_watcher.h"
 #include "nucleo_apps.h"
 
 class GavetaWatcher {
@@ -153,11 +154,11 @@ private:
         std::lock_guard<std::recursive_mutex> trava(trava_);
         ativo_ = nullptr;
         aberta_ = true;
-        std::vector<PainelWatcher::Item> itens = {{"Voltar", "", MATERIAL_SYMBOLS_ARROW_BACK}};  // primeira célula
+        std::vector<PainelWatcher::Item> itens = {{TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK}};  // primeira célula
         for (auto* a : Visiveis()) {
             itens.push_back({a->Nome(), a->Detalhe(), a->Icone()});
         }
-        painel_.MostrarGrade("Apps", itens, ultimo_indice_);
+        painel_.MostrarGrade(TR("Apps", "Apps", "应用", "Apps"), itens, ultimo_indice_);
     }
 
     void FecharTudo() {

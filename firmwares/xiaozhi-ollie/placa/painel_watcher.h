@@ -15,6 +15,7 @@
 
 #include "display.h"
 #include "fontes_watcher.h"
+#include "idioma_watcher.h"
 #include "material_symbols.h"
 
 // qrcodegen (Nayuki, MIT) já vem no componente esp_emote_gfx; ativar o lv_qrcode duplicaria os símbolos
@@ -186,7 +187,7 @@ public:
             }
             lv_obj_center(canvas);
         } else {
-            auto erro = Rotulo(Fontes::Pequena(), 0x000000, "Texto longo demais para QR", fundo);
+            auto erro = Rotulo(Fontes::Pequena(), 0x000000, TR("Texto longo demais para QR", "Text too long for QR", "文本太长，无法生成二维码", "Texto demasiado largo para QR"), fundo);
             lv_obj_center(erro);
         }
         auto r = Rotulo(Fontes::Pequena(), 0x9A9A9A, legenda);
@@ -285,7 +286,8 @@ public:
         lv_obj_set_style_text_align(d, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(d, LV_ALIGN_TOP_MID, 0, 168);
         auto s = Rotulo(Fontes::Pequena(), 0x9A9A9A,
-                        "sensação " + std::to_string(sensacao) + "° · umidade " + std::to_string(umidade) + "%");
+                        TR("sensação ", "feels like ", "体感 ", "sensación ") + std::to_string(sensacao) +
+                            TR("° · umidade ", "° · humidity ", "° · 湿度 ", "° · humedad ") + std::to_string(umidade) + "%");
         lv_obj_align(s, LV_ALIGN_TOP_MID, 0, 192);
         // Hoje e amanhã: cada linha centrada (ícone + texto), acima dos botões
         for (size_t i = 0; i < dias.size() && i < 2; i++) {
@@ -303,7 +305,7 @@ public:
             IconeTempo(linha, dias[i].categoria, false, 30, 0, 0);
             Rotulo(Fontes::Pequena(), 0xEDEDED,
                    dias[i].nome + "  " + std::to_string(dias[i].min) + "°/" + std::to_string(dias[i].max) +
-                       "°  · chuva " + std::to_string(dias[i].chuva) + "%",
+                       TR("°  · chuva ", "°  · rain ", "°  · 降水 ", "°  · lluvia ") + std::to_string(dias[i].chuva) + "%",
                    linha);
         }
         botoes_y_ = 314;  // a barra de botões cabe na parte mais larga do fim do círculo
@@ -338,12 +340,14 @@ public:
             auto r = Rotulo(f, cor, t);
             lv_obj_align(r, LV_ALIGN_CENTER, 0, y);
         };
-        linha(Fontes::Grande(), 0xD97757, "Uso do Claude", -96);
-        linha(Fontes::Grande(), CorNivel(pct_5h), "5 h: " + std::to_string(pct_5h) + "%", -44);
-        linha(Fontes::Pequena(), 0x9A9A9A, "reinicia em " + Duracao(reinicio_5h_s), -14);
-        linha(Fontes::Grande(), CorNivel(pct_7d), "Semana: " + std::to_string(pct_7d) + "%", 30);
-        linha(Fontes::Pequena(), 0x9A9A9A, "reinicia em " + Duracao(reinicio_7d_s), 60);
-        linha(Fontes::Pequena(), 0x6E6E6E, "Clique para voltar", 112);
+        linha(Fontes::Grande(), 0xD97757, TR("Uso do Claude", "Claude usage", "Claude 用量", "Uso de Claude"), -96);
+        linha(Fontes::Grande(), CorNivel(pct_5h), TR("5 h: ", "5 h: ", "5 小时：", "5 h: ") + std::to_string(pct_5h) + "%", -44);
+        linha(Fontes::Pequena(), 0x9A9A9A, TR("reinicia em ", "resets in ", "", "se reinicia en ") + Duracao(reinicio_5h_s) +
+                 TR("", "", " 后重置", ""), -14);
+        linha(Fontes::Grande(), CorNivel(pct_7d), TR("Semana: ", "Week: ", "本周：", "Semana: ") + std::to_string(pct_7d) + "%", 30);
+        linha(Fontes::Pequena(), 0x9A9A9A, TR("reinicia em ", "resets in ", "", "se reinicia en ") + Duracao(reinicio_7d_s) +
+                 TR("", "", " 后重置", ""), 60);
+        linha(Fontes::Pequena(), 0x6E6E6E, TR("Clique para voltar", "Click to go back", "点击返回", "Pulsa para volver"), 112);
     }
 
     // Gravação de reunião: bolinha vermelha pulsando (parada e cinza em pausa), tempo gravado e dois botões
@@ -373,7 +377,7 @@ public:
                 lv_obj_set_style_pad_all(botoes_gravacao_[i], 0, 0);
                 lv_obj_remove_flag(botoes_gravacao_[i], LV_OBJ_FLAG_SCROLLABLE);
                 lv_obj_align(botoes_gravacao_[i], LV_ALIGN_TOP_MID, i == 0 ? -68 : 68, 288);
-                auto r = Rotulo(Fontes::Pequena(), 0xEDEDED, i == 0 ? "Pausar" : "Parar", botoes_gravacao_[i]);
+                auto r = Rotulo(Fontes::Pequena(), 0xEDEDED, i == 0 ? TR("Pausar", "Pause", "暂停", "Pausar") : TR("Parar", "Stop", "停止", "Detener"), botoes_gravacao_[i]);
                 lv_obj_center(r);
             }
             pausado_desenhado_ = !pausado;  // força o primeiro desenho do estado
@@ -381,8 +385,10 @@ public:
         if (pausado != pausado_desenhado_) {
             pausado_desenhado_ = pausado;
             lv_anim_delete(ponto_, nullptr);
-            lv_label_set_text(titulo_gravacao_, pausado ? "Reunião pausada" : "Gravando reunião");
-            lv_label_set_text(lv_obj_get_child(botoes_gravacao_[0], 0), pausado ? "Continuar" : "Pausar");
+            lv_label_set_text(titulo_gravacao_, pausado ? TR("Reunião pausada", "Meeting paused", "会议已暂停", "Reunión en pausa")
+                                                      : TR("Gravando reunião", "Recording meeting", "正在录制会议", "Grabando reunión"));
+            lv_label_set_text(lv_obj_get_child(botoes_gravacao_[0], 0), pausado ? TR("Continuar", "Resume", "继续", "Reanudar")
+                                                                         : TR("Pausar", "Pause", "暂停", "Pausar"));
             lv_obj_set_style_bg_color(ponto_, lv_color_hex(pausado ? 0x6E6E6E : 0xE5484D), 0);
             lv_obj_set_size(ponto_, 34, 34);
             lv_obj_align(ponto_, LV_ALIGN_TOP_MID, 0, 96);
@@ -589,12 +595,12 @@ private:
             return "?";
         }
         if (s >= 86400) {
-            return std::to_string(s / 86400) + " d " + std::to_string(s % 86400 / 3600) + " h";
+            return std::to_string(s / 86400) + TR(" d ", " d ", " 天 ", " d ") + std::to_string(s % 86400 / 3600) + TR(" h", " h", " 小时", " h");
         }
         if (s >= 3600) {
-            return std::to_string(s / 3600) + " h " + std::to_string(s % 3600 / 60) + " min";
+            return std::to_string(s / 3600) + TR(" h ", " h ", " 小时 ", " h ") + std::to_string(s % 3600 / 60) + TR(" min", " min", " 分钟", " min");
         }
-        return std::to_string(s / 60) + " min";
+        return std::to_string(s / 60) + TR(" min", " min", " 分钟", " min");
     }
 
     // Spinner (arco laranja girando) reaproveitado nas telas de carregamento e nas listas
@@ -683,7 +689,7 @@ private:
         lv_obj_remove_flag(conteudo_, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_align(conteudo_, LV_ALIGN_TOP_MID, 0, 92);
         if (itens_.empty()) {
-            auto r = Rotulo(Fontes::Pequena(), 0x9A9A9A, "Nada por aqui", conteudo_);
+            auto r = Rotulo(Fontes::Pequena(), 0x9A9A9A, TR("Nada por aqui", "Nothing here", "这里什么都没有", "No hay nada aquí"), conteudo_);
             lv_obj_align(r, LV_ALIGN_CENTER, 0, 0);
             return;
         }
@@ -743,7 +749,7 @@ private:
     // Cria o mosaico uma vez; trocar a seleção só repinta as células (AtualizarGrade) e rola a grade
     void DesenharGrade() {
         if (itens_.empty()) {
-            auto r = Rotulo(Fontes::Pequena(), 0x9A9A9A, "Nada por aqui");
+            auto r = Rotulo(Fontes::Pequena(), 0x9A9A9A, TR("Nada por aqui", "Nothing here", "这里什么都没有", "No hay nada aquí"));
             lv_obj_align(r, LV_ALIGN_CENTER, 0, 0);
             return;
         }

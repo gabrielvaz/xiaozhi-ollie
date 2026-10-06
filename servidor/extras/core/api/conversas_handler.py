@@ -17,44 +17,42 @@ from aiohttp import web
 
 from core.api.avisos_handler import AvisosHandler
 from core.utils import diario, memoria, perfil
+from core.utils.idioma import t
+from core.utils.vigia import rotulo_dia
 
 ID_VALIDO = re.compile(r"^\d{8}-\d{6}$")
-DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 LIMITE_AUDIO = 6000   # caracteres narrados (~6 min de áudio)
 
 
 def _detalhe(c: dict) -> str:
     quando = datetime.fromisoformat(c["inicio"])
-    hoje = datetime.now().date()
-    if quando.date() == hoje:
-        dia = "Hoje"
-    elif (hoje - quando.date()).days == 1:
-        dia = "Ontem"
-    else:
-        dia = f"{DIAS[quando.weekday()]} {quando:%d/%m}"
-    return f"{dia} {quando:%H:%M} · {c.get('falas', 0)} falas"
+    return f"{rotulo_dia(quando)} {quando:%H:%M} · {c.get('falas', 0)} " + t("falas", "messages", "条对话", "mensajes")
 
 
 def _texto(c: dict) -> str:
     partes = []
     if c.get("resumo"):
-        partes.append(f"Resumo: {c['resumo']}\n")
-    partes += [f"{quem}: {texto}" for quem, texto in diario.falas(c)]
+        partes.append(t("Resumo", "Summary", "摘要", "Resumen") + f": {c['resumo']}\n")
+    voce = t("Você", "You", "你", "Tú")
+    partes += [f"{voce if quem == 'Você' else quem}: {texto}" for quem, texto in diario.falas(c)]
     return "\n".join(partes)
 
 
 def _audio(c: dict) -> str:
     """Narra a conversa em partes (o TTS aceita textos curtos) e junta num único .ogg."""
     roteiro = []
-    for quem, texto in diario.falas(c):
-        roteiro.append(f"Você disse: {texto}" if quem == "Você" else f"Ollie respondeu: {texto}")
-    corrido = " ".join(roteiro)[:LIMITE_AUDIO] or "Esta conversa não tem falas."
+    voce_disse = t("Você disse", "You said", "你说", "Dijiste")
+    ollie_respondeu = t("Ollie respondeu", "Ollie replied", "Ollie 回答", "Ollie respondió")
+    for quem, texto in diario.falas(c):  # diario.falas devolve sempre "Você" para o usuário
+        roteiro.append(f"{voce_disse}: {texto}" if quem == "Você" else f"{ollie_respondeu}: {texto}")
+    corrido = " ".join(roteiro)[:LIMITE_AUDIO] or t("Esta conversa não tem falas.", "This conversation has no messages.",
+                                                    "这段对话没有内容。", "Esta conversación no tiene mensajes.")
     nome = "conversa-" + hashlib.sha1(corrido.encode("utf-8")).hexdigest()[:12] + ".ogg"
     destino = memoria.CACHE / nome
     if destino.exists():
         return nome
     blocos, atual = [], ""
-    for frase in re.split(r"(?<=[.!?])\s+", corrido):
+    for frase in re.split(r"(?<=[.!?])\s+|(?<=[。！？])", corrido):
         if len(atual) + len(frase) > 1200 and atual:
             blocos.append(atual)
             atual = ""
@@ -94,7 +92,8 @@ class ConversasHandler(AvisosHandler):
             return web.json_response({"erro": "não autorizado"}, status=401)
         itens = await asyncio.to_thread(diario.conversas, 40)
         return web.json_response({"conversas": [
-            {"id": c["id"], "titulo": c.get("titulo") or "Conversa em andamento", "detalhe": _detalhe(c)}
+            {"id": c["id"], "titulo": c.get("titulo") or t("Conversa em andamento", "Conversation in progress",
+                                                                     "对话进行中", "Conversación en curso"), "detalhe": _detalhe(c)}
             for c in itens]})
 
     def _buscar(self, request: web.Request) -> dict | None:
@@ -108,7 +107,7 @@ class ConversasHandler(AvisosHandler):
         if c is None:
             return web.json_response({"erro": "não encontrada"}, status=404)
         texto = await asyncio.to_thread(_texto, c)
-        return web.json_response({"titulo": c.get("titulo") or "Conversa", "texto": texto[:8000]})
+        return web.json_response({"titulo": c.get("titulo") or t("Conversa", "Conversation", "对话", "Conversación"), "texto": texto[:8000]})
 
     async def handle_audio(self, request: web.Request) -> web.StreamResponse:
         if not self._autorizado(request):

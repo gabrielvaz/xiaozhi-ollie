@@ -3,6 +3,7 @@
 from aiohttp import web
 
 from core.auth import AuthManager
+from core.utils.idioma import t
 from core.utils.vigia import avisos_desde
 
 
@@ -24,8 +25,11 @@ class AvisosHandler:
         from core.utils.vigia import ponte_carregada
         ponte = ponte_carregada()
         agentes = await asyncio.to_thread(ponte._agentes)
+        # rótulos de situacao ficam em português: o firmware compara o texto para escolher o ícone (app_sessoes.h)
         rotulos = {"esperando você": "Esperando você", "trabalhando": "Trabalhando", "subagentes rodando": "Subagentes",
                    "concluiu recentemente": "Concluída", "parada": "Parada"}
+        sessao_padrao = t("Sessão", "Session", "会话", "Sesión")
+        un_min, un_h = t("min", "min", "分钟", "min"), t("h", "h", "小时", "h")
         sessoes = []
         for a in agentes:
             if a["situacao"] == "parada" and len(sessoes) >= 12:
@@ -33,10 +37,10 @@ class AvisosHandler:
             minutos = a.get("minutos_desde_ultima_atividade")
             sessoes.append({
                 "id": a["sessao"],
-                "titulo": (a.get("titulo") or a.get("workspace") or a.get("pasta") or "Sessão")[:40],
+                "titulo": (a.get("titulo") or a.get("workspace") or a.get("pasta") or sessao_padrao)[:40],
                 "agente": a.get("agente", ""),
                 "situacao": rotulos.get(a["situacao"], a["situacao"]),
-                "ha": "" if minutos is None else (f"{minutos} min" if minutos < 60 else f"{minutos // 60} h"),
+                "ha": "" if minutos is None else (f"{minutos} {un_min}" if minutos < 60 else f"{minutos // 60} {un_h}"),
                 "ultima": (a.get("ultima_fala") or "")[:300],
             })
         return web.json_response({"sessoes": sessoes[:20]})
@@ -68,7 +72,7 @@ class AvisosHandler:
             while len(msgs) > 1 and sum(len(m["texto"]) for m in msgs) > 5000:
                 msgs.pop(0)
             return {
-                "titulo": (agente.get("titulo") or agente.get("workspace") or agente.get("pasta") or "Sessão")[:40],
+                "titulo": (agente.get("titulo") or agente.get("workspace") or agente.get("pasta") or t("Sessão", "Session", "会话", "Sesión"))[:40],
                 "situacao": rotulos.get(agente["situacao"], agente["situacao"]),
                 "mensagens": msgs,
             }
@@ -124,8 +128,12 @@ class AvisosHandler:
         arq = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Watcher/QR.md"
         if not arq.exists():
             arq.parent.mkdir(parents=True, exist_ok=True)
-            arq.write_text("# QR codes do Watcher\n\nUma linha por QR: Título | conteúdo (link, texto, contato).\n\n"
-                           "- Projeto no GitHub | https://github.com/gabrielvaz/xiaozhi-ollie\n", encoding="utf-8")
+            arq.write_text(t("# QR codes do Watcher\n\nUma linha por QR: Título | conteúdo (link, texto, contato).\n\n",
+                             "# Watcher QR codes\n\nOne line per QR: Title | content (link, text, contact).\n\n",
+                             "# Watcher 二维码\n\n每行一个二维码：标题 | 内容（链接、文本、联系人）。\n\n",
+                             "# Códigos QR del Watcher\n\nUna línea por QR: Título | contenido (enlace, texto, contacto).\n\n")
+                           + "- " + t("Projeto no GitHub", "Project on GitHub", "GitHub 项目", "Proyecto en GitHub")
+                           + " | https://github.com/gabrielvaz/xiaozhi-ollie\n", encoding="utf-8")
         itens = []
         from core.utils.icloud import ler_texto
         for linha in ler_texto(arq, padrao="").splitlines():
@@ -145,7 +153,7 @@ class AvisosHandler:
         try:
             return web.json_response(await asyncio.to_thread(dados_tempo, ip))
         except Exception as e:
-            return web.json_response({"ok": False, "erro": f"Previsão indisponível: {e}"})
+            return web.json_response({"ok": False, "erro": t("Previsão indisponível", "Forecast unavailable", "天气预报不可用", "Previsión no disponible") + f": {e}"})
 
     async def handle_historico(self, request: web.Request) -> web.Response:
         """GET /watcher/avisos/historico: todos os avisos guardados, mais recentes primeiro."""

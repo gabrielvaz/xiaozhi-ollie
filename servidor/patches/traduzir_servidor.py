@@ -1,4 +1,6 @@
-"""Traduz para pt-BR as frases do xiaozhi-server que chegam à tela ou à voz do Watcher.
+"""Traduz as frases do xiaozhi-server que chegam à tela ou à voz do Watcher.
+
+As frases visíveis viram t("pt", "en", "zh", "es") (core/utils/idioma.py), resolvidas pelo IDIOMA do .env.
 
 Idempotente: pode rodar de novo depois de atualizar o servidor. Cada troca
 precisa achar o texto original (ou já estar traduzida); senão, avisa.
@@ -20,7 +22,14 @@ TROCAS: list[tuple[str, str, str]] = [
         "请您说出指令吧。",
         "我认真听着呢，请讲。",
         "请问您需要什么帮助？",
-        "我在这里，等候您的指令。",''', '''        "Pois não?",
+        "我在这里，等候您的指令。",''', '''        __import__("core.utils.idioma", fromlist=["t"]).t("Pois não?", "Yes?", "我在。", "¿Sí?"),
+        __import__("core.utils.idioma", fromlist=["t"]).t("Estou aqui, pode falar.", "I'm here, go ahead.", "我在呢，请说。", "Aquí estoy, dime."),
+        __import__("core.utils.idioma", fromlist=["t"]).t("Diga.", "Go ahead.", "请讲。", "Dime."),
+        __import__("core.utils.idioma", fromlist=["t"]).t("Às ordens.", "At your service.", "随时为您效劳。", "A tus órdenes."),
+        __import__("core.utils.idioma", fromlist=["t"]).t("Pode mandar.", "What do you need?", "需要我做什么？", "¿Qué necesitas?"),
+        __import__("core.utils.idioma", fromlist=["t"]).t("Estou ouvindo.", "I'm listening.", "我在听。", "Te escucho."),''',
+     # versão anterior (só português), para atualizar servidores já instalados
+     '''        "Pois não?",
         "Estou aqui, pode falar.",
         "Diga.",
         "Às ordens.",
@@ -56,10 +65,13 @@ TROCAS: list[tuple[str, str, str]] = [
 
     conn.just_woken_up = True
     await send_tts_message(conn, "start")'''),
-    ("core/handle/intentHandler.py", "工具调用超时，请一会再试下哈", "A ferramenta demorou demais. Tenta de novo daqui a pouco."),
+    ("core/handle/intentHandler.py", '"工具调用超时，请一会再试下哈"',
+     '__import__("core.utils.idioma", fromlist=["t"]).t("A ferramenta demorou demais. Tenta de novo daqui a pouco.", "That tool took too long. Please try again in a moment.", "工具响应超时，请稍后再试。", "La herramienta ha tardado demasiado. Inténtalo de nuevo en un momento.")',
+     '"A ferramenta demorou demais. Tenta de novo daqui a pouco."'),
     ("core/connection.py", "当用户的请求不匹配其他任何工具时，可用此选项直接回复。将回复内容写在response参数里。",
      "Quando o pedido do usuário não combina com nenhuma outra ferramenta, use esta para responder direto. Escreva a resposta no parâmetro response."),
-    ("core/connection.py", '"服务器重启中..."', '"Servidor reiniciando..."'),
+    ("core/connection.py", '"服务器重启中..."',
+     '__import__("core.utils.idioma", fromlist=["t"]).t("Servidor reiniciando...", "Server restarting...", "服务器重启中...", "Reiniciando el servidor...")', '"Servidor reiniciando..."'),
     ("core/connection.py", 'content="给我讲个故事吧"', 'content="Me conta uma curiosidade"'),
     ("core/connection.py", '好呀，你想听什么类型的呀？童话、冒险还是搞笑的？选一个我给你开讲~', 'Claro. Prefere ciência, história ou tecnologia?'),
     ("core/connection.py", 'content="已直接回复"', 'content="Respondido diretamente"'),
@@ -68,9 +80,12 @@ TROCAS: list[tuple[str, str, str]] = [
     ("core/connection.py", 'content="退出意图已处理"', 'content="Despedida processada"'),
     ("core/connection.py", "[系统提示] 已达到最大工具调用次数限制，请你基于目前已经获取的所有信息，直接给出最终答案。不要再尝试调用任何工具。",
      "[Aviso do sistema] O limite de chamadas de ferramentas foi atingido. Responda agora com o que já tem, sem chamar mais ferramentas."),
-    ("core/connection.py", "哎呀，网络遇到点问题，请稍后再试下！", "Ops, a rede falhou. Tenta de novo daqui a pouco."),
-    ("core/handle/receiveAudioHandle.py", "不好意思，我现在有点事情要忙，明天这个时候我们再聊，约好了哦！明天不见不散，拜拜！",
-     "Por hoje chega de conversa, atingi o limite de uso. Amanhã a gente continua. Tchau!"),
+    ("core/connection.py", '"哎呀，网络遇到点问题，请稍后再试下！"',
+     '__import__("core.utils.idioma", fromlist=["t"]).t("Ops, a rede falhou. Tenta de novo daqui a pouco.", "Oops, the network failed. Please try again in a moment.", "哎呀，网络出了点问题，请稍后再试。", "Vaya, ha fallado la red. Inténtalo de nuevo en un momento.")',
+     '"Ops, a rede falhou. Tenta de novo daqui a pouco."'),
+    ("core/handle/receiveAudioHandle.py", '"不好意思，我现在有点事情要忙，明天这个时候我们再聊，约好了哦！明天不见不散，拜拜！"',
+     '__import__("core.utils.idioma", fromlist=["t"]).t("Por hoje chega de conversa, atingi o limite de uso. Amanhã a gente continua. Tchau!", "That is enough talking for today, I hit my usage limit. Let us pick it up tomorrow. Bye!", "今天就聊到这里吧，我已经达到使用上限了。明天再继续，拜拜！", "Por hoy basta de charla, he llegado al límite de uso. Mañana seguimos. ¡Adiós!")',
+     '"Por hoje chega de conversa, atingi o limite de uso. Amanhã a gente continua. Tchau!"'),
     ("core/handle/receiveAudioHandle.py", "没有找到该设备的版本信息，请正确配置 OTA地址，然后重新编译固件。",
      "Não encontrei a versão deste aparelho. Confira o endereço OTA e grave o firmware de novo."),
     ("core/providers/tools/unified_tool_handler.py", '"无法解析函数参数"', '"Não consegui entender os parâmetros da ferramenta."'),
@@ -89,6 +104,7 @@ TROCAS: list[tuple[str, str, str]] = [
     ("core/providers/tools/server_plugins/plugin_executor.py", 'necessary_functions = ["handle_exit_intent", "get_lunar"]', 'necessary_functions = ["handle_exit_intent"]'),
     # Ao dizer "Jarvis", o servidor mandava "ei, olá" em chinês ao modelo (e à tela)
     ("core/handle/textHandler/listenMessageHandler.py", '"嘿，你好呀"',
+     '__import__("core.utils.idioma", fromlist=["t"]).t("Oi", "Hi", "你好", "Hola") + ", " + __import__("core.utils.perfil", fromlist=["x"]).nome_agente()',
      'f"Oi, {__import__(\'core.utils.perfil\', fromlist=[\'x\']).nome_agente()}"'),
     # Correção: comando enviado logo ao conectar (3 cliques) chegava antes das ferramentas da ponte carregarem
     ("core/connection.py", """            functions = list(self.func_handler.get_functions())
@@ -145,7 +161,9 @@ TROCAS: list[tuple[str, str, str]] = [
             # 清理opus解码器
             if hasattr(self, "_connection_opus_decoder"):"""),
     # Câmera: o servidor mandava responder em chinês
-    ("core/providers/vllm/openai.py", 'question = question + "(请使用中文回复)"', 'question = question + " (Responda em português do Brasil, em até 3 frases curtas.)"'),
+    ("core/providers/vllm/openai.py", 'question = question + "(请使用中文回复)"',
+     'question = question + __import__("core.utils.idioma", fromlist=["t"]).t(" (Responda em português do Brasil, em até 3 frases curtas.)", " (Answer in English, in up to 3 short sentences.)", "（请用简体中文回答，最多 3 句短句。）", " (Responde en español, en 3 frases cortas como máximo.)")',
+     'question = question + " (Responda em português do Brasil, em até 3 frases curtas.)"'),
     # Tela: frase amigável no lugar de "% nome_da_ferramenta" (extras/core/utils/avisos.py)
     ("core/providers/tools/unified_tool_handler.py", 'await send_display_message(self.conn, f"% {function_name}")',
      'from core.utils.avisos import aviso_ferramenta\n                if aviso_ferramenta(function_name):\n                    await send_display_message(self.conn, aviso_ferramenta(function_name))'),
@@ -172,6 +190,7 @@ TROCAS: list[tuple[str, str, str]] = [
                                 web.get("/watcher/qrcodes", avisos.handle_qrcodes),
                                 web.get("/watcher/tempo", avisos.handle_tempo),
                                 web.post("/watcher/upload", cartao.handle_upload),
+                                web.post("/watcher/backup", cartao.handle_backup),
                                 web.get("/watcher/memoria", cartao.handle_memoria),
                                 web.get("/watcher/memoria/audio/{nome}", cartao.handle_audio),
                                 web.get("/watcher/perfil", conversas.handle_perfil),
@@ -208,6 +227,14 @@ TROCAS: list[tuple[str, str, str]] = [
     "Friday": "星期五",
     "Saturday": "星期六",
     "Sunday": "星期日",""", """WEEKDAY_MAP = {
+    "Monday": __import__("core.utils.idioma", fromlist=["t"]).t("segunda-feira", "Monday", "星期一", "lunes"),
+    "Tuesday": __import__("core.utils.idioma", fromlist=["t"]).t("terça-feira", "Tuesday", "星期二", "martes"),
+    "Wednesday": __import__("core.utils.idioma", fromlist=["t"]).t("quarta-feira", "Wednesday", "星期三", "miércoles"),
+    "Thursday": __import__("core.utils.idioma", fromlist=["t"]).t("quinta-feira", "Thursday", "星期四", "jueves"),
+    "Friday": __import__("core.utils.idioma", fromlist=["t"]).t("sexta-feira", "Friday", "星期五", "viernes"),
+    "Saturday": __import__("core.utils.idioma", fromlist=["t"]).t("sábado", "Saturday", "星期六", "sábado"),
+    "Sunday": __import__("core.utils.idioma", fromlist=["t"]).t("domingo", "Sunday", "星期日", "domingo"),""",
+     """WEEKDAY_MAP = {
     "Monday": "segunda-feira",
     "Tuesday": "terça-feira",
     "Wednesday": "quarta-feira",
@@ -238,14 +265,16 @@ TROCAS: list[tuple[str, str, str]] = [
 
 def main() -> int:
     problemas = 0
-    for rel, antigo, novo in TROCAS:
+    for rel, antigo, novo, *anterior in TROCAS:
         arq = RAIZ / rel
         texto = arq.read_text(encoding="utf-8")
         if novo in texto:
             print(f"já estava  {rel}: {novo.strip().splitlines()[0][:60]}")
             continue
-        if antigo in texto:
-            arq.write_text(texto.replace(antigo, novo), encoding="utf-8")
+        # 4º item opcional: versão anterior (só em português) de servidores já instalados
+        anterior = next((a for a in anterior if a in texto), None)
+        if antigo in texto or anterior:
+            arq.write_text(texto.replace(anterior or antigo, novo), encoding="utf-8")
             print(f"traduzido  {rel}: {novo.strip().splitlines()[0][:60]}")
         elif novo in texto:
             print(f"já estava  {rel}: {novo.strip().splitlines()[0][:60]}")

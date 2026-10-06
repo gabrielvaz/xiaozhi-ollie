@@ -16,8 +16,9 @@ from aiohttp import web
 from core.api.avisos_handler import AvisosHandler
 from core.utils import reuniao
 from core.utils.icloud import ler_texto
+from core.utils.idioma import t
+from core.utils.vigia import rotulo_dia
 
-DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 FFPROBE = "/opt/homebrew/bin/ffprobe"
 LIMITE = 30
 
@@ -49,23 +50,17 @@ def _duracao_s(pasta: Path) -> int | None:
 
 
 def _formatar_duracao(s: int) -> str:
+    un_min = t("min", "min", "分钟", "min")
     if s < 60:
-        return f"{s} s"
+        return f"{s} " + t("s", "s", "秒", "s")
     minutos = round(s / 60)
     if minutos < 60:
-        return f"{minutos} min"
-    return f"{minutos // 60} h {minutos % 60:02d} min"
+        return f"{minutos} {un_min}"
+    return f"{minutos // 60} " + t("h", "h", "小时", "h") + f" {minutos % 60:02d} {un_min}"
 
 
 def _detalhe(quando: datetime, duracao: int | None) -> str:
-    hoje = datetime.now().date()
-    if quando.date() == hoje:
-        dia = "Hoje"
-    elif (hoje - quando.date()).days == 1:
-        dia = "Ontem"
-    else:
-        dia = f"{DIAS[quando.weekday()]} {quando:%d/%m}"
-    texto = f"{dia} {quando:%H:%M}"
+    texto = f"{rotulo_dia(quando)} {quando:%H:%M}"
     return texto if duracao is None else f"{texto} · {_formatar_duracao(duracao)}"
 
 
@@ -86,7 +81,7 @@ def listar() -> list[dict]:
         tem_audio = (p / "audio.wav").exists() or (p / "audio.m4a").exists()
         if not tem_audio and not resumo.exists():
             continue
-        titulo = "Processando…"
+        titulo = t("Processando…", "Processing…", "处理中…", "Procesando…")
         if resumo.exists():
             primeira = ler_texto(resumo, padrao="").strip().splitlines()
             if primeira:

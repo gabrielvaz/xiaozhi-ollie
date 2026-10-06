@@ -13,6 +13,10 @@ Três cliques na roda abrem a gaveta. Girar escolhe, clicar abre. Cada app é um
 | `registro_apps.h` | **Onde se adiciona um app** (ordem = ordem na gaveta) |
 | `apps/` | Os apps |
 
+## Textos e idiomas
+
+Todo texto que aparece na tela ou é falado usa `TR("português", "English", "中文", "español")`, de `idioma_watcher.h` (`#include "../idioma_watcher.h"` dentro de `apps/`). O build escolhe um idioma (`compilar.sh --idioma`) e só aquele texto entra no binário. Não traduza chaves de configuração, JSON, caminhos nem valores comparados com o servidor. Use `Fontes::Grande()` e `Fontes::Pequena()`, que já trocam para a fonte CJK em chinês.
+
 ## Ciclo de vida de um app
 
 | Método | Quando | Regra |

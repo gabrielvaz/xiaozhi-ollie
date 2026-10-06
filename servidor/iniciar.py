@@ -37,6 +37,10 @@ import idioma  # noqa: E402
 
 os.environ["IDIOMA"] = idioma.IDIOMA
 os.environ["IDIOMA_NOME"] = idioma.NOME
+os.environ["OLLIE_ERRO"] = idioma.t("Tive um problema agora. Tenta de novo daqui a pouco.",
+                                    "Something went wrong. Please try again in a moment.",
+                                    "刚才出了点问题，请稍后再试。",
+                                    "He tenido un problema. Inténtalo de nuevo en un momento.")
 if not os.environ.get("VOZ"):
     os.environ["VOZ"] = idioma.VOZES[idioma.IDIOMA]
 

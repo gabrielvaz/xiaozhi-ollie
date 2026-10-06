@@ -8,7 +8,7 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 
 | | XiaoZhi original | Xiaozhi Ollie |
 |---|---|---|
-| Idioma | Interface em chinês ou inglês | **Português do Brasil** inteiro: tela, portal de Wi-Fi (pt-BR, não pt-PT), avisos e ferramentas |
+| Idiomas | Interface em vários idiomas; assistente na nuvem do xiaozhi.me | **4 idiomas de ponta a ponta**: português do Brasil, inglês, chinês simplificado e espanhol (tela, apps, avisos, voz e respostas). Escolha no build: `compilar.sh --idioma en-US` (padrão: `IDIOMA` do `servidor/.env`). Textos do firmware em `TR(pt, en, zh, es)` (`placa/idioma_watcher.h`); em chinês o texto usa a fonte CJK do tema |
 | Ativação | "你好小智" (WakeNet chinês) | **"Hey Ollie"** (MultiNet7 em inglês; fonemas gerados no aparelho). O nome do agente é escolhido em Configurações: Ollie, Clawd, Jarvis, Nova, Atlas, Luna, Max ou Iris, e muda a ativação e a apresentação |
 | Servidor | xiaozhi.me | **Servidor próprio no Mac** (endereço OTA embutido, Tailscale Funnel com caminho secreto) |
 | Mascote | Emojis Noto | **Clawd**, o mascote do Claude Code, em GIFs animados, com animações próprias para **conectando, ouvindo e falando** |

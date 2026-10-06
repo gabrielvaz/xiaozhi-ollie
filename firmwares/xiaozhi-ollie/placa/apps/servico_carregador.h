@@ -2,11 +2,12 @@
 // (animação "choque" por ~3 s) e depois volta à expressão do estado atual.
 #pragma once
 
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class ServicoCarregador : public AppWatcher {
 public:
-    const char* Nome() const override { return "Carregador"; }
+    const char* Nome() const override { return TR("Carregador", "Charger", "充电器", "Cargador"); }
     bool Visivel() const override { return false; }
     void Abrir(ContextoApps& c) override {}
     bool Clicar(ContextoApps& c) override { return false; }

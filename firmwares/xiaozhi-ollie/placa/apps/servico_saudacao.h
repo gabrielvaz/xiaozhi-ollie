@@ -11,11 +11,12 @@
 #include <esp_random.h>
 
 #include "../agente_watcher.h"
+#include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
 class ServicoSaudacao : public AppWatcher {
 public:
-    const char* Nome() const override { return "Saudação"; }
+    const char* Nome() const override { return TR("Saudação", "Greeting", "问候", "Saludo"); }
     bool Visivel() const override { return false; }
     void Abrir(ContextoApps& c) override {}
     bool Clicar(ContextoApps& c) override { return false; }
@@ -119,24 +120,52 @@ private:
 
     std::string Frase() {
         std::string nome = AgenteWatcher::Usuario();
+        // Frases do idioma do build: gerais e por período; o nome entra no lugar de "{}" sempre como vocativo
+        // separado por vírgula (", " ou a chinesa "，"), para poder tirar quando não há nome
+#if defined(CONFIG_LANGUAGE_EN_US)
+        std::vector<std::string> frases = {
+            "Hi, {}! How's it going?", "What are we doing today, {}?", "How can I help, {}?",
+            "Hey, {}, how are you?", "Ready to get started, {}?", "I'm right here, {}. Just ask.",
+        };
+        std::vector<std::string> manha = {"Good morning, {}! Had your coffee?", "Morning, {}! Ready for the day?"};
+        std::vector<std::string> tarde = {"Good afternoon, {}! How's your day?", "Good afternoon, {}. Need anything?"};
+        std::vector<std::string> noite = {"Good evening, {}! Still going?", "Good evening, {}. How was your day?"};
+        std::vector<std::string> madrugada = {"Hey, {}, late night grind?", "Still up, {}? I'm here."};
+#elif defined(CONFIG_LANGUAGE_ZH_CN)
+        std::vector<std::string> frases = {
+            "你好，{}，最近好吗？", "{}，今天想做点什么？", "有什么可以帮你的，{}？",
+            "嗨，{}！准备开工了吗？", "{}，需要我做点什么吗？", "{}，我在这儿，随时叫我。",
+        };
+        std::vector<std::string> manha = {"早上好，{}！喝咖啡了吗？", "早上好，{}！今天也加油！"};
+        std::vector<std::string> tarde = {"下午好，{}！今天过得怎样？", "下午好，{}。需要帮忙吗？"};
+        std::vector<std::string> noite = {"晚上好，{}！还在忙吗？", "晚上好，{}。今天过得如何？"};
+        std::vector<std::string> madrugada = {"{}，还没睡呀？我在这儿。", "夜深了，{}，还在忙吗？"};
+#elif defined(CONFIG_LANGUAGE_ES_ES)
+        std::vector<std::string> frases = {
+            "Hola, {}, ¿qué tal?", "¿Qué hacemos hoy, {}?", "¿En qué te ayudo, {}?",
+            "¡Ey, {}! ¿Cómo estás?", "¿Empezamos, {}?", "Aquí estoy, {}. Solo llámame.",
+        };
+        std::vector<std::string> manha = {"¡Buenos días, {}! ¿Ya has tomado café?", "¡Buenos días, {}! ¿Empezamos el día?"};
+        std::vector<std::string> tarde = {"¡Buenas tardes, {}! ¿Qué tal el día?", "Buenas tardes, {}. ¿Necesitas algo?"};
+        std::vector<std::string> noite = {"¡Buenas noches, {}! ¿Aún con energía?", "Buenas noches, {}. ¿Qué tal el día?"};
+        std::vector<std::string> madrugada = {"Ey, {}, ¿madrugada productiva?", "¿Aún despierto, {}? Aquí estoy."};
+#else
         std::vector<std::string> frases = {
             "Olá, tudo bem, {}?", "O que vamos fazer hoje, {}?", "Como posso te ajudar, {}?",
             "Opaaa, {}, como você está?", "E aí, {}? Bora começar?", "Tô por aqui, {}. É só chamar.",
         };
+        std::vector<std::string> manha = {"Bom dia, {}! Café já tomado?", "Bom dia, {}! Bora começar o dia?"};
+        std::vector<std::string> tarde = {"Boa tarde, {}! Como vai o dia?", "Boa tarde, {}. Precisa de algo?"};
+        std::vector<std::string> noite = {"Boa noite, {}! Ainda no gás?", "Boa noite, {}. Como foi o dia?"};
+        std::vector<std::string> madrugada = {"Opa, {}, madrugada produtiva?", "Ainda acordado, {}? Tô aqui."};
+#endif
         time_t t = time(nullptr);
         struct tm agora;
         localtime_r(&t, &agora);
         if (agora.tm_year + 1900 >= 2025) {  // relógio já sincronizado
             int h = agora.tm_hour;
-            if (h >= 5 && h < 12) {
-                frases.insert(frases.end(), {"Bom dia, {}! Café já tomado?", "Bom dia, {}! Bora começar o dia?"});
-            } else if (h >= 12 && h < 18) {
-                frases.insert(frases.end(), {"Boa tarde, {}! Como vai o dia?", "Boa tarde, {}. Precisa de algo?"});
-            } else if (h >= 18) {
-                frases.insert(frases.end(), {"Boa noite, {}! Ainda no gás?", "Boa noite, {}. Como foi o dia?"});
-            } else {
-                frases.insert(frases.end(), {"Opa, {}, madrugada produtiva?", "Ainda acordado, {}? Tô aqui."});
-            }
+            const auto& periodo = (h >= 5 && h < 12) ? manha : (h >= 12 && h < 18) ? tarde : (h >= 18) ? noite : madrugada;
+            frases.insert(frases.end(), periodo.begin(), periodo.end());
         }
         int i = esp_random() % frases.size();
         if (i == ultima_frase_) {
@@ -145,12 +174,24 @@ private:
         ultima_frase_ = i;
         std::string f = frases[i];
         auto pos = f.find("{}");
-        if (nome.empty()) {  // sem nome: tira o vocativo (", {}" ou "{}, ")
-            if (pos >= 2 && f.compare(pos - 2, 2, ", ") == 0) {
-                f.erase(pos - 2, 4);
-            } else {
-                f.erase(pos, f.compare(pos + 2, 2, ", ") == 0 ? 4 : 2);
+        if (nome.empty()) {  // sem nome: tira o vocativo (", {}" ou "{}, "; em chinês "，{}" ou "{}，")
+            const std::string virgulas[] = {", ", "，"};
+            size_t ini = pos, fim = pos + 2;
+            for (const auto& v : virgulas) {
+                if (pos >= v.size() && f.compare(pos - v.size(), v.size(), v) == 0) {
+                    ini = pos - v.size();
+                    break;
+                }
             }
+            if (ini == pos) {
+                for (const auto& v : virgulas) {
+                    if (f.compare(pos + 2, v.size(), v) == 0) {
+                        fim = pos + 2 + v.size();
+                        break;
+                    }
+                }
+            }
+            f.erase(ini, fim - ini);
         } else {
             f.replace(pos, 2, nome);
         }
