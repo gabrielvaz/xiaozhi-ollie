@@ -108,7 +108,7 @@ selected_module:
 # responder no meio da frase. Mais alto = pode pausar mais, mas a resposta começa um pouco depois.
 VAD:
   SileroVAD:
-    min_silence_duration_ms: 1000
+    min_silence_duration_ms: 2000
 
 Intent:
   function_call:
