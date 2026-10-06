@@ -248,19 +248,22 @@ public:
         lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
     }
 
+    static constexpr int kDesceTopo = 14;
+
     // CustomLcdDisplay::SetupUI (sensecap_watcher.cc depois dos patches)
     void SetupWatcher() {
         auto text_font = &font_noto_sans_basic_30_4;
         auto icon_font = &font_material_symbols_20_4;
-        lv_obj_set_size(top_bar_, LV_HOR_RES, text_font->line_height);
+        // Ícones e data descem kDesceTopo px (sensecap_watcher.cc): o anel do volume passa acima deles
+        lv_obj_set_size(top_bar_, LV_HOR_RES, text_font->line_height + kDesceTopo);
         lv_obj_set_style_layout(top_bar_, LV_LAYOUT_NONE, 0);
-        lv_obj_set_style_pad_top(top_bar_, 10, 0);
+        lv_obj_set_style_pad_top(top_bar_, 10 + kDesceTopo, 0);
         lv_obj_set_style_pad_bottom(top_bar_, 1, 0);
         lv_obj_set_size(status_bar_, LV_HOR_RES, text_font->line_height);
         lv_obj_set_style_layout(status_bar_, LV_LAYOUT_NONE, 0);
         lv_obj_set_style_pad_top(status_bar_, 10, 0);
         lv_obj_set_style_pad_bottom(status_bar_, 1, 0);
-        lv_obj_set_y(status_bar_, text_font->line_height);
+        lv_obj_set_y(status_bar_, text_font->line_height + kDesceTopo);
         lv_obj_add_flag(status_bar_, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_parent(mute_label_, top_bar_);
         lv_obj_set_parent(battery_label_, top_bar_);

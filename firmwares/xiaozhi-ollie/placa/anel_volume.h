@@ -37,6 +37,6 @@ public:
 
 private:
     static constexpr int kDiametro = 404;  // 4 px da borda: o vidro redondo corta um pouco a beirada
-    static constexpr int kEspessura = 8;
+    static constexpr int kEspessura = 4;  // fina, por fora do Wi-Fi e da bateria (que descem 14 px)
     lv_obj_t* arco_ = nullptr;
 };

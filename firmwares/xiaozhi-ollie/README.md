@@ -15,7 +15,7 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 | Fala na tela | Uma linha rolando de lado | **Streaming em até 3 linhas**, que rola para cima, com fonte própria de 24 px com acentos |
 | Abertura | Logo do XiaoZhi | **Clawd acenando, logo "Ollie" e versão** por ~3 s |
 | Fonte | Noto Sans | **Noto Sans ou JetBrains Mono** (estilo terminal), escolhida em Configurações |
-| Ao ligar | Logo XiaoZhi | **Logo do Ollie** e depois uma **saudação com o seu nome**, que muda ao longo do dia ("Bom dia, Ana! Café já tomado?") |
+| Ao ligar | Logo XiaoZhi | **Logo do Ollie** e depois uma **saudação com o seu nome** ("Bom dia, Ana! Café já tomado?"); em espera, uma **frase aleatória nova a cada 3 min** abaixo do Clawd |
 | Tela inicial | Hora | **Dia da semana, data e hora** ("Seg, 05/10 · 16:20") |
 | Tema | Claro | **Escuro** por padrão (ajustável) |
 | Roda | Volume e conversa | Volume (com **anel branco na borda** do tamanho do volume e o Clawd animado), conversa e **gaveta de apps em mosaico** (2 cliques abrem; 2 cliques voltam; 3 cliques fecham) |

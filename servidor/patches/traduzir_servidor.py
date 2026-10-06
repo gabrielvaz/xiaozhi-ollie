@@ -243,6 +243,11 @@ TROCAS: list[tuple[str, str, str]] = [
 """, """                app.add_routes([web.post("/watcher/reunioes/{id}/claude", ReunioesHandler(self.config).handle_claude)])
                 app.add_routes([web.get("/watcher/fotos", CartaoHandler(self.config).handle_fotos)])
 """),
+    # App Câmera: endereço e token da análise sem depender do canal de voz (extras/core/api/cartao_handler.py)
+    ("core/http_server.py", """                app.add_routes([web.get("/watcher/fotos", CartaoHandler(self.config).handle_fotos)])
+""", """                app.add_routes([web.get("/watcher/fotos", CartaoHandler(self.config).handle_fotos)])
+                app.add_routes([web.get("/watcher/visao", CartaoHandler(self.config).handle_visao)])
+"""),
     # Depuração: WATCHER_REGISTRAR_PROMPT=1 grava a última requisição ao modelo em data/ultimo_prompt.json
     ("core/providers/llm/openai/openai.py", """        stream = self.client.chat.completions.create(**request_params)""", """        if os.environ.get("WATCHER_REGISTRAR_PROMPT") == "1":
             import json as _json

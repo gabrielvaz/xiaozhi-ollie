@@ -962,7 +962,7 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.5.5"
+OLLIE_VERSAO_APP = "2.5.6"
 OLLIE_POSE_ASSETS = "sem_wifi"
 OLLIE_ARQUIVO_ASSETS = "ollie-assets_2.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
@@ -1055,6 +1055,15 @@ trocar(app_cc, """        if (!success) {
        """        if (!success) {
             display->MostrarAtualizando(false);
             Alert(Lang::Strings::ERROR, Lang::Strings::DOWNLOAD_ASSETS_FAILED, "cancel",""")
+
+# 27. Wi-Fi, bateria e data 14 px mais baixos: o anel do volume (placa/anel_volume.h) passa por fora deles
+trocar(placa, """            lv_obj_set_size(top_bar_, LV_HOR_RES, text_font->line_height);
+            lv_obj_set_style_layout(top_bar_, LV_LAYOUT_NONE, 0);
+            lv_obj_set_style_pad_top(top_bar_, 10, 0);""", """            lv_obj_set_size(top_bar_, LV_HOR_RES, text_font->line_height + 14);  // Ollie: 14 px mais baixo
+            lv_obj_set_style_layout(top_bar_, LV_LAYOUT_NONE, 0);
+            lv_obj_set_style_pad_top(top_bar_, 10 + 14, 0);""")
+trocar(placa, """            lv_obj_set_y(status_bar_, text_font->line_height);""",
+       """            lv_obj_set_y(status_bar_, text_font->line_height + 14);  // Ollie: acompanha os ícones""")
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))

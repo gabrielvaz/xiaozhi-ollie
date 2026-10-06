@@ -4,6 +4,7 @@ POST /watcher/upload?tipo=conversas|reunioes&nome=ARQ&offset=N[&fim=1]  envio em
 POST /watcher/backup                                                    copia as conversas para o iCloud
 POST /watcher/diagnostico                                               pulso por minuto e relatório de reinício
 GET  /watcher/memoria                                                   itens da memória offline
+GET  /watcher/visao                                                     endereço e token da análise de fotos
 GET  /watcher/memoria/audio/{nome}                                      áudio .ogg de um item
 """
 
@@ -97,6 +98,17 @@ class CartaoHandler(AvisosHandler):
             return web.json_response({"erro": "não autorizado"}, status=401)
         from core.utils import fotos
         return web.json_response({"fotos": await asyncio.to_thread(fotos.listar)})
+
+    async def handle_visao(self, request: web.Request) -> web.Response:
+        """GET /watcher/visao: endereço e token novos para analisar fotos (/mcp/vision/explain). O servidor só
+        os manda no MCP do canal de voz: sem conversa desde o boot (ou com o token vencido) o app Câmera
+        tirava a foto e não conseguia analisar."""
+        if not self._autorizado(request):
+            return web.json_response({"erro": "não autorizado"}, status=401)
+        from core.utils.auth import AuthToken
+        from core.utils.util import get_vision_url
+        token = AuthToken(self.config["server"]["auth_key"]).generate_token(request.headers.get("Device-Id", ""))
+        return web.json_response({"url": get_vision_url(self.config), "token": token})
 
     async def handle_backup(self, request: web.Request) -> web.Response:
         """App Backup do Watcher: o único momento em que as conversas são copiadas para o iCloud."""

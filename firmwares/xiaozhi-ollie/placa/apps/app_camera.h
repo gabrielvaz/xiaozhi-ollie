@@ -10,6 +10,8 @@
 #include <ctime>
 #include <sys/stat.h>
 
+#include <esp_log.h>
+
 #include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 #include "../sscma_camera.h"  // a câmera da placa (apps/ fica dentro da pasta da placa)
@@ -134,6 +136,22 @@ private:
         return CartaoWatcher::Escrever(caminho, jpeg) ? caminho : "";
     }
 
+    // GET /watcher/visao: endereço e token novos de /mcp/vision/explain
+    static bool RenovarAnalise(Camera* camera) {
+        std::string corpo;
+        if (!RedeWatcher::Pedir("GET", "/watcher/visao", "", corpo)) {
+            return false;
+        }
+        cJSON* raiz = cJSON_Parse(corpo.c_str());
+        std::string url = RedeWatcher::Campo(raiz, "url"), token = RedeWatcher::Campo(raiz, "token");
+        cJSON_Delete(raiz);
+        if (url.empty() || token.empty()) {
+            return false;
+        }
+        camera->SetExplainUrl(url, token);
+        return true;
+    }
+
     void TirarFoto(ContextoApps& c) {
         auto camera = Board::GetInstance().GetCamera();
         std::string descricao;
@@ -141,10 +159,19 @@ private:
         std::string arquivo;
         if (camera != nullptr && camera->Capture()) {
             arquivo = SalvarNoCartao(static_cast<SscmaCamera*>(camera)->UltimaFotoJpeg());
-            auto r = camera->Explain(TR("Descreva em português do Brasil, em até 3 frases, o que aparece nesta foto.",
-                                        "Describe in English, in up to 3 sentences, what is in this photo.",
-                                        "用中文、最多 3 句话描述这张照片里的内容。",
-                                        "Describe en español, en hasta 3 frases, lo que aparece en esta foto."));
+            const char* pergunta = TR("Descreva em português do Brasil, em até 3 frases, o que aparece nesta foto.",
+                                      "Describe in English, in up to 3 sentences, what is in this photo.",
+                                      "用中文、最多 3 句话描述这张照片里的内容。",
+                                      "Describe en español, en hasta 3 frases, lo que aparece en esta foto.");
+            auto r = camera->Explain(pergunta);
+            // O endereço e o token da análise só chegam pelo canal de voz: sem conversa desde o boot (ou com o
+            // token vencido) a análise falhava. Pede ao servidor um par novo e tenta mais uma vez
+            if (!r && RenovarAnalise(camera)) {
+                r = camera->Explain(pergunta);
+            }
+            if (!r) {
+                ESP_LOGW("Camera", "Análise da foto falhou: %s", r.error().c_str());
+            }
             if (r) {
                 cJSON* raiz = cJSON_Parse(r->c_str());
                 descricao = RedeWatcher::Campo(raiz, "response");

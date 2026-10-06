@@ -11,6 +11,7 @@ _cache_tempo: dict = {}  # ip -> (quando, previsão)
 
 class AvisosHandler:
     def __init__(self, config: dict):
+        self.config = config
         self.auth = AuthManager(secret_key=config["server"]["auth_key"],
                                 expire_seconds=config["server"].get("auth", {}).get("expire_seconds"))
 

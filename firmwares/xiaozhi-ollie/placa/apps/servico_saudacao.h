@@ -1,6 +1,6 @@
 // Serviço (sem tela na gaveta): saudação com o nome do usuário na tela de espera.
-// Aparece ao ligar (depois do logo) e ao voltar para a espera, e troca a cada 15 min ao longo do dia,
-// com frases do período (bom dia, boa tarde...). O Clawd troca de expressão/pose a cada 40–90 s,
+// Aparece ao ligar (depois do logo) e ao voltar para a espera (sempre uma saudação do período: bom dia,
+// boa tarde...) e troca a cada 3 min por uma frase aleatória (saudações e frases soltas, sem repetir a anterior). O Clawd troca de expressão/pose a cada 40–90 s,
 // com poses que combinam com a hora do dia (sem Wi-Fi: "offline"; bateria no fim: "sad"). Também informa ao servidor o nome do agente.
 #pragma once
 
@@ -70,7 +70,8 @@ public:
         proxima_ = agora + kTrocaS;
         proxima_pose_ = agora + 40;  // a pose nova acompanha a frase nova
         std::string pose = Pose();
-        std::string frase = Frase();
+        std::string frase = Frase(saudou_desde_ != ocioso_desde_);  // entrou na espera: saudação
+        saudou_desde_ = ocioso_desde_;
         ContextoApps::App().Schedule([pose]() { Board::GetInstance().GetDisplay()->SetEmotion(pose.c_str()); });
         ContextoApps::App().Schedule([frase]() {
             Board::GetInstance().GetDisplay()->SetChatMessage("saudacao", frase.c_str());
@@ -78,12 +79,13 @@ public:
     }
 
 private:
-    static constexpr int kTrocaS = 15 * 60;
+    static constexpr int kTrocaS = 3 * 60;
     int ocioso_desde_ = -1;
+    int saudou_desde_ = -2;  // ocioso_desde_ da última saudação (a 1ª frase de cada espera é saudação)
     int proxima_ = 0;
     int perfil_em_ = 0;
     bool perfil_ok_ = false;
-    int ultima_frase_ = -1;
+    std::string ultima_frase_;
     int proxima_pose_ = 0;
     int proxima_trabalho_ = 0;
     bool trabalhando_ = false;
@@ -165,11 +167,12 @@ private:
         if (!usuario.empty() && usuario != AgenteWatcher::Usuario()) {
             AgenteWatcher::DefinirUsuario(usuario);
             proxima_ = 0;  // já mostra a saudação com o nome
+            saudou_desde_ = -2;
         }
         perfil_ok_ = true;
     }
 
-    std::string Frase() {
+    std::string Frase(bool saudacao) {
         std::string nome = AgenteWatcher::Usuario();
         // Frases do idioma do build: gerais e por período; o nome entra no lugar de "{}" sempre como vocativo
         // separado por vírgula (", " ou a chinesa "，"), para poder tirar quando não há nome
@@ -182,6 +185,14 @@ private:
         std::vector<std::string> tarde = {"Good afternoon, {}! How's your day?", "Good afternoon, {}. Need anything?"};
         std::vector<std::string> noite = {"Good evening, {}! Still going?", "Good evening, {}. How was your day?"};
         std::vector<std::string> madrugada = {"Hey, {}, late night grind?", "Still up, {}? I'm here."};
+        std::vector<std::string> soltas = {
+            "Did you know? The first computer bug was a real moth.", "Time for a sip of water?",
+            "Stretch your back, {}. I'll keep watch.", "Small commits, happy merges.",
+            "Your agents are in good hands.", "Ask me about your sessions anytime.",
+            "Tip: three clicks on the wheel open the apps.", "Done is better than perfect.",
+            "Look away from the screen for 20 seconds.", "One step at a time, {}.",
+            "I'm keeping an eye on everything.", "Need a meeting summary? I can record it.",
+        };
 #elif defined(CONFIG_LANGUAGE_ZH_CN)
         std::vector<std::string> frases = {
             "你好，{}，最近好吗？", "{}，今天想做点什么？", "有什么可以帮你的，{}？",
@@ -191,6 +202,14 @@ private:
         std::vector<std::string> tarde = {"下午好，{}！今天过得怎样？", "下午好，{}。需要帮忙吗？"};
         std::vector<std::string> noite = {"晚上好，{}！还在忙吗？", "晚上好，{}。今天过得如何？"};
         std::vector<std::string> madrugada = {"{}，还没睡呀？我在这儿。", "夜深了，{}，还在忙吗？"};
+        std::vector<std::string> soltas = {
+            "你知道吗？第一个计算机 bug 是一只真的飞蛾。", "要不要喝口水？",
+            "{}，伸个懒腰吧，我帮你盯着。", "小步提交，合并更顺。",
+            "你的助手们都很靠谱。", "随时问我会话的进展。",
+            "小提示：滚轮连按三下打开应用。", "完成比完美更重要。",
+            "让眼睛离开屏幕 20 秒吧。", "{}，一步一步来。",
+            "我一直在帮你看着。", "要会议纪要吗？我可以录音。",
+        };
 #elif defined(CONFIG_LANGUAGE_ES_ES)
         std::vector<std::string> frases = {
             "Hola, {}, ¿qué tal?", "¿Qué hacemos hoy, {}?", "¿En qué te ayudo, {}?",
@@ -200,6 +219,14 @@ private:
         std::vector<std::string> tarde = {"¡Buenas tardes, {}! ¿Qué tal el día?", "Buenas tardes, {}. ¿Necesitas algo?"};
         std::vector<std::string> noite = {"¡Buenas noches, {}! ¿Aún con energía?", "Buenas noches, {}. ¿Qué tal el día?"};
         std::vector<std::string> madrugada = {"Ey, {}, ¿madrugada productiva?", "¿Aún despierto, {}? Aquí estoy."};
+        std::vector<std::string> soltas = {
+            "¿Sabías? El primer bug fue una polilla de verdad.", "¿Un trago de agua?",
+            "Estira la espalda, {}. Yo vigilo.", "Commits pequeños, merges felices.",
+            "Tus agentes están en buenas manos.", "Pregúntame por tus sesiones cuando quieras.",
+            "Truco: tres clics en la rueda abren las apps.", "Hecho es mejor que perfecto.",
+            "Mira lejos de la pantalla 20 segundos.", "Paso a paso, {}.",
+            "Lo estoy vigilando todo.", "¿Resumen de reunión? Puedo grabarla.",
+        };
 #else
         std::vector<std::string> frases = {
             "Olá, tudo bem, {}?", "O que vamos fazer hoje, {}?", "Como posso te ajudar, {}?",
@@ -209,6 +236,14 @@ private:
         std::vector<std::string> tarde = {"Boa tarde, {}! Como vai o dia?", "Boa tarde, {}. Precisa de algo?"};
         std::vector<std::string> noite = {"Boa noite, {}! Ainda no gás?", "Boa noite, {}. Como foi o dia?"};
         std::vector<std::string> madrugada = {"Opa, {}, madrugada produtiva?", "Ainda acordado, {}? Tô aqui."};
+        std::vector<std::string> soltas = {
+            "Sabia? O 1º bug da computação foi uma mariposa.", "Que tal um gole de água?",
+            "Estica as costas, {}. Eu fico de olho.", "Commits pequenos, merges felizes.",
+            "Seus agentes estão em boas mãos.", "Pergunta das suas sessões quando quiser.",
+            "Dica: três cliques na roda abrem os apps.", "Feito é melhor que perfeito.",
+            "Olha para longe da tela por 20 segundos.", "Um passo de cada vez, {}.",
+            "Tô de olho em tudo por aqui.", "Precisa de resumo de reunião? Eu gravo.",
+        };
 #endif
         time_t t = time(nullptr);
         struct tm agora;
@@ -217,14 +252,23 @@ private:
             int h = agora.tm_hour;
             const auto& periodo = (h >= 5 && h < 12) ? manha : (h >= 12 && h < 18) ? tarde : (h >= 18) ? noite : madrugada;
             frases.insert(frases.end(), periodo.begin(), periodo.end());
+            if (saudacao) {
+                frases = periodo;  // ao entrar na espera: saudação do período
+            }
+        }
+        if (!saudacao) {
+            frases.insert(frases.end(), soltas.begin(), soltas.end());
         }
         int i = esp_random() % frases.size();
-        if (i == ultima_frase_) {
+        if (frases[i] == ultima_frase_) {
             i = (i + 1) % frases.size();
         }
-        ultima_frase_ = i;
+        ultima_frase_ = frases[i];
         std::string f = frases[i];
         auto pos = f.find("{}");
+        if (pos == std::string::npos) {
+            return f;  // frase sem vocativo
+        }
         if (nome.empty()) {  // sem nome: tira o vocativo (", {}" ou "{}, "; em chinês "，{}" ou "{}，")
             const std::string virgulas[] = {", ", "，"};
             size_t ini = pos, fim = pos + 2;
