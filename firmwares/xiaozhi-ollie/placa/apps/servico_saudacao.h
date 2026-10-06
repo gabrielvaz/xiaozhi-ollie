@@ -26,6 +26,9 @@ public:
     void Fundo(ContextoApps& c) override {
         int agora = ContextoApps::Agora();
         SincronizarPerfil(agora);
+        if (ContextoApps::tela_apagada) {
+            return;  // tela apagada: não troca frase, pose nem o "Codando…" (economia de bateria)
+        }
         if (ContextoApps::App().GetDeviceState() != kDeviceStateIdle) {
             ocioso_desde_ = -1;
             return;

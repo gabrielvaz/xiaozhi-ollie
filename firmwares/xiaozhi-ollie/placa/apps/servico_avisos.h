@@ -17,7 +17,11 @@ public:
 
     void Fundo(ContextoApps& c) override {
         int agora = ContextoApps::Agora();
-        if (agora - ultima_ < 20 || (c.gaveta_aberta && c.gaveta_aberta()) ||
+        // Tela acesa: a cada 20 s (avisos e sessões trabalhando em dia); apagada: a cada 5 min (bateria).
+        // Economia de energia: 1 min com a tela acesa e 10 min apagada
+        bool economia = ConfigWatcher::Int("economia", 0);
+        int intervalo = ContextoApps::tela_apagada ? (economia ? 600 : 300) : (economia ? 60 : 20);
+        if (agora - ultima_ < intervalo || (c.gaveta_aberta && c.gaveta_aberta()) ||
             ContextoApps::App().GetDeviceState() != kDeviceStateIdle || !RedeWatcher::Online()) {
             return;
         }

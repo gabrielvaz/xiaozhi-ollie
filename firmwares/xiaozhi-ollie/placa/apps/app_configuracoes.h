@@ -145,6 +145,26 @@ public:
                 ContextoApps::App().DefinirVoz(ligada);
                 break;
             }
+            case kEconomia: {  // brilho 30%, sem "Hey Ollie", pulso e avisos mais espaçados
+                bool ligar = !ConfigWatcher::Int("economia", 0);
+                ConfigWatcher::SetInt("economia", ligar ? 1 : 0);
+                auto luz = Board::GetInstance().GetBacklight();
+                if (ligar) {
+                    ConfigWatcher::SetInt("brilho_antes", luz->brightness());
+                    if (luz->brightness() > kBrilhoEconomia) {
+                        luz->SetBrightness(kBrilhoEconomia, true);
+                    }
+                } else {
+                    luz->SetBrightness(ConfigWatcher::Int("brilho_antes", luz->brightness()), true);
+                }
+                ContextoApps::App().AplicarAtivacao();
+                break;
+            }
+            case kAtivacao: {  // microfone sempre ouvindo a palavra de ativação (desligado: só pela roda)
+                ConfigWatcher::SetInt("ativacao", ConfigWatcher::Int("ativacao", 1) ? 0 : 1);
+                ContextoApps::App().AplicarAtivacao();
+                break;
+            }
             case kAvisos:
                 ConfigWatcher::SetInt("avisos", ConfigWatcher::Int("avisos", 1) ? 0 : 1);
                 break;
@@ -166,7 +186,8 @@ public:
     }
 
 private:
-    enum { kAgente, kVoz, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kAtualizar, kSobre };
+    static constexpr int kBrilhoEconomia = 30;  // % ao ligar a economia de energia
+    enum { kAgente, kVoz, kEconomia, kAtivacao, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kAtualizar, kSobre };
     // Atualização: Buscando (consulta no Fundo), Pronta (versão nova, botões), Resultado (já na mais nova ou erro)
     enum class EstadoOta { Nada, Buscando, Pronta, Resultado };
     std::atomic<EstadoOta> ota_{EstadoOta::Nada};
@@ -203,6 +224,16 @@ private:
              {TR("Respostas faladas", "Spoken replies", "语音回复", "Respuestas habladas"),
               ConfigWatcher::Int("voz", 1) ? TR("Ligadas", "On", "开启", "Activadas")
                                            : TR("Só texto na tela", "Text only", "仅屏幕文字", "Solo texto")},
+             {TR("Economia de energia", "Battery saver", "省电模式", "Ahorro de energía"),
+              ConfigWatcher::Int("economia", 0) ? TR("Ligada: brilho 30%, sem \"Hey\", avisos a cada 1 min",
+                                                     "On: 30% brightness, no \"Hey\", notices every 1 min",
+                                                     "开启：亮度 30%，无唤醒词，每 1 分钟通知",
+                                                     "Activado: brillo 30%, sin \"Hey\", avisos cada 1 min")
+                                                : TR("Desligada", "Off", "关闭", "Desactivado")},
+             {TR("Ouvir \"Hey ", "Listen for \"Hey ", "聆听 \"Hey ", "Escuchar \"Hey ") + AgenteWatcher::Nome() + "\"",
+              ConfigWatcher::Int("economia", 0) ? TR("Desligado pela economia de energia", "Off (battery saver)", "关闭（省电模式）", "Desactivado (ahorro de energía)")
+              : ConfigWatcher::Int("ativacao", 1) ? TR("Ligado (gasta mais bateria)", "On (uses more battery)", "开启（更耗电）", "Activado (gasta más batería)")
+                                                  : TR("Desligado: só pela roda", "Off: wheel only", "关闭：仅用滚轮", "Desactivado: solo la rueda")},
              {TR("Tema", "Theme", "主题", "Tema"), ConfigWatcher::Texto("tema", "dark") == "dark" ? TR("Escuro", "Dark", "深色", "Oscuro") : TR("Claro", "Light", "浅色", "Claro")},
              {TR("Fonte", "Font", "字体", "Fuente"), Fontes::Nome()},
              {TR("Tela apaga após", "Screen off after", "熄屏时间", "Apagar pantalla"), Tempo(ConfigWatcher::Int("tela_s", 60))},

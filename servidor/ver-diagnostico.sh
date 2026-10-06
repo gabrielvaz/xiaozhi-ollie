@@ -21,7 +21,9 @@ for linha in open(sys.argv[1], encoding="utf-8"):
     if e["tipo"] == "pulso":
         pulsos += 1
         if pulsos % 30 == 1:  # uma amostra a cada ~30 min
-            print(f"{e['quando']}  pulso  ligado {e['ligado_s'] // 60} min  heap {e['heap_k']}k (mín {e['heap_min_k']}k, "
+            bat = f"  bateria {e['bateria']}%{' carregando' if e.get('carregando') else ''}" if e.get("bateria", -1) >= 0 else ""
+            tela = "  tela apagada" if e.get("tela_apagada") else ""
+            print(f"{e['quando']}  pulso  ligado {e['ligado_s'] // 60} min{bat}{tela}  heap {e['heap_k']}k (mín {e['heap_min_k']}k, "
                   f"maior bloco {e['maior_bloco_k']}k)  psram {e['psram_k']}k  estado {e['estado']}")
     elif e["tipo"] == "buraco":
         buracos += 1

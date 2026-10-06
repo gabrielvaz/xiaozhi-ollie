@@ -58,16 +58,23 @@ public:
         // Em conversa (conectando, ouvindo, falando) o pulso abriria uma 2ª conexão HTTPS junto com a da voz,
         // com ~40 KB de RAM interna livre: atrasava a resposta e é suspeita de travar o aparelho falando.
         // Fora da espera, só um pulso a cada 150 s (o servidor acusa "sem pulso" depois de 3 min)
-        int intervalo = estado == kDeviceStateIdle ? 30 : 150;
+        // Economia de energia: também 150 s na espera
+        int intervalo = estado == kDeviceStateIdle && !ConfigWatcher::Int("economia", 0) ? 30 : 150;
         if (agora - ultimo_pulso_ < intervalo) {
             return;
         }
         ultimo_pulso_ = agora;
-        char corpo[320];
+        int bateria = -1;
+        bool carregando = false, descarregando = false;
+        if (!Board::GetInstance().GetBatteryLevel(bateria, carregando, descarregando)) {
+            bateria = -1;
+        }
+        char corpo[384];
         snprintf(corpo, sizeof(corpo),
-                 "{\"tipo\":\"pulso\",\"ligado_s\":%d,\"estado\":%d,\"heap_k\":%u,\"heap_min_k\":%u,"
-                 "\"psram_k\":%u,\"maior_bloco_k\":%u}",
-                 agora, (int)estado, (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+                 "{\"tipo\":\"pulso\",\"ligado_s\":%d,\"estado\":%d,\"bateria\":%d,\"carregando\":%s,"
+                 "\"tela_apagada\":%s,\"heap_k\":%u,\"heap_min_k\":%u,\"psram_k\":%u,\"maior_bloco_k\":%u}",
+                 agora, (int)estado, bateria, carregando ? "true" : "false",
+                 ContextoApps::tela_apagada ? "true" : "false", (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
                  (unsigned)(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024),
                  (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
                  (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024));

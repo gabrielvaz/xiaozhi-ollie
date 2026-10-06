@@ -71,6 +71,13 @@ public:
         obj_ = rotulo_ = nullptr;
     }
 
+    // Tela apagada: para de animar (economia de bateria)
+    void Pausar(bool pausar) {
+        if (timer_ != nullptr) {
+            pausar ? lv_timer_pause(timer_) : lv_timer_resume(timer_);
+        }
+    }
+
     lv_obj_t* Objeto() const { return obj_; }
     void IrParaQuadro(int passo) { passo_ = passo; }  // simulador: fotografa um quadro
 

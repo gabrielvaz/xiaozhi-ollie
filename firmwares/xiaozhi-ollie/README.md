@@ -17,6 +17,7 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 | Fonte | Noto Sans | **Noto Sans ou JetBrains Mono** (estilo terminal), escolhida em Configurações |
 | Ao ligar | Logo XiaoZhi | **Logo do Ollie** e depois uma **saudação com o seu nome** ("Bom dia, Ana! Café já tomado?"); em espera, uma **frase aleatória nova a cada 3 min** abaixo do Clawd |
 | Tela inicial | Hora | **Dia da semana, data e hora** ("Seg, 05/10 · 16:20") |
+| Tela apagada | Só apaga a luz | **Economiza bateria**: animações pausadas, processador com frequência automática (40 a 240 MHz), avisos a cada 5 min |
 | Tema | Claro | **Escuro** por padrão (ajustável) |
 | Roda | Volume e conversa | Volume (com **anel branco na borda** do tamanho do volume e o Clawd animado), conversa e **gaveta de apps em mosaico** (2 cliques abrem; 2 cliques voltam; 3 cliques fecham) |
 | Sem Wi-Fi | Alerta com engrenagem e a dica numa frase | **Tela própria**: Clawd confuso com o Wi-Fi riscado, a rede **Ollie-XXXX** e o endereço do portal; o portal diz **por que** a rede não conectou (só 2,4 GHz, senha recusada, Wi-Fi corporativo, nome com maiúsculas diferentes) |
@@ -50,7 +51,7 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 | **Mostrar QR code** | Wi-Fi atual e a lista de `iCloud Drive/Watcher/QR.md` |
 | **Memória offline** | Sessões, últimas reuniões e lembretes, com texto e áudio, guardados no microSD para usar sem internet |
 | **Backup** | Conversas e reuniões do microSD para `iCloud Drive/Watcher/Do cartão` (spinner e confirmação) |
-| **Configurações** | Nome do agente (reinicia para trocar a ativação), tema, fonte (Noto Sans ou JetBrains Mono), tela apaga após, brilho, volume, desligar na bateria, avisos na tela, Sobre |
+| **Configurações** | Nome do agente (reinicia para trocar a ativação), **economia de energia** (brilho 30%, sem "Hey Ollie", pulso a cada 150 s, avisos a cada 1 min com a tela acesa e 10 min apagada), ouvir "Hey Ollie" (desligado, o microfone não fica ouvindo; conversa pela roda), tema, fonte (Noto Sans ou JetBrains Mono), tela apaga após, brilho, volume, desligar na bateria, avisos na tela, Sobre |
 
 Para criar um app: veja [`placa/README.md`](placa/README.md). Cada app é um arquivo em `placa/apps/` mais uma linha em `placa/registro_apps.h`.
 

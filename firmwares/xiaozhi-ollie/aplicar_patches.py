@@ -975,7 +975,7 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.5.9"
+OLLIE_VERSAO_APP = "2.6.0"
 OLLIE_POSE_ASSETS = "xingando"
 OLLIE_ARQUIVO_ASSETS = "ollie-assets_3.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
@@ -1079,6 +1079,114 @@ trocar(placa, """            lv_obj_set_size(top_bar_, LV_HOR_RES, text_font->li
             lv_obj_set_style_pad_top(top_bar_, 10 + 14, 0);""")
 trocar(placa, """            lv_obj_set_y(status_bar_, text_font->line_height);""",
        """            lv_obj_set_y(status_bar_, text_font->line_height + 14);  // Ollie: acompanha os ícones""")
+
+# 28. Bateria ------------------------------------------------------------------------------------------
+#     Configurações > Ouvir "Hey Ollie": desligado, o microfone não fica ouvindo na espera (o AudioService
+#     desliga a entrada quando nem a ativação nem a conversa precisam dela); conversa pela roda.
+trocar(app_h, "    void MostrarEmocaoResposta(const std::string& emocao);",
+       """    void MostrarEmocaoResposta(const std::string& emocao);
+    bool AtivacaoLigada() const;  // Configurações > Ouvir "Hey Ollie" (e desligada no modo economia)
+    void AplicarAtivacao();       // aplica na hora (na espera)""")
+trocar(app_cc, "void Application::ToggleChatState() {", """bool Application::AtivacaoLigada() const {
+    Settings ajustes("watcher", false);
+    return ajustes.GetInt("ativacao", 1) != 0 && ajustes.GetInt("economia", 0) == 0;
+}
+
+void Application::AplicarAtivacao() {
+    Schedule([this]() {
+        if (GetDeviceState() == kDeviceStateIdle && !gravacao_local_) {
+            audio_service_.EnableWakeWordDetection(AtivacaoLigada());
+        }
+    });
+}
+
+void Application::ToggleChatState() {""")
+trocar(app_cc, """            audio_service_.EnableWakeWordDetection(!gravacao_local_);""",
+       """            audio_service_.EnableWakeWordDetection(!gravacao_local_ && AtivacaoLigada());""")
+trocar(app_cc, """            audio_service_.EnableWakeWordDetection(!ligada);""",
+       """            audio_service_.EnableWakeWordDetection(!ligada && AtivacaoLigada());""")
+#     Tela apagada: processador com frequência automática (40 a 240 MHz). O original, com isso, também
+#     desligava a ativação e o microfone e ligava o sono leve; aqui a ativação segue a configuração acima e
+#     não há sono leve (a roda e o botão passam pelo expansor de I/O e poderiam demorar a responder).
+cfg_pm = XZ / "main/boards/sensecap-watcher/config.json"
+placa_pm = json.loads(cfg_pm.read_text(encoding="utf-8"))
+extra_pm = placa_pm["builds"][0]["sdkconfig_append"]
+if "CONFIG_PM_ENABLE=y" not in extra_pm:
+    extra_pm.append("CONFIG_PM_ENABLE=y")
+    cfg_pm.write_text(json.dumps(placa_pm, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
+trocar(placa, "power_save_timer_ = new PowerSaveTimer(-1, ajustes.GetInt(",
+       "power_save_timer_ = new PowerSaveTimer(240, ajustes.GetInt(")  # 240 MHz: liga a frequência automática
+pst = XZ / "main/boards/common/power_save_timer.cc"
+trocar(pst, """            if (cpu_max_freq_ != -1) {
+                // Disable wake word detection
+                auto& audio_service = app.GetAudioService();
+                is_wake_word_running_ = audio_service.IsWakeWordRunning();
+                if (is_wake_word_running_) {
+                    audio_service.EnableWakeWordDetection(false);
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                }
+                // Disable audio input
+                auto codec = Board::GetInstance().GetAudioCodec();
+                if (codec) {
+                    codec->EnableInput(false);
+                }
+
+                esp_pm_config_t pm_config = {
+                    .max_freq_mhz = cpu_max_freq_,
+                    .min_freq_mhz = 40,
+                    .light_sleep_enable = true,
+                };""", """            if (cpu_max_freq_ != -1) {
+                // Ollie: só a frequência automática; a ativação segue Configurações > Ouvir "Hey Ollie"
+                esp_pm_config_t pm_config = {
+                    .max_freq_mhz = cpu_max_freq_,
+                    .min_freq_mhz = 40,
+                    .light_sleep_enable = false,
+                };""")
+trocar(pst, """            esp_pm_configure(&pm_config);
+
+            // Enable wake word detection
+            auto& app = Application::GetInstance();
+            auto& audio_service = app.GetAudioService();
+            if (is_wake_word_running_) {
+                audio_service.EnableWakeWordDetection(true);
+            }
+        }""", """            esp_pm_configure(&pm_config);
+        }""")
+#     Tela apagada: avisa os serviços (avisos a cada 5 min, sem trocar frases) e para as animações
+trocar(placa, """            GetDisplay()->SetPowerSaveMode(true);
+            GetBacklight()->SetBrightness(0);  // tela apaga""", """            ContextoApps::tela_apagada = true;
+            GetDisplay()->SetPowerSaveMode(true);
+            GetBacklight()->SetBrightness(0);  // tela apaga""")
+trocar(placa, """            GetDisplay()->SetPowerSaveMode(false);
+            GetBacklight()->RestoreBrightness();""", """            ContextoApps::tela_apagada = false;
+            GetDisplay()->SetPowerSaveMode(false);
+            GetBacklight()->RestoreBrightness();""")
+trocar(placa, """            if (volume_sentido_ == 0) {
+                SpiLcdDisplay::SetEmotion(emotion);
+            }""", """            if (volume_sentido_ == 0) {
+                SpiLcdDisplay::SetEmotion(emotion);
+                if (tela_dormindo_ && gif_controller_) {
+                    gif_controller_->Stop();  // tela apagada: a pose troca, mas não anima
+                }
+            }""")
+trocar(placa, """        // Modo de configuração de Wi-Fi: tela própria (placa/tela_sem_wifi.h) no lugar do alerta do XiaoZhi""",
+       """        // Tela apagada: o Clawd e o asterisco param de animar (a tela não é redesenhada à toa)
+        bool tela_dormindo_ = false;
+
+        virtual void SetPowerSaveMode(bool on) override {
+            DisplayLockGuard lock(this);
+            tela_dormindo_ = on;
+            if (gif_controller_) {
+                if (on) {
+                    gif_controller_->Stop();
+                } else {
+                    gif_controller_->Start();
+                }
+            }
+            asterisco_.Pausar(on);
+        }
+
+        // Modo de configuração de Wi-Fi: tela própria (placa/tela_sem_wifi.h) no lugar do alerta do XiaoZhi""")
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))
