@@ -55,7 +55,11 @@ public:
                 DiagnosticoWatcher::RelatorioEnviado();
             }
         }
-        if (agora - ultimo_pulso_ < 30) {
+        // Em conversa (conectando, ouvindo, falando) o pulso abriria uma 2ª conexão HTTPS junto com a da voz,
+        // com ~40 KB de RAM interna livre: atrasava a resposta e é suspeita de travar o aparelho falando.
+        // Fora da espera, só um pulso a cada 150 s (o servidor acusa "sem pulso" depois de 3 min)
+        int intervalo = estado == kDeviceStateIdle ? 30 : 150;
+        if (agora - ultimo_pulso_ < intervalo) {
             return;
         }
         ultimo_pulso_ = agora;

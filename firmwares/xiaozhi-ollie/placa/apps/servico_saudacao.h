@@ -5,7 +5,9 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdio>
 #include <ctime>
+#include <string>
 #include <vector>
 
 #include <esp_random.h>
@@ -104,8 +106,20 @@ private:
         constexpr int kCozinhando = 8;  // posição de "Cozinhando" em kVerbos
         verbo_ = (verbo_ + 1 + (int)(esp_random() % (n - 1))) % n;  // nunca repete o anterior
         int outras = ContextoApps::atividade_n - 1;
-        std::string frase = std::string("* ") + kVerbos[verbo_] + "…\n" + ContextoApps::atividade_titulo +
+        // Nome da sessão numa linha (cabem 3 na tela de espera) e, embaixo, há quanto tempo ela está rodando
+        std::string titulo = ContextoApps::atividade_titulo;
+        if (titulo.size() > 18) {
+            size_t corte = 17;
+            while (corte > 0 && (static_cast<unsigned char>(titulo[corte]) & 0xC0) == 0x80) {
+                corte--;  // não corta um caractere acentuado ao meio
+            }
+            titulo = titulo.substr(0, corte) + "…";
+        }
+        std::string frase = std::string("* ") + kVerbos[verbo_] + "…\n" + titulo +
                             (outras > 0 ? " +" + std::to_string(outras) : "");
+        if (ContextoApps::atividade_inicio >= 0) {
+            frase += "\n" + Rodando(ContextoApps::Agora() - ContextoApps::atividade_inicio);
+        }
         ContextoApps::App().Schedule([frase]() {
             Board::GetInstance().GetDisplay()->SetChatMessage("saudacao", frase.c_str());
         });
@@ -118,6 +132,24 @@ private:
         }
     }
     std::string ultima_pose_;
+
+    // "rodando há 45 s", "rodando há 3 min 20 s", "rodando há 1 h 05 min"
+    static std::string Rodando(int s) {
+        s = std::max(0, s);
+        std::string un_s = TR(" s", " s", " 秒", " s"), un_min = TR(" min", " min", " 分钟", " min"),
+                    un_h = TR(" h", " h", " 小时", " h");
+        std::string tempo;
+        if (s < 60) {
+            tempo = std::to_string(s) + un_s;
+        } else if (s < 3600) {
+            tempo = std::to_string(s / 60) + un_min + (s < 600 ? " " + std::to_string(s % 60) + un_s : "");
+        } else {
+            char mm[4];
+            snprintf(mm, sizeof(mm), "%02d", s % 3600 / 60);
+            tempo = std::to_string(s / 3600) + un_h + " " + mm + un_min;
+        }
+        return TR("rodando há ", "running for ", "已运行 ", "en marcha hace ") + tempo;
+    }
 
     // Pose do Clawd para a espera: um conjunto comum mais poses do período, sem repetir a anterior
     std::string Pose() {

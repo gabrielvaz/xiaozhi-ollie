@@ -64,6 +64,11 @@ public:
             cJSON* titulos = cJSON_GetObjectItem(atividade, "titulos");
             cJSON* primeiro = cJSON_IsArray(titulos) ? cJSON_GetArrayItem(titulos, 0) : nullptr;
             ContextoApps::atividade_titulo = cJSON_IsString(primeiro) ? primeiro->valuestring : "";
+            // Há quantos segundos a 1ª sessão roda (o servidor lê o pedido no histórico do Claude Code)
+            cJSON* segundos = cJSON_GetObjectItem(atividade, "segundos");
+            cJSON* s0 = cJSON_IsArray(segundos) ? cJSON_GetArrayItem(segundos, 0) : nullptr;
+            ContextoApps::atividade_inicio =
+                cJSON_IsNumber(s0) && s0->valueint >= 0 ? ContextoApps::Agora() - s0->valueint : -1;
         }
         cJSON_Delete(raiz);
     }

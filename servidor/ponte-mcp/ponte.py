@@ -174,6 +174,36 @@ def _historico_claude(sessao_id: str, cwd: str) -> dict:
 
 
 
+def _inicio_turno_claude(sessao_id: str, cwd: str) -> float | None:
+    """Quando começou o turno atual (ou o último) de uma sessão do Claude Code: a última mensagem real do
+    usuário no histórico (sem resultados de ferramentas, subagentes nem mensagens de sistema). Epoch ou None."""
+    arq = _arquivo_claude(sessao_id, cwd)
+    if arq is None:
+        return None
+    try:
+        with open(arq, "rb") as f:
+            f.seek(max(0, arq.stat().st_size - 3_000_000))  # turnos longos: o pedido pode estar bem atrás
+            linhas = f.read().decode("utf-8", errors="ignore").splitlines()
+    except OSError:
+        return None
+    from datetime import datetime as _dt
+    for linha in reversed(linhas):
+        try:
+            d = json.loads(linha)
+        except json.JSONDecodeError:
+            continue
+        if d.get("type") != "user" or d.get("isSidechain") or d.get("isMeta") or not d.get("timestamp"):
+            continue
+        conteudo = (d.get("message") or {}).get("content")
+        if isinstance(conteudo, list) and all(x.get("type") == "tool_result" for x in conteudo):
+            continue
+        try:
+            return _dt.fromisoformat(d["timestamp"].replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return None
+    return None
+
+
 def _arquivo_claude(sessao_id: str, cwd: str) -> Path | None:
     if not sessao_id:
         return None

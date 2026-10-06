@@ -518,7 +518,7 @@ int main() {
     SalvarPng("04-espera-saudacao-longa");
 
     t.SetEmotion("codando");
-    t.SetChatMessage("saudacao", "* Codando…\nxiaozhi-ollie +2");
+    t.SetChatMessage("saudacao", "* Codando…\nMascote não apare… +2\nrodando há 3 min 20 s");
     Avancar(200);
     SalvarPng("05-espera-trabalhando");
     // Quadros do asterisco do Claude Code (· ✢ ✳ ✶ ✻ ✽), só para ver: "-sucesso" o medir.py não mede
@@ -581,7 +581,7 @@ int main() {
     // Atualização do sistema (MostrarAtualizando no firmware): spinner no lugar do Clawd, progresso abaixo
     {
         auto spinner = SpinnerWatcher(lv_obj_get_parent(t.emoji_box_), 100, 12, 0x2A2A2A);
-        lv_obj_align(spinner, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_align(spinner, LV_ALIGN_CENTER, 0, -10);  // como no firmware: 10 px acima do percentual
         lv_obj_add_flag(t.emoji_box_, LV_OBJ_FLAG_HIDDEN);
         t.SetChatMessage("system", "37% 120KB/s");
         Avancar(300);

@@ -23,7 +23,7 @@ MAX_AVISOS = 50
 MAX_HISTORICO = 200
 HISTORICO = Path(__file__).resolve().parents[2] / "data/avisos_historico.json"
 _avisos: list[dict] = []
-_atividade: dict = {"trabalhando": 0, "titulos": []}
+_atividade: dict = {"trabalhando": 0, "titulos": [], "inicios": []}  # inicios: epoch do turno de cada título
 _sessoes = {"quando": 0.0, "lista": []}  # lista compacta para o app Claude Code (vai junto com os avisos)
 
 
@@ -123,7 +123,11 @@ def avisos_desde(ultimo: int) -> dict:
     with _trava:
         # "atividade": sessões trabalhando agora (o Watcher mostra o Clawd trabalhando na tela de espera)
         # "sessoes": a lista do app Claude Code, para ele abrir sem esperar (o Watcher já consulta a cada 20 s)
-        extra = {"atividade": dict(_atividade), "sessoes": list(_sessoes["lista"])}
+        agora = time.time()
+        atividade = {"trabalhando": _atividade["trabalhando"], "titulos": list(_atividade["titulos"]),
+                     # há quantos segundos cada sessão está rodando (o Watcher conta a partir daí); -1 = não se sabe
+                     "segundos": [int(agora - i) if i else -1 for i in _atividade["inicios"]]}
+        extra = {"atividade": atividade, "sessoes": list(_sessoes["lista"])}
         if ultimo < 0:  # primeira consulta do aparelho: só sincroniza, sem repetir avisos antigos
             return {"ultimo": _seq, "avisos": [], **extra}
         return {"ultimo": _seq, "avisos": [a for a in _avisos if a["id"] > ultimo], **extra}
@@ -152,6 +156,16 @@ def _frase_curta(titulo: str, fala: str) -> str:
         return reserva
 
 
+def duracao(segundos: float) -> str:
+    """"45 s", "12 min", "1 h 05 min" (no idioma do .env)."""
+    s, un_min, un_h = int(segundos), t("min", "min", "分钟", "min"), t("h", "h", "小时", "h")
+    if s < 60:
+        return f"{s} " + t("s", "s", "秒", "s")
+    if s < 3600:
+        return f"{s // 60} {un_min}"
+    return f"{s // 3600} {un_h} {s % 3600 // 60:02d} {un_min}"
+
+
 def _titulo_curto(a: dict) -> str:
     return a.get("titulo") or a.get("workspace") or a.get("pasta") or t("Sessão", "Session", "会话", "Sesión")
 
@@ -159,15 +173,25 @@ def _titulo_curto(a: dict) -> str:
 def _loop(ponte) -> None:
     estados: dict[str, str] = {}
     conclusoes: dict[str, int] = {}
+    inicios: dict[str, float] = {}  # sessão -> começo do turno em andamento (histórico do Claude; senão, 1ª vez vista)
+    ultimo_inicio: dict[str, float] = {}  # sessão que acabou de parar -> começo do turno (para o aviso)
     primeira = True
     while True:
         try:
             agentes = ponte._agentes()
-            ativos = [_titulo_curto(a) for a in agentes
-                      if a.get("situacao") in ("trabalhando", "subagentes rodando") or a.get("status") == "working"]
+            rodando = [a for a in agentes
+                       if a.get("situacao") in ("trabalhando", "subagentes rodando") or a.get("status") == "working"]
+            for a in rodando:
+                if a["sessao"] not in inicios:
+                    inicios[a["sessao"]] = (ponte._inicio_turno_claude(a.get("_sessao_id", ""), a.get("_cwd", ""))
+                                            if a.get("_sessao_id") else None) or time.time()
+            for chave in [c for c in inicios if c not in {a["sessao"] for a in rodando}]:
+                ultimo_inicio[chave] = inicios.pop(chave)  # parou: guarda para o aviso de concluída
+            ativos = [_titulo_curto(a) for a in rodando]
             compactas = sessoes_compactas(agentes)
             with _trava:
-                _atividade.update(trabalhando=len(ativos), titulos=ativos[:3])
+                _atividade.update(trabalhando=len(ativos), titulos=ativos[:3],
+                                  inicios=[inicios.get(a["sessao"]) for a in rodando[:3]])
                 _sessoes.update(quando=time.time(), lista=compactas)
             for a in agentes:
                 chave, estado, feitas = a["sessao"], a["status"], a.get("_conclusoes", 0)
@@ -182,8 +206,15 @@ def _loop(ponte) -> None:
                         time.sleep(3)  # dá tempo de o histórico registrar a fala final
                         info = ponte._historico_claude(a.get("_sessao_id", ""), a.get("_cwd", "")) if a.get("_sessao_id") else {}
                         fala = info.get("ultima_fala") or a.get("ultima_fala", "")
-                        adicionar_aviso("concluiu", t("Tarefa concluída", "Task done", "任务完成", "Tarea completada"), _frase_curta(_titulo_curto(a), fala), "celebrating",
+                        # quanto tempo rodou: do pedido no histórico do Claude (ou de quando o vigia viu começar)
+                        inicio = (ponte._inicio_turno_claude(a.get("_sessao_id", ""), a.get("_cwd", ""))
+                                  if a.get("_sessao_id") else None) or ultimo_inicio.get(chave)
+                        rodou = time.time() - inicio if inicio else 0
+                        titulo = (t("Concluída em ", "Done in ", "完成，用时 ", "Completada en ") + duracao(rodou)
+                                  if 0 < rodou < 7 * 86400 else t("Tarefa concluída", "Task done", "任务完成", "Tarea completada"))
+                        adicionar_aviso("concluiu", titulo, _frase_curta(_titulo_curto(a), fala), "celebrating",
                                         sessao=a.get("sessao", ""), nome_sessao=_titulo_curto(a))
+                        ultimo_inicio.pop(chave, None)
                 estados[chave], conclusoes[chave] = estado, feitas
             primeira = False
         except Exception:

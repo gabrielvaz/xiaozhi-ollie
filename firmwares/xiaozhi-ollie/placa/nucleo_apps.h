@@ -168,6 +168,7 @@ struct ContextoApps {
     // Sessões do Claude Code trabalhando agora (vem junto com os avisos; a tela de espera mostra o Clawd trabalhando)
     inline static std::atomic<int> atividade_n{0};
     inline static std::string atividade_titulo;  // escrito e lido só pela tarefa da gaveta
+    inline static int atividade_inicio = -1;     // Agora() em que a 1ª sessão começou o turno (-1: não se sabe)
     // Lista do app Claude Code que veio junto com a última consulta de avisos (abre sem esperar a rede)
     inline static std::string sessoes_json;
     inline static int sessoes_quando = -100000;  // Agora() do último aviso (a saudação não o cobre)

@@ -972,7 +972,7 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.5.7"
+OLLIE_VERSAO_APP = "2.5.8"
 OLLIE_POSE_ASSETS = "xingando"
 OLLIE_ARQUIVO_ASSETS = "ollie-assets_3.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
@@ -1029,8 +1029,8 @@ trocar(placa, """#include "tela_sem_wifi.h"     // modo de configuração de Wi-
 trocar(placa, """#include "spinner_watcher.h"   // spinner da tela de atualização\n""",
        """#include "spinner_watcher.h"   // spinner da tela de atualização\n#include "asterisco_claude.h"  // asterisco animado do Claude Code\n""")
 trocar(placa, """        // Modo de configuração de Wi-Fi: tela própria (placa/tela_sem_wifi.h) no lugar do alerta do XiaoZhi""",
-       """        // Atualização do sistema: spinner no lugar do Clawd, no centro da tela; com 100 px ele termina onde
-        // começa a caixa do progresso (layout de conversa, placa/layout_mascote.h)
+       """        // Atualização do sistema: spinner no lugar do Clawd, no centro da tela e 10 px acima da caixa do
+        // progresso (com 100 px, centrado, ele terminaria onde a caixa começa: placa/layout_mascote.h)
         lv_obj_t* spinner_atualizacao_ = nullptr;
 
         virtual void MostrarAtualizando(bool ativo) override {
@@ -1040,7 +1040,7 @@ trocar(placa, """        // Modo de configuração de Wi-Fi: tela própria (plac
             }
             if (ativo) {
                 spinner_atualizacao_ = SpinnerWatcher(lv_obj_get_parent(emoji_box_), 100, 12, 0x2A2A2A);
-                lv_obj_align(spinner_atualizacao_, LV_ALIGN_CENTER, 0, 0);
+                lv_obj_align(spinner_atualizacao_, LV_ALIGN_CENTER, 0, -10);  // 10 px acima do percentual
                 lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
             } else {
                 lv_obj_delete(spinner_atualizacao_);
