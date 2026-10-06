@@ -226,7 +226,10 @@ def espelhar() -> int:
             for tentativa in range(10):  # o iCloud devolve EDEADLK enquanto sincroniza: tenta de novo
                 try:
                     destino.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(origem, destino)
+                    # grava ao lado e troca: o iCloud bloqueia sobrescrever um arquivo que está sincronizando
+                    temporario = destino.with_name(f".{destino.name}.{os.getpid()}.tmp")
+                    shutil.copyfile(origem, temporario)
+                    os.replace(temporario, destino)
                     copiados += 1
                     break
                 except OSError as e:
