@@ -780,8 +780,7 @@ private:
             lv_obj_remove_flag(celula, LV_OBJ_FLAG_CLICKABLE);
             // Ícone (filho 0 da célula) ampliado ~1,4x a partir do centro
             if (item.icone != nullptr && strcmp(item.icone, kIconeSol) == 0) {
-                // Sol desenhado em vetor (a fonte de ícones não tem sol)
-                IconeTempo(celula, "sol", false, 50, 0, (kCelula - 50) / 2);
+                SolContorno(celula);  // a fonte de ícones não tem sol: desenhado no mesmo estilo (contorno)
                 celulas_.push_back(celula);
                 continue;
             }
@@ -803,6 +802,32 @@ private:
         AtualizarGrade(false);
     }
 
+    // Sol em contorno (círculo vazado + 8 raios), do tamanho e traço dos ícones Material ampliados na grade
+    void SolContorno(lv_obj_t* celula) {
+        auto sol = lv_obj_create(celula);
+        lv_obj_remove_style_all(sol);
+        lv_obj_set_size(sol, 44, 44);
+        lv_obj_add_flag(sol, LV_OBJ_FLAG_USER_1);
+        lv_obj_center(sol);
+        auto disco = lv_obj_create(sol);
+        lv_obj_remove_style_all(disco);
+        lv_obj_set_size(disco, 20, 20);
+        lv_obj_set_style_radius(disco, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_border_width(disco, 4, 0);
+        lv_obj_set_style_border_color(disco, lv_color_hex(0xD97757), 0);
+        lv_obj_center(disco);
+        static const lv_point_precise_t kRaios[8][2] = {
+            {{22, 1}, {22, 7}},   {{22, 37}, {22, 43}}, {{1, 22}, {7, 22}},   {{37, 22}, {43, 22}},
+            {{7, 7}, {11, 11}},   {{33, 33}, {37, 37}}, {{37, 7}, {33, 11}},  {{7, 37}, {11, 33}}};
+        for (const auto& raio : kRaios) {
+            auto l = lv_line_create(sol);
+            lv_line_set_points(l, raio, 2);
+            lv_obj_set_style_line_width(l, 4, 0);
+            lv_obj_set_style_line_rounded(l, true, 0);
+            lv_obj_set_style_line_color(l, lv_color_hex(0xD97757), 0);
+        }
+    }
+
     void AtualizarGrade(bool animar) {
         if (grade_ == nullptr || celulas_.empty()) {
             return;
@@ -813,8 +838,15 @@ private:
             lv_obj_set_style_bg_color(celula, lv_color_hex(atual ? 0xD97757 : 0x1C1C1C), 0);
             lv_obj_set_style_bg_opa(celula, atual ? LV_OPA_COVER : LV_OPA_70, 0);
             auto ic = lv_obj_get_child(celula, 0);
-            if (ic != nullptr) {
-                lv_obj_set_style_text_color(ic, lv_color_hex(atual ? 0x000000 : 0xD97757), 0);
+            uint32_t cor = atual ? 0x000000 : 0xD97757;
+            if (ic != nullptr && lv_obj_has_flag(ic, LV_OBJ_FLAG_USER_1)) {  // sol de contorno: pinta as partes
+                for (uint32_t k = 0; k < lv_obj_get_child_count(ic); k++) {
+                    auto parte = lv_obj_get_child(ic, k);
+                    lv_obj_set_style_border_color(parte, lv_color_hex(cor), 0);
+                    lv_obj_set_style_line_color(parte, lv_color_hex(cor), 0);
+                }
+            } else if (ic != nullptr) {
+                lv_obj_set_style_text_color(ic, lv_color_hex(cor), 0);
             }
         }
         if (nome_grade_ != nullptr && selecionado_ >= 0 && selecionado_ < (int)itens_.size()) {

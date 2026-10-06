@@ -28,7 +28,8 @@ _trava = threading.Lock()
 _iniciado = False
 
 
-def adicionar_aviso(tipo: str, titulo: str, texto: str, emocao: str = "neutral", sessao: str = "") -> None:
+def adicionar_aviso(tipo: str, titulo: str, texto: str, emocao: str = "neutral", sessao: str = "",
+                    nome_sessao: str = "") -> None:
     """sessao = id do painel no herdr (o mesmo de /watcher/sessoes); com tipo "esperando" o Watcher abre a sessão."""
     global _seq
     with _trava:
@@ -37,6 +38,8 @@ def adicionar_aviso(tipo: str, titulo: str, texto: str, emocao: str = "neutral",
                  "quando": int(time.time())}
         if sessao:
             aviso["sessao"] = sessao
+        if nome_sessao:  # o app Avisos usa como título (vários "Tarefa concluída" ficavam iguais)
+            aviso["nome_sessao"] = nome_sessao[:50]
         _avisos.append(aviso)
         del _avisos[:-MAX_AVISOS]
         _guardar_historico(aviso)
@@ -133,13 +136,14 @@ def _loop(ponte) -> None:
                         adicionar_aviso("esperando", t("Esperando você", "Waiting for you", "等待你回复", "Esperándote"),
                                         f"{_titulo_curto(a)[:50]} " + t("precisa da sua resposta", "needs your answer",
                                                                         "需要你的回复", "necesita tu respuesta"), "warning",
-                                        sessao=chave)
+                                        sessao=chave, nome_sessao=_titulo_curto(a))
                     # herdr soma completion_seq a cada tarefa terminada (pega até as que duram menos que o intervalo)
                     elif feitas > conclusoes.get(chave, feitas) and estado in ("idle", "done"):
                         time.sleep(3)  # dá tempo de o histórico registrar a fala final
                         info = ponte._historico_claude(a.get("_sessao_id", ""), a.get("_cwd", "")) if a.get("_sessao_id") else {}
                         fala = info.get("ultima_fala") or a.get("ultima_fala", "")
-                        adicionar_aviso("concluiu", t("Tarefa concluída", "Task done", "任务完成", "Tarea completada"), _frase_curta(_titulo_curto(a), fala), "happy")
+                        adicionar_aviso("concluiu", t("Tarefa concluída", "Task done", "任务完成", "Tarea completada"), _frase_curta(_titulo_curto(a), fala), "happy",
+                                        sessao=a.get("sessao", ""), nome_sessao=_titulo_curto(a))
                 estados[chave], conclusoes[chave] = estado, feitas
             primeira = False
         except Exception:

@@ -1,4 +1,4 @@
-// App "Sessões": lista as sessões do Claude Code/Codex no herdr, mostra as últimas mensagens (roláveis),
+// App "Claude Code": lista as sessões do Claude Code/Codex no herdr, mostra as últimas mensagens (roláveis),
 // manda um pedido por voz e responde pela tela às perguntas da sessão (escolha única ou múltipla,
 // e pedidos de permissão), ou pede ao agente para ler as opções e responder por voz.
 // Aberto por um aviso de "sessão esperando você", mostra o aviso com o botão "Ir para a sessão".
@@ -13,7 +13,7 @@
 
 class AppSessoes : public AppWatcher {
 public:
-    const char* Nome() const override { return TR("Sessões", "Sessions", "会话", "Sesiones"); }
+    const char* Nome() const override { return "Claude Code"; }
     const char* Id() const override { return "sessoes"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_ROBOT_2; }
     std::string Detalhe() const override { return TR("Ver, ler e mandar pedidos", "View, read and send requests", "查看、阅读和发送请求", "Ver, leer y enviar peticiones"); }
@@ -21,7 +21,7 @@ public:
     void Abrir(ContextoApps& c) override {
         ir_para_.clear();
         tela_ = Tela::Carregando;
-        c.painel.MostrarStatus(TR("Sessões", "Sessions", "会话", "Sesiones"), PainelWatcher::Status::Carregando,
+        c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando,
                                TR("Carregando sessões…", "Loading sessions…", "正在加载会话…", "Cargando sesiones…"));
         pedido_ = Pedido::Lista;
     }
@@ -41,7 +41,7 @@ public:
         if (argumento.rfind("ir\n", 0) == 0) {  // "ir\n<id>": abre direto a sessão (ex.: do histórico de avisos)
             ir_para_ = argumento.substr(3);
             tela_ = Tela::Carregando;
-            c.painel.MostrarStatus(TR("Sessões", "Sessions", "会话", "Sesiones"), PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
+            c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
             pedido_ = Pedido::Lista;
             return;
         }
@@ -70,7 +70,7 @@ public:
             case Tela::Aviso:
                 if (i == 0) {  // Ir para a sessão: carrega a lista e abre a sessão do aviso
                     tela_ = Tela::Carregando;
-                    c.painel.MostrarStatus(TR("Sessões", "Sessions", "会话", "Sesiones"), PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
+                    c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando, TR("Abrindo a sessão…", "Opening session…", "正在打开会话…", "Abriendo la sesión…"));
                     pedido_ = Pedido::Lista;
                     return true;
                 }
@@ -88,10 +88,20 @@ public:
                                    "trabajando, cuáles esperan aprobación, cuáles tienen subagentes y qué ha terminado o está haciendo cada una."));
                     return true;
                 }
-                if (i <= 0 || i > (int)sessoes_.size() + 1) {  // item 0 = Voltar
+                if (i == 2) {  // sessão nova por voz
+                    c.Perguntar(TR("Quero começar uma sessão nova do Claude Code. Pergunte em qual projeto e o que devo pedir; "
+                                   "depois confirme e use claude_nova_sessao.",
+                                   "I want to start a new Claude Code session. Ask which project and what to request; "
+                                   "then confirm and use claude_nova_sessao.",
+                                   "我想新建一个 Claude Code 会话。问我用哪个项目、要做什么；确认后使用 claude_nova_sessao。",
+                                   "Quiero empezar una sesión nueva de Claude Code. Pregunta en qué proyecto y qué pedir; "
+                                   "luego confirma y usa claude_nova_sessao."));
+                    return true;
+                }
+                if (i <= 0 || i > (int)sessoes_.size() + 2) {  // item 0 = Voltar
                     return false;
                 }
-                AbrirSessao(c, i - 2);
+                AbrirSessao(c, i - 3);
                 return true;
             case Tela::Detalhe: {
                 // Botões: [Responder,] Enviar pedido, Voltar
@@ -241,7 +251,7 @@ private:
         std::string corpo;
         if (!RedeWatcher::Pedir("GET", "/watcher/sessoes", "", corpo)) {
             tela_ = Tela::Erro;
-            c.painel.MostrarStatus(TR("Sessões", "Sessions", "会话", "Sesiones"), PainelWatcher::Status::Erro, TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "现在无法连接 Mac。", "No he podido hablar con el Mac."),
+            c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Erro, TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "现在无法连接 Mac。", "No he podido hablar con el Mac."),
                                    {TR("Voltar", "Back", "返回", "Volver")});
             return;
         }
@@ -333,11 +343,15 @@ private:
                                                   {TR("Resumir todas", "Summarize all", "全部汇总", "Resumir todas"),
                                                    TR("O Ollie fala o estado de cada sessão", "Ollie reads each session's status",
                                                       "Ollie 播报每个会话的状态", "Ollie dice el estado de cada sesión"),
-                                                   MATERIAL_SYMBOLS_HEADPHONES}};
+                                                   MATERIAL_SYMBOLS_HEADPHONES},
+                                                  {TR("Nova sessão", "New session", "新会话", "Nueva sesión"),
+                                                   TR("Diga o projeto e o que pedir", "Say the project and the request",
+                                                      "说出项目和要做的事", "Di el proyecto y qué pedir"),
+                                                   MATERIAL_SYMBOLS_MIC}};
         for (const auto& s : sessoes_) {
             itens.push_back({s.titulo, RotuloSituacao(s.situacao) + (s.ha.empty() ? std::string() : TR(" · há ", " · ", " · ", " · hace ") + s.ha + TR("", " ago", "前", "")), IconeSituacao(s.situacao)});
         }
-        c.painel.MostrarLista(TR("Sessões", "Sessions", "会话", "Sesiones"), itens, selecionar + 2);
+        c.painel.MostrarLista("Claude Code", itens, selecionar + 3);
     }
 
     void MostrarDetalhe(ContextoApps& c) {

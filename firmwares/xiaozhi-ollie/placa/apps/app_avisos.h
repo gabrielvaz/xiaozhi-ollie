@@ -42,7 +42,7 @@ public:
             atual_ = i - 1;
             const auto& a = avisos_[atual_];
             tela_ = Tela::Item;
-            c.painel.MostrarTexto(a.titulo, a.detalhe + "\n\n" + a.texto,
+            c.painel.MostrarTexto(a.Nome(), a.Linha() + "\n\n" + a.texto,
                                   a.sessao.empty() ? std::vector<std::string>{TR("Voltar", "Back", "返回", "Volver")}
                                                    : std::vector<std::string>{TR("Ir para a sessão", "Go to session", "前往会话", "Ir a la sesión"),
                                                                             TR("Voltar", "Back", "返回", "Volver")});
@@ -77,7 +77,7 @@ public:
             cJSON_ArrayForEach(a, lista) {
                 avisos_.push_back({RedeWatcher::Campo(a, "titulo"), RedeWatcher::Campo(a, "texto"),
                                    RedeWatcher::Campo(a, "detalhe"), RedeWatcher::Campo(a, "tipo"),
-                                   RedeWatcher::Campo(a, "sessao")});
+                                   RedeWatcher::Campo(a, "sessao"), RedeWatcher::Campo(a, "nome_sessao")});
             }
             cJSON_Delete(raiz);
         }
@@ -87,7 +87,19 @@ public:
 private:
     enum class Tela { Carregando, Lista, Item };
     struct Aviso {
-        std::string titulo, texto, detalhe, tipo, sessao;
+        std::string titulo, texto, detalhe, tipo, sessao, nome_sessao;
+
+        // Título da lista: o nome da sessão (vários "Tarefa concluída" ficavam iguais). Avisos antigos sem o
+        // campo usam o nome que vem antes de ":" no texto.
+        std::string Nome() const {
+            if (!nome_sessao.empty()) {
+                return nome_sessao;
+            }
+            auto pos = texto.find(": ");
+            return (tipo == "concluiu" && pos != std::string::npos && pos < 40) ? texto.substr(0, pos) : titulo;
+        }
+        // Linha de baixo: quando e o tipo do aviso ("Hoje 19:30 · Tarefa concluída")
+        std::string Linha() const { return Nome() == titulo ? detalhe : detalhe + " · " + titulo; }
     };
     std::atomic<Tela> tela_{Tela::Carregando};
     std::atomic<bool> buscar_{false};
@@ -104,7 +116,7 @@ private:
         tela_ = Tela::Lista;
         std::vector<PainelWatcher::Item> itens = {{TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK}};
         for (const auto& a : avisos_) {
-            itens.push_back({a.titulo, a.detalhe + " · " + a.texto, IconeTipo(a.tipo)});
+            itens.push_back({a.Nome(), a.Linha(), IconeTipo(a.tipo)});
         }
         if (avisos_.empty()) {
             itens.push_back({TR("Nenhum aviso ainda", "No notices yet", "暂无通知", "Aún no hay avisos"), "", MATERIAL_SYMBOLS_NOTIFICATIONS});
