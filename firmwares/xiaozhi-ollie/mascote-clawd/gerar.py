@@ -382,12 +382,21 @@ def quadro(emocao, f):
         for i, peças in enumerate(partes):
             for x, y, w, h in peças:
                 t.px(x, y, AMARELO if i < acesas else CINZA_ESCURO, w, h)
-    elif emocao == "ouvindo":            # olhos grandes e ondas de som chegando pelos dois lados
-        olhos(t, "grande" if f % 6 != 5 else "fechado"); boca(t, "o" if f % 3 == 1 else "reta")
-        for k in range(3):
-            cor = AZUL if k == f % 3 else (CINZA_ESCURO if k == (f + 1) % 3 else AZUL_ESCURO)
-            t.px(1 - k, 7 - k, cor, 1, 2 + 2 * k)
-            t.px(18 + k, 7 - k, cor, 1, 2 + 2 * k)
+    elif emocao == "ouvindo":            # de fone de ouvido, olhos grandes e atentos
+        FONE, FONE_CLARO = (45, 45, 55), (95, 95, 110)
+        t.px(4, 2, FONE, 12, 1); t.px(5, 1, FONE_CLARO, 10, 1)        # arco sobre a cabeça
+        t.px(3, 2, FONE, 1, 2); t.px(16, 2, FONE, 1, 2)                # hastes
+        for x in (0, 17):                                              # conchas nas laterais
+            t.px(x, 3, FONE, 3, 6)
+            t.px(x + (0 if x == 0 else 2), 4, FONE_CLARO, 1, 4)        # acolchoado
+            t.px(x + 1, 5, AZUL if f % 3 != 2 else AZUL_ESCURO, 1, 2)  # luz pulsando
+        olhar = (0, 0, 1, 1, -1, -1)[f % 6]                           # olha de um lado para o outro
+        if f % 6 == 5:
+            olhos(t, "fechado")                                        # pisca de vez em quando
+        else:
+            for x in (5 + olhar, 12 + olhar):                          # olhos grandes com brilho
+                t.px(x, 5, OLHO, 3, 3); t.px(x + (1 if olhar >= 0 else 0), 5, BRANCO)
+        boca(t, "o" if f % 3 == 1 else "reta")
     elif emocao == "falando":            # boca abrindo e fechando no ritmo da voz
         olhos(t, "feliz" if f in (2, 3) else "normal")
         abertura = (0, 3, 1, 2, 0, 2)[f % 6]
