@@ -7,6 +7,7 @@
 class AppCronometro : public AppWatcher {
 public:
     const char* Nome() const override { return TR("Cronômetro", "Stopwatch", "秒表", "Cronómetro"); }
+    const char* Id() const override { return "cronometro"; }
     const char* Icone() const override { return PainelWatcher::kIconeAmpulheta; }  // desenhada
     std::string Detalhe() const override {
         return correndo_ ? TR("Correndo: ", "Running: ", "计时中：", "En marcha: ") + Formatar(Decorrido())

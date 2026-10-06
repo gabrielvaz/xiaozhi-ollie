@@ -57,4 +57,4 @@ E em `registro_apps.h`: `#include "apps/app_contador.h"` e `gaveta.Registrar(std
 
 ## Pedidos ao Mac
 
-`RedeWatcher::Pedir("GET", "/watcher/<rota>", "", corpo)` usa o mesmo token do canal de voz. As rotas ficam no servidor, em `servidor/extras/core/api/`, registradas no patch de rotas de `servidor/patches/traduzir_servidor.py`. Hoje existem: `avisos`, `sessoes`, `uso`, `memoria`, `memoria/audio/{nome}`, `upload`.
+`RedeWatcher::Pedir("GET", "/watcher/<rota>", "", corpo)` usa o mesmo token do canal de voz. As rotas ficam no servidor, em `servidor/extras/core/api/`, registradas no patch de rotas de `servidor/patches/traduzir_servidor.py`. Hoje existem, entre outras: `avisos`, `sessoes`, `uso`, `memoria`, `memoria/audio/{nome}`, `upload`, `codex`, `multica`.

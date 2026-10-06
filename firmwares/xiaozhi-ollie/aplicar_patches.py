@@ -343,6 +343,7 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
                 lv_obj_align(network_label_, LV_ALIGN_TOP_MID, -5 * l / 2, 0);
                 lv_obj_align(mute_label_, LV_ALIGN_TOP_MID, -l / 2, 0);
                 lv_obj_align(battery_label_, LV_ALIGN_TOP_MID, 3 * l / 2, 0);
+                lv_obj_set_style_text_font(network_label_, &font_material_symbols_16_4, 0);  // Wi-Fi menor
                 bateria_pct_ = lv_label_create(top_bar_);
                 lv_obj_set_style_text_font(bateria_pct_, Fontes::Pequena(), 0);
             }
@@ -636,6 +637,16 @@ trocar(app_cc, """        if (GetDeviceState() == kDeviceStateSpeaking) {
         }""", """        if (GetDeviceState() == kDeviceStateSpeaking && voz_ligada_) {  // modo só texto: não toca a resposta
             audio_service_.PushPacketToDecodeQueue(std::move(packet));
         }""")
+
+# 21. Câmera: expõe a última foto em JPEG (o app Câmera salva no microSD)
+trocar(XZ / "main/boards/sensecap-watcher/sscma_camera.h",
+       """    virtual void SetExplainUrl(const std::string& url, const std::string& token);""",
+       """    virtual void SetExplainUrl(const std::string& url, const std::string& token);
+    // Última foto em JPEG (preenchida por Capture); vazia se ainda não houve captura
+    std::string UltimaFotoJpeg() const {
+        return (jpeg_data_.buf != nullptr && jpeg_data_.len > 0) ? std::string((const char*)jpeg_data_.buf, jpeg_data_.len)
+                                                                  : std::string();
+    }""")
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))

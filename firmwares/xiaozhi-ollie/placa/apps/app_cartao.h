@@ -11,6 +11,7 @@
 class AppCartao : public AppWatcher {
 public:
     const char* Nome() const override { return TR("Backup", "Backup", "备份", "Copia de seguridad"); }
+    const char* Id() const override { return "backup"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_SD_CARD; }
     std::string Detalhe() const override { return TR("Conversas e reuniões do microSD", "Chats and meetings on microSD", "microSD 上的对话和会议", "Chats y reuniones de la microSD"); }
 

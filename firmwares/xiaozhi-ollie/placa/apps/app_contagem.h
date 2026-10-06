@@ -12,6 +12,7 @@
 class AppContagem : public AppWatcher {
 public:
     const char* Nome() const override { return TR("Timer", "Timer", "倒计时", "Temporizador"); }
+    const char* Id() const override { return "timer"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_ALARM; }
     std::string Detalhe() const override {
         return fim_s_ > 0 ? TR("Faltam ", "", "剩余 ", "Quedan ") + Formatar(fim_s_ - ContextoApps::Agora()) +

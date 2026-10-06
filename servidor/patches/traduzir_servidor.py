@@ -209,6 +209,40 @@ TROCAS: list[tuple[str, str, str]] = [
                 iniciar_vigia()
                 # 添加路由
                 app.add_routes("""),
+    # Rotas do app Multica: patch à parte, para entrar também em servidores já instalados
+    ("core/http_server.py", "from core.api.vision_handler import VisionHandler\n",
+     "from core.api.multica_handler import MulticaHandler\nfrom core.api.vision_handler import VisionHandler\n"),
+    ("core/http_server.py", """                avisos = AvisosHandler(self.config)
+""", """                multica = MulticaHandler(self.config)
+                app.add_routes([web.get("/watcher/multica", multica.handle_resumo),
+                                web.get("/watcher/multica/issues/{id}", multica.handle_issue),
+                                web.post("/watcher/multica/issues/{id}/status", multica.handle_status),
+                                web.post("/watcher/multica/daemon", multica.handle_daemon),
+                                web.post("/watcher/multica/autopilots/{id}/disparar", multica.handle_disparar)])
+                avisos = AvisosHandler(self.config)
+"""),
+    # Gravador: mandar a transcrição para uma sessão nova do Claude Code. Fica DEPOIS das rotas originais
+    # (fora do bloco grande do Watcher), para não quebrar a verificação de "já aplicado" daquele bloco.
+    ("core/http_server.py", """                            "/mcp/vision/explain", self.vision_handler.handle_options
+                        ),
+                    ]
+                )
+""", """                            "/mcp/vision/explain", self.vision_handler.handle_options
+                        ),
+                    ]
+                )
+                app.add_routes([web.post("/watcher/reunioes/{id}/claude", ReunioesHandler(self.config).handle_claude)])
+"""),
+    # Fotos do Watcher ficam guardadas com a pergunta e a descrição (extras/core/utils/fotos.py)
+    ("core/api/vision_handler.py", """            result = vllm.response(question, image_base64)
+""", """            result = vllm.response(question, image_base64)
+            __import__("core.utils.fotos", fromlist=["guardar"]).guardar(image_data, question, result)
+"""),
+    # App Câmera: lista de fotos (fora do bloco grande de rotas, como a rota do Claude acima)
+    ("core/http_server.py", """                app.add_routes([web.post("/watcher/reunioes/{id}/claude", ReunioesHandler(self.config).handle_claude)])
+""", """                app.add_routes([web.post("/watcher/reunioes/{id}/claude", ReunioesHandler(self.config).handle_claude)])
+                app.add_routes([web.get("/watcher/fotos", CartaoHandler(self.config).handle_fotos)])
+"""),
     # Depuração: WATCHER_REGISTRAR_PROMPT=1 grava a última requisição ao modelo em data/ultimo_prompt.json
     ("core/providers/llm/openai/openai.py", """        stream = self.client.chat.completions.create(**request_params)""", """        if os.environ.get("WATCHER_REGISTRAR_PROMPT") == "1":
             import json as _json

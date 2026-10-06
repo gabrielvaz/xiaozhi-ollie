@@ -3,6 +3,7 @@
 // Desenha na camada de cima do LVGL; quem chama não precisa travar a tela.
 #pragma once
 
+#include <cmath>
 #include <cstring>
 
 #include <lvgl.h>
@@ -201,6 +202,8 @@ public:
     // Ícone especial para Item::icone: sol desenhado em vetor (usado pelo app de previsão do tempo)
     static constexpr const char* kIconeSol = "\x01sol";
     static constexpr const char* kIconeAmpulheta = "\x01ampulheta";  // ampulheta em contorno (cronômetro)
+    static constexpr const char* kIconeClaude = "\x01claude";        // asterisco do Claude (app Claude Code)
+    static constexpr const char* kIconeCodex = "\x01codex";          // prompt ">_" do Codex
 
     // Status com ícone: spinner girando (carregando), check verde (sucesso) ou X vermelho (erro)
     void MostrarStatus(const std::string& cabecalho, Status status, const std::string& texto,
@@ -351,6 +354,70 @@ public:
         linha(Fontes::Pequena(), 0x6E6E6E, TR("Clique para voltar", "Click to go back", "点击返回", "Pulsa para volver"), 112);
     }
 
+    // Relógio mundial: 24 bolinhas no aro (posição 0 no topo, sentido horário, 15° cada), anel na posição
+    // `casa` e um cursor que desliza pelo caminho mais curto até `posicao`. Chamar de novo na mesma tela só
+    // move o cursor e troca os textos do centro.
+    void MostrarAro(int posicao, int casa, const std::string& cidade, const std::string& hora,
+                    const std::string& legenda) {
+        DisplayLockGuard lock(display_);
+        int alvo = ((posicao % kPosicoesAro) + kPosicoesAro) % kPosicoesAro * 3600 / kPosicoesAro;  // décimos de grau
+        if (modo_ != Modo::Aro || raiz_ == nullptr) {
+            Recriar();
+            modo_ = Modo::Aro;
+            botoes_.clear();
+            for (int i = 0; i < kPosicoesAro; i++) {
+                auto p = Forma(raiz_, 10, 10, 0, 0, 0x3A3A3A);
+                PosicionarNoAro(p, i * 3600 / kPosicoesAro);
+            }
+            auto anel = Forma(raiz_, 20, 20, 0, 0, 0x000000);
+            lv_obj_set_style_bg_opa(anel, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(anel, 2, 0);
+            lv_obj_set_style_border_color(anel, lv_color_hex(0xD97757), 0);
+            PosicionarNoAro(anel, ((casa % kPosicoesAro) + kPosicoesAro) % kPosicoesAro * 3600 / kPosicoesAro);
+            cursor_aro_ = Forma(raiz_, 22, 22, 0, 0, 0xD97757);
+            angulo_aro_ = alvo_aro_ = alvo;
+            PosicionarNoAro(cursor_aro_, alvo);
+            cidade_aro_ = Rotulo(Fontes::Grande(), 0xD97757, "");
+            lv_obj_set_width(cidade_aro_, 260);
+            lv_label_set_long_mode(cidade_aro_, LV_LABEL_LONG_DOT);
+            lv_obj_set_style_text_align(cidade_aro_, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(cidade_aro_, LV_ALIGN_CENTER, 0, -82);
+            valor_ = Rotulo(Fontes::Grande(), 0xEDEDED, "");
+            lv_obj_set_style_transform_scale(valor_, 640, 0);  // 2,5x
+            lv_obj_set_style_transform_pivot_x(valor_, LV_PCT(50), 0);
+            lv_obj_set_style_transform_pivot_y(valor_, LV_PCT(50), 0);
+            lv_obj_align(valor_, LV_ALIGN_CENTER, 0, -12);
+            legenda_ = Rotulo(Fontes::Pequena(), 0x9A9A9A, "");
+            lv_obj_set_width(legenda_, 280);
+            lv_obj_set_style_text_align(legenda_, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(legenda_, LV_ALIGN_CENTER, 0, 66);
+        } else if (alvo != alvo_aro_) {
+            // Parte de onde o cursor está agora (pode estar no meio de outra animação) pelo caminho mais curto
+            int delta = ((alvo - angulo_aro_) % 3600 + 3600) % 3600;
+            if (delta > 1800) {
+                delta -= 3600;
+            }
+            alvo_aro_ = alvo;
+            lv_anim_delete(cursor_aro_, nullptr);
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, cursor_aro_);
+            lv_anim_set_user_data(&a, this);
+            lv_anim_set_custom_exec_cb(&a, [](lv_anim_t* an, int32_t v) {
+                auto self = static_cast<PainelWatcher*>(lv_anim_get_user_data(an));
+                self->angulo_aro_ = (v % 3600 + 3600) % 3600;
+                self->PosicionarNoAro(static_cast<lv_obj_t*>(an->var), self->angulo_aro_);
+            });
+            lv_anim_set_values(&a, angulo_aro_, angulo_aro_ + delta);
+            lv_anim_set_duration(&a, 220);
+            lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+            lv_anim_start(&a);
+        }
+        lv_label_set_text(cidade_aro_, cidade.c_str());
+        lv_label_set_text(valor_, hora.c_str());
+        lv_label_set_text(legenda_, legenda.c_str());
+    }
+
     // Gravação de reunião: bolinha vermelha pulsando (parada e cinza em pausa), tempo gravado e dois botões
     // escolhidos pela roda: 0 = Pausar/Continuar, 1 = Parar
     void MostrarGravacao(int segundos, bool pausado = false, int botao = 0) {
@@ -386,8 +453,8 @@ public:
         if (pausado != pausado_desenhado_) {
             pausado_desenhado_ = pausado;
             lv_anim_delete(ponto_, nullptr);
-            lv_label_set_text(titulo_gravacao_, pausado ? TR("Reunião pausada", "Meeting paused", "会议已暂停", "Reunión en pausa")
-                                                      : TR("Gravando reunião", "Recording meeting", "正在录制会议", "Grabando reunión"));
+            lv_label_set_text(titulo_gravacao_, pausado ? TR("Gravação pausada", "Recording paused", "录音已暂停", "Grabación en pausa")
+                                                      : TR("Gravando", "Recording", "正在录音", "Grabando"));
             lv_label_set_text(lv_obj_get_child(botoes_gravacao_[0], 0), pausado ? TR("Continuar", "Resume", "继续", "Reanudar")
                                                                          : TR("Pausar", "Pause", "暂停", "Pausar"));
             lv_obj_set_style_bg_color(ponto_, lv_color_hex(pausado ? 0x6E6E6E : 0xE5484D), 0);
@@ -481,11 +548,13 @@ public:
         grade_ = nullptr;
         nome_grade_ = nullptr;
         celulas_.clear();
+        cursor_aro_ = nullptr;
+        cidade_aro_ = nullptr;
         modo_ = Modo::Nenhum;
     }
 
 private:
-    enum class Modo { Nenhum, Lista, Grade, Texto, Gravacao };
+    enum class Modo { Nenhum, Lista, Grade, Texto, Gravacao, Aro };
 
     // Medidas do mosaico (tela redonda 412x412): 3 colunas x 3 linhas visíveis de 78 px com 12 px
     // de espaço = 258x258, de y=90 a y=348; os cantos arredondados ficam dentro do círculo.
@@ -494,6 +563,9 @@ private:
     static constexpr int kColunas = 3;
     static constexpr int kLinhasVisiveis = 3;
     static constexpr int kGradeY = 90;
+    // Aro do relógio mundial: 24 posições num raio que deixa o cursor (22 px) dentro do círculo
+    static constexpr int kPosicoesAro = 24;
+    static constexpr int kRaioAro = 188;
 
     Display* display_;
     lv_obj_t* raiz_ = nullptr;
@@ -518,6 +590,10 @@ private:
     std::vector<lv_obj_t*> celulas_;  // uma por item, na ordem de itens_
     std::vector<std::string> botoes_;
     int selecionado_ = 0;
+    lv_obj_t* cursor_aro_ = nullptr;
+    lv_obj_t* cidade_aro_ = nullptr;
+    int angulo_aro_ = 0;  // décimos de grau, onde o cursor está desenhado agora
+    int alvo_aro_ = 0;    // décimos de grau, para onde o cursor vai
 
     // ------------------------------------------------------------ ícones de tempo (formas LVGL)
 
@@ -629,6 +705,14 @@ private:
         return arco;
     }
 
+    // Centra o objeto no aro, no ângulo dado em décimos de grau (0 = topo, sentido horário)
+    void PosicionarNoAro(lv_obj_t* o, int decimos) {
+        float rad = decimos * 3.14159265f / 1800.0f;
+        int x = LV_HOR_RES / 2 + (int)lroundf(kRaioAro * sinf(rad));
+        int y = LV_VER_RES / 2 - (int)lroundf(kRaioAro * cosf(rad));
+        lv_obj_set_pos(o, x - lv_obj_get_style_width(o, LV_PART_MAIN) / 2, y - lv_obj_get_style_height(o, LV_PART_MAIN) / 2);
+    }
+
     lv_obj_t* Rotulo(const lv_font_t* fonte, uint32_t cor, const std::string& texto, lv_obj_t* pai = nullptr) {
         auto r = lv_label_create(pai ? pai : raiz_);
         lv_obj_set_style_text_font(r, fonte, 0);
@@ -654,6 +738,8 @@ private:
         grade_ = nullptr;
         nome_grade_ = nullptr;
         celulas_.clear();
+        cursor_aro_ = nullptr;
+        cidade_aro_ = nullptr;
         raiz_ = lv_obj_create(lv_layer_top());
         lv_obj_set_size(raiz_, LV_HOR_RES, LV_VER_RES);
         lv_obj_set_style_bg_color(raiz_, lv_color_hex(0x000000), 0);
@@ -785,6 +871,16 @@ private:
                 celulas_.push_back(celula);
                 continue;
             }
+            if (item.icone != nullptr && strcmp(item.icone, kIconeClaude) == 0) {
+                ClaudeAsterisco(celula);
+                celulas_.push_back(celula);
+                continue;
+            }
+            if (item.icone != nullptr && strcmp(item.icone, kIconeCodex) == 0) {
+                CodexPrompt(celula);
+                celulas_.push_back(celula);
+                continue;
+            }
             if (item.icone != nullptr && strcmp(item.icone, kIconeAmpulheta) == 0) {
                 AmpulhetaContorno(celula);  // idem: a fonte não tem ampulheta
                 celulas_.push_back(celula);
@@ -828,6 +924,60 @@ private:
         for (const auto& raio : kRaios) {
             auto l = lv_line_create(sol);
             lv_line_set_points(l, raio, 2);
+            lv_obj_set_style_line_width(l, 4, 0);
+            lv_obj_set_style_line_rounded(l, true, 0);
+            lv_obj_set_style_line_color(l, lv_color_hex(0xD97757), 0);
+        }
+    }
+
+    // Asterisco do Claude: 12 raios saindo do centro, como o logo do Claude Code
+    void ClaudeAsterisco(lv_obj_t* celula) {
+        auto logo = lv_obj_create(celula);
+        lv_obj_remove_style_all(logo);
+        lv_obj_set_size(logo, 46, 46);
+        lv_obj_add_flag(logo, LV_OBJ_FLAG_USER_1);  // AtualizarGrade repinta as partes
+        lv_obj_center(logo);
+        static lv_point_precise_t raios[12][2];
+        static bool prontos = false;
+        if (!prontos) {
+            for (int k = 0; k < 12; k++) {
+                float ang = k * 3.14159265f / 6.0f;
+                float comprimento = (k % 2) ? 17.0f : 21.0f;  // raios alternados, como no logo
+                raios[k][0] = {(lv_value_precise_t)lroundf(23 + 5 * cosf(ang)), (lv_value_precise_t)lroundf(23 + 5 * sinf(ang))};
+                raios[k][1] = {(lv_value_precise_t)lroundf(23 + comprimento * cosf(ang)),
+                               (lv_value_precise_t)lroundf(23 + comprimento * sinf(ang))};
+            }
+            prontos = true;
+        }
+        for (auto& raio : raios) {
+            auto l = lv_line_create(logo);
+            lv_line_set_points(l, raio, 2);
+            lv_obj_set_style_line_width(l, 5, 0);
+            lv_obj_set_style_line_rounded(l, true, 0);
+            lv_obj_set_style_line_color(l, lv_color_hex(0xD97757), 0);
+        }
+    }
+
+    // Codex: janela de terminal com o prompt ">_"
+    void CodexPrompt(lv_obj_t* celula) {
+        auto logo = lv_obj_create(celula);
+        lv_obj_remove_style_all(logo);
+        lv_obj_set_size(logo, 46, 40);
+        lv_obj_add_flag(logo, LV_OBJ_FLAG_USER_1);
+        lv_obj_center(logo);
+        auto janela = lv_obj_create(logo);
+        lv_obj_remove_style_all(janela);
+        lv_obj_set_size(janela, 46, 40);
+        lv_obj_set_style_radius(janela, 10, 0);
+        lv_obj_set_style_border_width(janela, 4, 0);
+        lv_obj_set_style_border_color(janela, lv_color_hex(0xD97757), 0);
+        static const lv_point_precise_t kSeta[] = {{11, 13}, {19, 20}, {11, 27}};
+        static const lv_point_precise_t kTraco[] = {{24, 27}, {35, 27}};
+        const lv_point_precise_t* tracos[] = {kSeta, kTraco};
+        const int pontos[] = {3, 2};
+        for (int k = 0; k < 2; k++) {
+            auto l = lv_line_create(logo);
+            lv_line_set_points(l, tracos[k], pontos[k]);
             lv_obj_set_style_line_width(l, 4, 0);
             lv_obj_set_style_line_rounded(l, true, 0);
             lv_obj_set_style_line_color(l, lv_color_hex(0xD97757), 0);

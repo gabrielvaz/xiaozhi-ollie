@@ -180,10 +180,13 @@ private:
                 std::lock_guard<std::recursive_mutex> trava(trava_);
                 ativo = ativo_;
             }
+            DiagnosticoWatcher::Batida("laco");
             if (ativo != nullptr) {
+                DiagnosticoWatcher::Batida(ativo->Id());  // se travar aqui, o vigia anota qual app
                 ativo->Tique(contexto_);
             }
             for (auto& a : apps_) {
+                DiagnosticoWatcher::Batida(a->Id());
                 a->Fundo(contexto_);
             }
         }

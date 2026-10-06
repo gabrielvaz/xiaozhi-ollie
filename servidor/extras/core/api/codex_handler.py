@@ -39,12 +39,23 @@ def _negado() -> web.Response:
     return web.json_response({"erro": "não autorizado"}, status=401)
 
 
+_cache_remoto = {"quando": 0.0, "dados": None}
+
+
+def _status_remoto_cache() -> dict:
+    """O status do controle remoto leva ~3 s (CLI): guarda por 60 s."""
+    import time
+    if _cache_remoto["dados"] is None or time.time() - _cache_remoto["quando"] > 60:
+        _cache_remoto.update(quando=time.time(), dados=codex_remoto.status_remoto())
+    return _cache_remoto["dados"]
+
+
 class CodexHandler(AvisosHandler):
     async def handle_resumo(self, request: web.Request) -> web.Response:
         if not self._autorizado(request):
             return _negado()
         remoto, sessoes, (nuvem, erro_nuvem) = await asyncio.gather(
-            asyncio.to_thread(codex_remoto.status_remoto),
+            asyncio.to_thread(_status_remoto_cache),
             asyncio.to_thread(codex_remoto.listar_sessoes),
             asyncio.to_thread(codex_remoto.listar_nuvem))
         return web.json_response({"remoto": remoto, "sessoes": sessoes, "nuvem": nuvem, "erro_nuvem": erro_nuvem})
@@ -85,6 +96,8 @@ class CodexHandler(AvisosHandler):
         corpo = await _corpo(request)
         if corpo is None or not isinstance(corpo.get("ligar"), bool):
             return web.json_response({"ok": False, "mensagem": 'Corpo inválido: use {"ligar": true}.'}, status=400)
+        _cache_remoto["dados"] = None  # muda o estado: a próxima consulta lê de novo
+        _cache_remoto["dados"] = None  # muda o estado: a próxima consulta lê de novo
         r = await asyncio.to_thread(codex_remoto.definir_remoto, corpo["ligar"], corpo.get("confirmado") is True)
         return web.json_response(r)
 

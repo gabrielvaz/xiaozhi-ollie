@@ -18,6 +18,7 @@
 #include <esp_timer.h>
 
 #include <functional>
+#include <map>
 #include <string>
 
 #include "application.h"
@@ -110,6 +111,26 @@ public:
         return true;
     }
 
+    // Igual a Pedir, mas reaproveita a resposta guardada se tiver até idade_max_s segundos: cada conexão
+    // segura nova custa 1 a 3 s no aparelho, então reabrir uma tela fica instantâneo. Só GET.
+    static bool PedirCache(const std::string& caminho, int idade_max_s, std::string& corpo) {
+        static std::map<std::string, std::pair<int, std::string>> guardados;
+        int agora = (int)(esp_timer_get_time() / 1000000);
+        auto it = guardados.find(caminho);
+        if (it != guardados.end() && agora - it->second.first <= idade_max_s) {
+            corpo = it->second.second;
+            return true;
+        }
+        if (!Pedir("GET", caminho, "", corpo)) {
+            return false;
+        }
+        if (guardados.size() > 24) {
+            guardados.clear();
+        }
+        guardados[caminho] = {agora, corpo};
+        return true;
+    }
+
     static std::string Campo(cJSON* obj, const char* chave) {
         cJSON* v = obj ? cJSON_GetObjectItem(obj, chave) : nullptr;
         return cJSON_IsString(v) ? v->valuestring : "";
@@ -146,7 +167,10 @@ struct ContextoApps {
     inline static std::atomic<int> ultimo_aviso{-100000};
     // Sessões do Claude Code trabalhando agora (vem junto com os avisos; a tela de espera mostra o Clawd trabalhando)
     inline static std::atomic<int> atividade_n{0};
-    inline static std::string atividade_titulo;  // escrito e lido só pela tarefa da gaveta  // Agora() do último aviso (a saudação não o cobre)
+    inline static std::string atividade_titulo;  // escrito e lido só pela tarefa da gaveta
+    // Lista do app Claude Code que veio junto com a última consulta de avisos (abre sem esperar a rede)
+    inline static std::string sessoes_json;
+    inline static int sessoes_quando = -100000;  // Agora() do último aviso (a saudação não o cobre)
 
     static void Avisar(const std::string& titulo, const std::string& texto, const std::string& emocao,
                        std::string_view som = "") {

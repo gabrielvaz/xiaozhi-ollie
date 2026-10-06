@@ -13,6 +13,7 @@
 class AppQrCode : public AppWatcher {
 public:
     const char* Nome() const override { return TR("QR code", "QR code", "二维码", "Código QR"); }
+    const char* Id() const override { return "qrcode"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_LINK; }
     std::string Detalhe() const override { return TR("Wi-Fi, links e contatos", "Wi-Fi, links and contacts", "Wi-Fi、链接和联系人", "Wi-Fi, enlaces y contactos"); }
 
@@ -39,7 +40,7 @@ public:
             return;
         }
         std::string corpo;
-        if (RedeWatcher::Pedir("GET", "/watcher/qrcodes", "", corpo)) {
+        if (RedeWatcher::PedirCache("/watcher/qrcodes", 600, corpo)) {
             if (corpo.size() < 3500) {  // guarda na memória do aparelho para funcionar offline
                 ConfigWatcher::SetTexto("qrcodes", corpo);
             }

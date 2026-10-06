@@ -72,7 +72,7 @@ public:
         }
         std::string corpo;
         avisos_.clear();
-        if (RedeWatcher::Pedir("GET", "/watcher/avisos/historico", "", corpo)) {
+        if (RedeWatcher::PedirCache("/watcher/avisos/historico", 20, corpo)) {
             cJSON* raiz = cJSON_Parse(corpo.c_str());
             cJSON* lista = raiz ? cJSON_GetObjectItem(raiz, "avisos") : nullptr;
             cJSON* a = nullptr;

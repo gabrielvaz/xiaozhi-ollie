@@ -25,7 +25,7 @@ public:
                 Board::GetInstance().GetDisplay()->SetEmotion(emocao);
             });
         }
-        if (agora - ultima_leitura_ < 1) {
+        if (agora - ultima_leitura_ < 3) {  // a barra de status também lê a bateria: não disputar o barramento
             return;
         }
         ultima_leitura_ = agora;

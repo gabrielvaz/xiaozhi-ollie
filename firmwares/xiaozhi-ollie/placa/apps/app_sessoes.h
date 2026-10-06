@@ -15,7 +15,7 @@ class AppSessoes : public AppWatcher {
 public:
     const char* Nome() const override { return "Claude Code"; }
     const char* Id() const override { return "sessoes"; }
-    const char* Icone() const override { return MATERIAL_SYMBOLS_ROBOT_2; }
+    const char* Icone() const override { return PainelWatcher::kIconeClaude; }  // logo desenhado
     std::string Detalhe() const override { return TR("Ver, ler e mandar pedidos", "View, read and send requests", "查看、阅读和发送请求", "Ver, leer y enviar peticiones"); }
 
     void Abrir(ContextoApps& c) override {
@@ -231,6 +231,7 @@ private:
     std::vector<Sessao> sessoes_;
     int atual_ = 0;
     std::string ir_para_;
+    bool sessoes_atualizar_ = false;
     std::string ir_titulo_;    // id da sessão a abrir depois de carregar a lista (vindo de um aviso)
     std::string mensagens_;  // últimas mensagens da sessão aberta
     Pergunta pergunta_;      // pergunta aberta na sessão (texto vazio = nenhuma)
@@ -253,7 +254,13 @@ private:
 
     void BuscarLista(ContextoApps& c) {
         std::string corpo;
-        if (!RedeWatcher::Pedir("GET", "/watcher/sessoes", "", corpo)) {
+        // Lista que veio com a última consulta de avisos (até 60 s): abre sem esperar a rede
+        bool do_cache = !sessoes_atualizar_ && ContextoApps::Agora() - ContextoApps::sessoes_quando <= 60 &&
+                        !ContextoApps::sessoes_json.empty();
+        sessoes_atualizar_ = false;
+        if (do_cache) {
+            corpo = ContextoApps::sessoes_json;
+        } else if (!RedeWatcher::Pedir("GET", "/watcher/sessoes", "", corpo)) {
             tela_ = Tela::Erro;
             c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Erro, TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "现在无法连接 Mac。", "No he podido hablar con el Mac."),
                                    {TR("Voltar", "Back", "返回", "Volver")});
@@ -303,6 +310,7 @@ private:
         const auto& s = sessoes_[atual_];
         std::string base = "/watcher/sessoes/" + Codificar(s.id);
         mensagens_.clear();
+        bool tem_pergunta = false;
         std::string corpo;
         if (RedeWatcher::Pedir("GET", base + "/mensagens", "", corpo)) {
             cJSON* raiz = cJSON_Parse(corpo.c_str());
@@ -313,12 +321,18 @@ private:
                 mensagens_ += (mensagens_.empty() ? "" : "\n\n") + RedeWatcher::Campo(m, "quem") +
                               (hora.empty() ? "" : " · " + hora) + "\n" + RedeWatcher::Campo(m, "texto");
             }
+            tem_pergunta = raiz && cJSON_GetObjectItem(raiz, "pergunta") != nullptr;
+            if (tem_pergunta) {
+                LerPerguntaDe(raiz);
+            }
             cJSON_Delete(raiz);
         }
         if (mensagens_.empty()) {
             mensagens_ = s.ultima.empty() ? TR("Sem mensagem registrada.", "No messages recorded.", "没有记录的消息。", "Sin mensajes registrados.") : s.ultima;
         }
-        LerPergunta(base);
+        if (!tem_pergunta) {
+            LerPergunta(base);
+        }
         MostrarDetalhe(c);
     }
 
@@ -329,6 +343,12 @@ private:
             return;
         }
         cJSON* raiz = cJSON_Parse(corpo.c_str());
+        LerPerguntaDe(raiz);
+        cJSON_Delete(raiz);
+    }
+
+    void LerPerguntaDe(cJSON* raiz) {
+        pergunta_ = Pergunta();
         cJSON* p = raiz ? cJSON_GetObjectItem(raiz, "pergunta") : nullptr;
         if (cJSON_IsObject(p)) {
             pergunta_.texto = RedeWatcher::Campo(p, "texto");
@@ -347,7 +367,6 @@ private:
                 pergunta_ = Pergunta();
             }
         }
-        cJSON_Delete(raiz);
     }
 
     void MostrarLista(ContextoApps& c, int selecionar) {

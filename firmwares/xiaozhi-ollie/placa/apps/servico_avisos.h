@@ -50,6 +50,14 @@ public:
             }
         }
         ultimo_id_ = RedeWatcher::Numero(raiz, "ultimo", ultimo_id_);
+        cJSON* sessoes = cJSON_GetObjectItem(raiz, "sessoes");
+        if (cJSON_IsArray(sessoes)) {
+            if (char* texto = cJSON_PrintUnformatted(sessoes)) {
+                ContextoApps::sessoes_json = std::string("{\"sessoes\":") + texto + "}";
+                ContextoApps::sessoes_quando = ContextoApps::Agora();
+                cJSON_free(texto);
+            }
+        }
         cJSON* atividade = cJSON_GetObjectItem(raiz, "atividade");
         if (cJSON_IsObject(atividade)) {
             ContextoApps::atividade_n = RedeWatcher::Numero(atividade, "trabalhando", 0);

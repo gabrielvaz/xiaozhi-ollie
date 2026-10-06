@@ -11,6 +11,7 @@
 class AppTempo : public AppWatcher {
 public:
     const char* Nome() const override { return TR("Tempo", "Weather", "天气", "El tiempo"); }
+    const char* Id() const override { return "tempo"; }
     const char* Icone() const override { return PainelWatcher::kIconeSol; }  // sol desenhado
     std::string Detalhe() const override { return TR("Agora, hoje e amanhã", "Now, today and tomorrow", "现在、今天和明天", "Ahora, hoy y mañana"); }
 
@@ -42,7 +43,7 @@ public:
         }
         pronto_ = erro_ = false;
         std::string corpo;
-        cJSON* raiz = RedeWatcher::Pedir("GET", "/watcher/tempo", "", corpo) ? cJSON_Parse(corpo.c_str()) : nullptr;
+        cJSON* raiz = RedeWatcher::PedirCache("/watcher/tempo", 600, corpo) ? cJSON_Parse(corpo.c_str()) : nullptr;
         if (raiz == nullptr || !cJSON_IsTrue(cJSON_GetObjectItem(raiz, "ok"))) {
             std::string erro = RedeWatcher::Campo(raiz, "erro");
             erro_ = true;

@@ -13,7 +13,8 @@
 class AppCodex : public AppWatcher {
 public:
     const char* Nome() const override { return "Codex"; }
-    const char* Icone() const override { return MATERIAL_SYMBOLS_KEYBOARD_DOUBLE_ARROW_RIGHT; }
+    const char* Id() const override { return "codex"; }
+    const char* Icone() const override { return PainelWatcher::kIconeCodex; }  // logo desenhado
     std::string Detalhe() const override { return TR("Sessões, nuvem e controle remoto", "Sessions, cloud, remote control", "会话、云端与远程控制", "Sesiones, nube y control remoto"); }
 
     void Abrir(ContextoApps& c) override {
@@ -179,7 +180,7 @@ private:
 
     void BuscarResumo(ContextoApps& c) {
         std::string corpo;
-        if (!RedeWatcher::Pedir("GET", "/watcher/codex", "", corpo)) {
+        if (!RedeWatcher::PedirCache("/watcher/codex", 30, corpo)) {
             tela_ = Tela::Erro;
             c.painel.MostrarStatus("Codex", PainelWatcher::Status::Erro, TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "现在无法连接 Mac。", "No he podido hablar con el Mac."),
                                    {TR("Voltar", "Back", "返回", "Volver")});

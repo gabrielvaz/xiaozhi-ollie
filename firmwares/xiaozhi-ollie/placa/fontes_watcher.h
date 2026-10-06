@@ -11,7 +11,8 @@
 #include "settings.h"
 
 LV_FONT_DECLARE(font_noto_sans_pt_24);       // fonte/font_noto_sans_pt_24.c
-LV_FONT_DECLARE(font_noto_sans_basic_20_4);  // do XiaoZhi
+LV_FONT_DECLARE(font_noto_sans_basic_20_4);
+LV_FONT_DECLARE(font_material_symbols_16_4);  // ícone do Wi-Fi na barra de status (menor)  // do XiaoZhi
 LV_FONT_DECLARE(font_jetbrains_mono_pt_22);  // fonte/font_jetbrains_mono_pt_22.c
 LV_FONT_DECLARE(font_jetbrains_mono_pt_18);  // fonte/font_jetbrains_mono_pt_18.c
 

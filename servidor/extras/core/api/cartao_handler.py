@@ -81,8 +81,22 @@ class CartaoHandler(AvisosHandler):
                                     **linha}, ensure_ascii=False) + "\n")
         if dados.get("tipo") == "reinicio":
             import logging
-            logging.getLogger(__name__).warning(f"Watcher reiniciou: {dados.get('motivo')}")
+            import re as _re
+            motivo = dados.get("motivo", "?")
+            logging.getLogger(__name__).warning(f"Watcher reiniciou: {motivo}")
+            travou = _re.search(r"TRAVOU: (\S+)", dados.get("rastro", ""))
+            from core.utils.vigia import adicionar_aviso
+            adicionar_aviso("diagnostico", "Reiniciei sozinho",
+                            f"{motivo}" + (f" (estava em {travou.group(1)})" if travou else "") + ". Detalhes no diagnóstico.",
+                            "embarrassed")
         return web.json_response({"ok": True})
+
+    async def handle_fotos(self, request: web.Request) -> web.Response:
+        """GET /watcher/fotos: fotos tiradas (mais recentes primeiro) com a descrição da IA."""
+        if not self._autorizado(request):
+            return web.json_response({"erro": "não autorizado"}, status=401)
+        from core.utils import fotos
+        return web.json_response({"fotos": await asyncio.to_thread(fotos.listar)})
 
     async def handle_backup(self, request: web.Request) -> web.Response:
         """App Backup do Watcher: o único momento em que as conversas são copiadas para o iCloud."""
@@ -94,6 +108,10 @@ class CartaoHandler(AvisosHandler):
         except OSError as e:
             return web.json_response({"ok": False, "copiados": 0, "erro": str(e)[:200]})
         reunioes, falhas = await asyncio.to_thread(reuniao.espelhar)
+        from core.utils import fotos
+        copiadas, falhas_fotos = await asyncio.to_thread(fotos.espelhar)
+        reunioes += copiadas
+        falhas += falhas_fotos
         if falhas:
             return web.json_response({"ok": False, "copiados": copiados + reunioes,
                                       "erro": f"{len(falhas)} arquivo(s) de reunião não copiados: {', '.join(falhas[:3])}"})

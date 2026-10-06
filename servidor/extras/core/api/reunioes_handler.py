@@ -126,7 +126,61 @@ def detalhe(rid: str) -> dict | None:
     return {"titulo": titulo, "texto": f"{cabecalho}\n\n{corpo}"[:3000]}
 
 
+def _enviar_ao_claude(rid: str, pasta: Path, titulo: str) -> None:
+    """Abre uma sessão nova do Claude Code na pasta da gravação, pedindo para estruturar a transcrição.
+    Leva até ~1 min (herdr inicia o agente); quando fica pronta, um aviso com "Continuar" aparece no Watcher."""
+    import re
+    from core.utils.vigia import adicionar_aviso, ponte_carregada
+    instrucao = t(
+        "Esta pasta tem a transcrição completa de uma gravação de voz (transcricao.md) e um resumo (resumo.md). "
+        "Leia a transcrição inteira e estruture melhor o conteúdo: organize as ideias por tema, liste decisões, "
+        "tarefas (com responsável e prazo quando aparecerem) e dúvidas em aberto, e corrija erros óbvios de "
+        "transcrição sem inventar nada. Salve o resultado em estruturado.md nesta pasta e me mostre um resumo curto.",
+        "This folder has the full transcript of a voice recording (transcricao.md) and a summary (resumo.md). "
+        "Read the whole transcript and structure it better: group ideas by topic, list decisions, tasks (with owner "
+        "and deadline when mentioned) and open questions, and fix obvious transcription errors without inventing "
+        "anything. Save the result to estruturado.md in this folder and show me a short summary.",
+        "此文件夹包含一段语音录音的完整转写（transcricao.md）和摘要（resumo.md）。请通读转写并更好地整理内容：按主题归纳要点，"
+        "列出决定、任务（如提到负责人和期限请注明）和待解决问题，并在不编造的前提下修正明显的转写错误。"
+        "将结果保存为本文件夹中的 estruturado.md，并给我一个简短摘要。",
+        "Esta carpeta tiene la transcripción completa de una grabación de voz (transcricao.md) y un resumen "
+        "(resumo.md). Lee toda la transcripción y estructura mejor el contenido: agrupa las ideas por tema, enumera "
+        "decisiones, tareas (con responsable y plazo cuando aparezcan) y dudas abiertas, y corrige errores obvios de "
+        "transcripción sin inventar nada. Guarda el resultado en estruturado.md en esta carpeta y muéstrame un resumen breve.")
+    resultado = ponte_carregada()._nova_sessao("claude", str(pasta), instrucao)
+    pane = re.search(r"\((w[^)]*:p[^)]*)\)", resultado)
+    if pane:
+        adicionar_aviso("concluiu", t("Sessão aberta", "Session opened", "会话已打开", "Sesión abierta"),
+                        t(f"Claude Code está estruturando “{titulo}”", f"Claude Code is structuring “{titulo}”",
+                          f"Claude Code 正在整理“{titulo}”", f"Claude Code está estructurando “{titulo}”"), "happy",
+                        sessao=pane.group(1), nome_sessao=titulo[:50])
+    else:
+        adicionar_aviso("concluiu", t("Não abri a sessão", "Session not opened", "未能打开会话", "No abrí la sesión"),
+                        resultado[:100], "sad")
+
+
 class ReunioesHandler(AvisosHandler):
+    async def handle_claude(self, request: web.Request) -> web.Response:
+        """POST /watcher/reunioes/{id}/claude: manda a transcrição para uma sessão nova do Claude Code."""
+        if not self._autorizado(request):
+            return web.json_response({"erro": "não autorizado"}, status=401)
+        import threading
+        rid = request.match_info["id"]
+        pasta = reuniao.PASTA / rid
+        if not (pasta / "transcricao.md").exists():
+            return web.json_response({"ok": False, "mensagem": t("Esta gravação ainda não tem transcrição.",
+                                      "This recording has no transcript yet.", "这段录音还没有转写。",
+                                      "Esta grabación aún no tiene transcripción.")})
+        linhas = ler_texto(pasta / "resumo.md", padrao="").strip().splitlines() if (pasta / "resumo.md").exists() else []
+        titulo = linhas[0].removeprefix("# ").strip() if linhas else rid
+        threading.Thread(target=_enviar_ao_claude, args=(rid, pasta, titulo), daemon=True).start()
+        return web.json_response({"ok": True, "mensagem": t(
+            "Abrindo uma sessão do Claude Code com a transcrição. Aviso quando ela estiver pronta.",
+            "Opening a Claude Code session with the transcript. I'll notify you when it's ready.",
+            "正在用转写打开一个 Claude Code 会话，准备好后会通知你。",
+            "Abriendo una sesión de Claude Code con la transcripción. Te aviso cuando esté lista.")})
+
+
     async def handle_reuniao(self, request: web.Request) -> web.Response:
         if not self._autorizado(request):
             return web.json_response({"erro": "não autorizado"}, status=401)

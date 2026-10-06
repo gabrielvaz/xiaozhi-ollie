@@ -12,6 +12,7 @@
 class AppMemoria : public AppWatcher {
 public:
     const char* Nome() const override { return TR("Memória", "Memory", "记忆", "Memoria"); }
+    const char* Id() const override { return "memoria"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_MEMORY; }
     std::string Detalhe() const override { return TR("Funciona sem internet", "Works offline", "离线可用", "Funciona sin internet"); }
 

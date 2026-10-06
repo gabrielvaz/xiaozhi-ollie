@@ -17,6 +17,7 @@
 class AppConfiguracoes : public AppWatcher {
 public:
     const char* Nome() const override { return TR("Ajustes", "Settings", "设置", "Ajustes"); }
+    const char* Id() const override { return "ajustes"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_SETTINGS; }
     std::string Detalhe() const override { return TR("Nome, tema, fonte, tela…", "Name, theme, font, screen…", "名称、主题、字体、屏幕…", "Nombre, tema, fuente…"); }
 

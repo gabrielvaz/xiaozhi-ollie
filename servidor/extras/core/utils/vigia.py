@@ -24,6 +24,35 @@ MAX_HISTORICO = 200
 HISTORICO = Path(__file__).resolve().parents[2] / "data/avisos_historico.json"
 _avisos: list[dict] = []
 _atividade: dict = {"trabalhando": 0, "titulos": []}
+_sessoes = {"quando": 0.0, "lista": []}  # lista compacta para o app Claude Code (vai junto com os avisos)
+
+
+def sessoes_compactas(agentes: list[dict]) -> list[dict]:
+    """Lista do app Claude Code do Watcher: situação (em português: o firmware compara), há quanto tempo e a última fala."""
+    rotulos = {"esperando você": "Esperando você", "trabalhando": "Trabalhando", "subagentes rodando": "Subagentes",
+               "concluiu recentemente": "Concluída", "parada": "Parada"}
+    sessao_padrao = t("Sessão", "Session", "会话", "Sesión")
+    un_min, un_h = t("min", "min", "分钟", "min"), t("h", "h", "小时", "h")
+    sessoes = []
+    for a in agentes:
+        if a["situacao"] == "parada" and len(sessoes) >= 12:
+            continue
+        minutos = a.get("minutos_desde_ultima_atividade")
+        sessoes.append({
+            "id": a["sessao"],
+            "titulo": (a.get("titulo") or a.get("workspace") or a.get("pasta") or sessao_padrao)[:40],
+            "agente": a.get("agente", ""),
+            "situacao": rotulos.get(a["situacao"], a["situacao"]),
+            "ha": "" if minutos is None else (f"{minutos} {un_min}" if minutos < 60 else f"{minutos // 60} {un_h}"),
+            "ultima": (a.get("ultima_fala") or "")[:300],
+        })
+    return sessoes[:20]
+
+
+def sessoes_recentes(idade_max_s: float = 15) -> list[dict] | None:
+    """A lista calculada pelo vigia, se tiver no máximo idade_max_s segundos."""
+    with _trava:
+        return list(_sessoes["lista"]) if time.time() - _sessoes["quando"] <= idade_max_s else None
 _seq = 0
 _trava = threading.Lock()
 _iniciado = False
@@ -93,9 +122,11 @@ def historico(limite: int = 60) -> list[dict]:
 def avisos_desde(ultimo: int) -> dict:
     with _trava:
         # "atividade": sessões trabalhando agora (o Watcher mostra o Clawd trabalhando na tela de espera)
+        # "sessoes": a lista do app Claude Code, para ele abrir sem esperar (o Watcher já consulta a cada 20 s)
+        extra = {"atividade": dict(_atividade), "sessoes": list(_sessoes["lista"])}
         if ultimo < 0:  # primeira consulta do aparelho: só sincroniza, sem repetir avisos antigos
-            return {"ultimo": _seq, "avisos": [], "atividade": dict(_atividade)}
-        return {"ultimo": _seq, "avisos": [a for a in _avisos if a["id"] > ultimo], "atividade": dict(_atividade)}
+            return {"ultimo": _seq, "avisos": [], **extra}
+        return {"ultimo": _seq, "avisos": [a for a in _avisos if a["id"] > ultimo], **extra}
 
 
 def _frase_curta(titulo: str, fala: str) -> str:
@@ -134,8 +165,10 @@ def _loop(ponte) -> None:
             agentes = ponte._agentes()
             ativos = [_titulo_curto(a) for a in agentes
                       if a.get("situacao") in ("trabalhando", "subagentes rodando") or a.get("status") == "working"]
+            compactas = sessoes_compactas(agentes)
             with _trava:
                 _atividade.update(trabalhando=len(ativos), titulos=ativos[:3])
+                _sessoes.update(quando=time.time(), lista=compactas)
             for a in agentes:
                 chave, estado, feitas = a["sessao"], a["status"], a.get("_conclusoes", 0)
                 if not primeira:

@@ -1,4 +1,4 @@
-// App "Reuniões": lista as reuniões gravadas (quando e duração) e grava uma nova. O áudio vai ao Mac
+// App "Gravador": lista as gravações (quando e duração) e grava uma nova (conversas, anotações, ditados). O áudio vai ao Mac
 // (transcrição, resumo e nota) e uma cópia fica no microSD. Gravando, a roda escolhe Pausar/Continuar
 // ou Parar; ao parar, volta para a lista.
 // Se a conexão cair, a gravação continua só no cartão e é enviada depois (app "Cartão").
@@ -23,7 +23,7 @@ public:
         tela_ = Tela::Carregando;
         buscar_em_ = 0;
         c.painel.MostrarStatus(TR("Gravador", "Recorder", "录音机", "Grabadora"), PainelWatcher::Status::Carregando,
-                               TR("Carregando reuniões…", "Loading meetings…", "正在加载会议…", "Cargando reuniones…"));
+                               TR("Carregando gravações…", "Loading recordings…", "正在加载录音…", "Cargando grabaciones…"));
     }
 
     void IniciarGravacao(ContextoApps& c) {
@@ -86,10 +86,19 @@ public:
             tela_ = Tela::Carregando;
             buscar_detalhe_ = true;
             c.painel.MostrarStatus(lista_[atual_].titulo, PainelWatcher::Status::Carregando,
-                                   TR("Abrindo a reunião…", "Opening meeting…", "正在打开会议…", "Abriendo la reunión…"));
+                                   TR("Abrindo a gravação…", "Opening recording…", "正在打开录音…", "Abriendo la grabación…"));
+            return true;
+        }
+        if (tela_ == Tela::Item && vendo_texto_ && c.painel.Selecionado() == 0) {  // botão "Claude Code"
+            vendo_texto_ = false;
+            tela_ = Tela::Carregando;
+            enviar_claude_ = true;
+            c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando,
+                                   TR("Enviando a transcrição…", "Sending the transcript…", "正在发送转写…", "Enviando la transcripción…"));
             return true;
         }
         if (tela_ == Tela::Item) {
+            vendo_texto_ = false;
             MostrarLista(c);
             return true;
         }
@@ -105,16 +114,35 @@ public:
     }
 
     void Tique(ContextoApps& c) override {
+        if (tela_ == Tela::Carregando && enviar_claude_.exchange(false)) {
+            // "Claude Code": a transcrição completa vai para uma sessão nova, que estrutura a gravação
+            std::string corpo, mensagem;
+            bool ok = RedeWatcher::Pedir("POST", "/watcher/reunioes/" + Codificar(lista_[atual_].id) + "/claude", "{}", corpo);
+            cJSON* raiz = ok ? cJSON_Parse(corpo.c_str()) : nullptr;
+            ok = ok && cJSON_IsTrue(cJSON_GetObjectItem(raiz, "ok"));
+            mensagem = RedeWatcher::Campo(raiz, "mensagem");
+            cJSON_Delete(raiz);
+            tela_ = Tela::Item;
+            c.painel.MostrarStatus("Claude Code", ok ? PainelWatcher::Status::Sucesso : PainelWatcher::Status::Erro,
+                                   mensagem.empty() ? TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.",
+                                                         "现在无法连接 Mac。", "No he podido hablar con el Mac.")
+                                                    : mensagem,
+                                   {TR("Voltar", "Back", "返回", "Volver")});
+            return;
+        }
         if (tela_ == Tela::Carregando && buscar_detalhe_.exchange(false)) {
             const auto& r = lista_[atual_];
             std::string corpo, texto;
-            if (RedeWatcher::Pedir("GET", "/watcher/reunioes/" + Codificar(r.id), "", corpo)) {
+            if (RedeWatcher::PedirCache("/watcher/reunioes/" + Codificar(r.id), 60, corpo)) {
                 cJSON* raiz = cJSON_Parse(corpo.c_str());
                 texto = RedeWatcher::Campo(raiz, "texto");
                 cJSON_Delete(raiz);
             }
             tela_ = Tela::Item;
-            c.painel.MostrarTexto(r.titulo, texto.empty() ? r.detalhe : texto, {TR("Voltar", "Back", "返回", "Volver")});
+            vendo_texto_ = true;
+            c.painel.MostrarTexto(TR("Gravador", "Recorder", "录音机", "Grabadora"),
+                                  r.titulo + "\n\n" + (texto.empty() ? r.detalhe : texto),
+                                  {TR("Claude Code", "Claude Code", "Claude Code", "Claude Code"), TR("Voltar", "Back", "返回", "Volver")});
             return;
         }
         if (tela_ == Tela::Carregando) {
@@ -144,6 +172,8 @@ public:
 private:
     enum class Tela { Gravando, Carregando, Lista, Item };
     std::atomic<bool> buscar_detalhe_{false};
+    std::atomic<bool> enviar_claude_{false};
+    bool vendo_texto_ = false;  // tela Item mostrando a gravação (com o botão Claude Code)
     int atual_ = 0;
 
     static std::string Codificar(const std::string& texto) {  // id tem espaço ("2026-10-05 19h55")
@@ -204,13 +234,13 @@ private:
         app.DefinirGanchoAudio(nullptr);
         CartaoWatcher::Instancia().PararReuniao();
         if (!arquivo_.empty() && !houve_queda_) {
-            CartaoWatcher::Mover(arquivo_, "/enviados/");  // o Mac já tem a reunião inteira
+            CartaoWatcher::Mover(arquivo_, "/enviados/");  // o Mac já tem a gravação inteira
         }
         gravando_ = false;
         pausado_ = false;
         if (houve_queda_) {
             int minutos = (segundos + 30) / 60;
-            ContextoApps::Avisar(TR("Reunião salva", "Meeting saved", "会议已保存", "Reunión guardada"),
+            ContextoApps::Avisar(TR("Gravação salva", "Recording saved", "录音已保存", "Grabación guardada"),
                                  std::to_string(minutos) +
                                      TR(" min no cartão. Envio ao Mac quando houver conexão.",
                                         " min on the card. Sending to the Mac once online.",
@@ -218,11 +248,11 @@ private:
                                         " min en la tarjeta. Se enviará al Mac cuando haya conexión."),
                                  "happy");
         }
-        // Lista das reuniões gravadas (espera o servidor registrar a que acabou de terminar)
+        // Lista das gravações (espera o servidor registrar a que acabou de terminar)
         tela_ = Tela::Carregando;
         buscar_em_ = ContextoApps::Agora() + 2;
         c.painel.MostrarStatus(TR("Gravador", "Recorder", "录音机", "Grabadora"), PainelWatcher::Status::Carregando,
-                               TR("Salvando a reunião…", "Saving meeting…", "正在保存会议…", "Guardando la reunión…"));
+                               TR("Salvando a gravação…", "Saving recording…", "正在保存录音…", "Guardando la grabación…"));
     }
 
     void BuscarLista(ContextoApps& c) {

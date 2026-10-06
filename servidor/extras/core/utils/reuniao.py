@@ -140,7 +140,7 @@ class GravadorReuniao:
                               f"{minutos} 分钟的摘要已保存到备忘录", f"Resumen de {minutos} min guardado en Notas"), "happy")
         except Exception as e:
             self._log(f"ERRO: {e}")
-            self._notificar(t("Reunião gravada, mas o processamento falhou", "Meeting recorded, but processing failed",
+            self._notificar(t("Gravação salva, mas o processamento falhou", "Recording saved, but processing failed",
                              "会议已录制，但处理失败", "Reunión grabada, pero el procesamiento falló") + f": {e}")
 
     def _transcrever(self) -> str:
@@ -200,7 +200,7 @@ end tell'''
 
     def _notificar(self, msg: str):
         msg = msg.replace('"', "'")[:200]
-        subprocess.run(["osascript", "-e", f'display notification "{msg}" with title "Watcher: {t("reunião", "meeting", "会议", "reunión")}"'],
+        subprocess.run(["osascript", "-e", f'display notification "{msg}" with title "Watcher: {t("gravador", "recorder", "录音机", "grabadora")}"'],
                        capture_output=True, timeout=15)
 
 

@@ -9,6 +9,7 @@
 class AppUsoClaude : public AppWatcher {
 public:
     const char* Nome() const override { return TR("Uso Claude", "Claude usage", "Claude 用量", "Uso de Claude"); }
+    const char* Id() const override { return "uso_claude"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_PROGRESS_ACTIVITY; }
     std::string Detalhe() const override { return TR("Limites de 5 h e da semana", "5-hour and weekly limits", "5 小时和每周限额", "Límites de 5 h y semanal"); }
 
@@ -25,7 +26,7 @@ public:
             return;
         }
         std::string corpo;
-        if (!RedeWatcher::Pedir("GET", "/watcher/uso", "", corpo)) {
+        if (!RedeWatcher::PedirCache("/watcher/uso", 120, corpo)) {
             c.painel.MostrarTexto(TR("Uso do Claude", "Claude usage", "Claude 用量", "Uso de Claude"),
                                   TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "暂时连不上 Mac。",
                                      "No he podido conectar con el Mac."),

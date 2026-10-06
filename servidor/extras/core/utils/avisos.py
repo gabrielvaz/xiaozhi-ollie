@@ -18,6 +18,8 @@ AVISOS = {
     "multica_agentes": t("Consultando os agentes…", "Checking the agents…", "正在查询智能体…", "Consultando los agentes…"),
     "multica_criar_issue": t("Criando a issue…", "Creating the issue…", "正在创建 issue…", "Creando la issue…"),
     "multica_comentar": t("Comentando na issue…", "Commenting on the issue…", "正在评论 issue…", "Comentando en la issue…"),
+    "multica_mudar_status": t("Mudando a issue…", "Updating the issue…", "正在更新 issue…", "Cambiando la issue…"),
+    "multica_daemon": t("Mexendo no daemon do Multica…", "Switching the Multica daemon…", "正在切换 Multica 守护进程…", "Cambiando el daemon de Multica…"),
     "multica_autopilot": t("Consultando os autopilots…", "Checking the autopilots…", "正在查询 autopilot…", "Consultando los autopilots…"),
     "mac_status": t("Checando o Mac…", "Checking the Mac…", "正在检查 Mac…", "Revisando el Mac…"),
     "mac_atalhos_listar": t("Vendo os atalhos do Mac…", "Looking at the Mac shortcuts…", "正在查看 Mac 快捷指令…", "Viendo los atajos del Mac…"),

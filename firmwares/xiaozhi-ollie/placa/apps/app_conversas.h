@@ -12,6 +12,7 @@
 class AppConversas : public AppWatcher {
 public:
     const char* Nome() const override { return TR("Conversas", "Chats", "对话", "Conversaciones"); }
+    const char* Id() const override { return "conversas"; }
     const char* Icone() const override { return MATERIAL_SYMBOLS_CHAT_BUBBLE; }
     std::string Detalhe() const override { return TR("Ler ou ouvir de novo", "Read or listen again", "重新阅读或收听", "Leer o escuchar de nuevo"); }
 
@@ -61,7 +62,7 @@ public:
         }
         std::string corpo;
         if (p == Pedido::Lista) {
-            if (!RedeWatcher::Pedir("GET", "/watcher/conversas", "", corpo)) {
+            if (!RedeWatcher::PedirCache("/watcher/conversas", 60, corpo)) {
                 pedido_ = Pedido::Nada;
                 tela_ = Tela::Erro;
                 c.painel.MostrarStatus(TR("Conversas", "Chats", "对话", "Conversaciones"), PainelWatcher::Status::Erro,

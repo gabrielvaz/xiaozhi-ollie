@@ -45,7 +45,7 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 | **Reuniões** | Lista as reuniões (quando e duração) e grava uma nova, com pausar e continuar. Áudio vai ao Mac (transcrição, resumo, decisões, próximos passos, nota no Apple Notes); cópia no microSD; se a internet cair, continua gravando no cartão |
 | **Cronômetro** | Com milissegundos; continua correndo com a gaveta fechada |
 | **Contagem regressiva** | Cada passo da roda vale 30 s; alarme com som ao terminar |
-| **Relógio mundial** | Milão, Lisboa, Londres, Nova York, Tóquio, Sydney e outras; horário de verão dos EUA, da Europa e da Austrália |
+| **Relógio mundial** | Aro com 24 bolinhas, uma por fuso (UTC+0 no topo); girar anda o cursor pelo aro e Brasília tem um anel. Cada fuso tem uma cidade (Londres, Nova York, Tóquio, Auckland...), com horário de verão dos EUA, da Europa, da Austrália e da Nova Zelândia |
 | **Mostrar QR code** | Wi-Fi atual e a lista de `iCloud Drive/Watcher/QR.md` |
 | **Memória offline** | Sessões, últimas reuniões e lembretes, com texto e áudio, guardados no microSD para usar sem internet |
 | **Backup** | Conversas e reuniões do microSD para `iCloud Drive/Watcher/Do cartão` (spinner e confirmação) |

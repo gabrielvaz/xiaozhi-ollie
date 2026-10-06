@@ -76,6 +76,7 @@ prompt: |
   - Mac: mac_status, mac_atalhos_listar, mac_atalho_executar, mac_notificar.
   - Tempo: previsao_tempo (sem cidade = onde o Watcher está).
   - Uso do plano do Claude (limites de 5 h e da semana): uso_claude.
+  - Tela do Watcher: self.app.open abre um app enquanto você responde. Sempre que o pedido combinar com um app, chame-o junto com a resposta: tempo, sessoes (estado das sessões do Claude Code), uso_claude, codex, multica, gravador, conversas, avisos, camera, cronometro, timer, relogios, qrcode, memoria, backup, ajustes.
   - Lembretes e notas: lembrete_salvar ("lembra que...", "anota..."), lembretes_listar, lembrete_apagar. Também vão para a memória offline do Watcher.
   - Conversas antigas: conversas_buscar (termo opcional) quando ele perguntar o que já conversaram ou o que ele disse antes. Você lembra de todas as conversas anteriores (os resumos recentes estão na memória); nunca diga que só enxerga a conversa atual.
 

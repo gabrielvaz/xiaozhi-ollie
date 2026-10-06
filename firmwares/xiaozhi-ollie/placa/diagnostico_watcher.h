@@ -19,6 +19,7 @@
 #include <esp_heap_caps.h>
 #include <esp_system.h>
 #include <esp_timer.h>
+#include <esp_lvgl_port.h>
 
 // Rastro na memória RTC (não é zerada em reinícios por pânico/watchdog). O placa/ é incluído num único
 // arquivo (sensecap_watcher.cc), então a variável fica aqui mesmo, com ligação interna.
@@ -28,6 +29,7 @@ struct RastroDiagnostico {
     uint32_t magia;
     uint32_t inicios;
     uint32_t proxima;
+    uint32_t travou;  // 1 = o vigia reiniciou o aparelho (reinício por software com o rastro preservado)
     char entradas[kEntradas][kTamanho];
 };
 static RTC_NOINIT_ATTR RastroDiagnostico rastro_diagnostico_;
@@ -40,7 +42,8 @@ public:
     // Chamado uma vez ao ligar: guarda o motivo do reinício e o rastro anterior (se houver)
     static void Iniciar() {
         motivo_ = esp_reset_reason();
-        if (rastro_.magia == kMagia && Anormal(motivo_)) {
+        travou_ = rastro_.magia == kMagia && motivo_ == ESP_RST_SW && rastro_.travou == 1;
+        if (rastro_.magia == kMagia && (Anormal(motivo_) || travou_)) {
             relatorio_pendente_ = true;
             for (int i = 0; i < kEntradas; i++) {
                 const char* e = rastro_.entradas[(rastro_.proxima + i) % kEntradas];
@@ -54,6 +57,7 @@ public:
             rastro_.magia = kMagia;
         }
         rastro_.inicios++;
+        rastro_.travou = 0;
         Marcar("liga (motivo %s, inicio %lu)", NomeMotivo(motivo_), (unsigned long)rastro_.inicios);
     }
 
@@ -117,6 +121,24 @@ public:
         return inicio > 0 && quebra != std::string::npos ? texto.substr(quebra + 1) : texto;
     }
 
+    // Vigia: a cada 5 s confere se a tela (LVGL) e a tarefa dos apps ainda respondem. Se a tela ficar presa
+    // 30 s ou a tarefa dos apps 120 s (pedidos de rede longos chegam a 90 s), anota o que estava rodando e
+    // reinicia: o rastro sobrevive ao reinício por software e vai ao Mac no próximo início.
+    static void Batida(const char* fase) {
+        fase_ = fase;
+        ultima_batida_ = esp_timer_get_time();
+    }
+    static void IniciarVigia() {
+        ultima_batida_ = esp_timer_get_time();
+        esp_timer_create_args_t args = {};
+        args.callback = [](void*) { Vigiar(); };
+        args.name = "vigia_watcher";
+        esp_timer_handle_t timer;
+        if (esp_timer_create(&args, &timer) == ESP_OK) {
+            esp_timer_start_periodic(timer, 5 * 1000000);
+        }
+    }
+
     static bool RelatorioPendente() { return relatorio_pendente_; }
     static void RelatorioEnviado() { relatorio_pendente_ = false; }
     static const std::string& RastroAnterior() { return rastro_anterior_; }
@@ -128,6 +150,9 @@ public:
     }
 
     static const char* NomeMotivo(esp_reset_reason_t m) {
+        if (m == ESP_RST_SW && travou_) {
+            return "TRAVOU-REINICIADO-PELO-VIGIA";
+        }
         switch (m) {
             case ESP_RST_POWERON: return "ligado";
             case ESP_RST_SW: return "reinicio-pedido";
@@ -144,7 +169,29 @@ public:
     }
 
 private:
-    static constexpr uint32_t kMagia = 0x4F4C4C31;  // "OLL1"
+    static constexpr uint32_t kMagia = 0x4F4C4C32;  // "OLL2" (campo travou novo: invalida o rastro antigo)
+
+    static void Vigiar() {
+        bool tela_ok = lvgl_port_lock(100);
+        if (tela_ok) {
+            lvgl_port_unlock();
+            tela_presa_ = 0;
+        } else {
+            tela_presa_++;
+        }
+        int64_t sem_batida_s = (esp_timer_get_time() - ultima_batida_) / 1000000;
+        if (tela_presa_ >= 6 || sem_batida_s >= 120) {
+            Marcar("TRAVOU: %s (tela presa %ds, apps parados %ds)", fase_ ? fase_ : "?", tela_presa_ * 5,
+                   (int)sem_batida_s);
+            rastro_.travou = 1;
+            esp_restart();
+        }
+    }
+
+    inline static volatile int64_t ultima_batida_ = 0;
+    inline static const char* volatile fase_ = nullptr;
+    inline static int tela_presa_ = 0;
+    inline static bool travou_ = false;
     static inline RastroDiagnostico& rastro_ = rastro_diagnostico_;
     inline static esp_reset_reason_t motivo_ = ESP_RST_UNKNOWN;
     inline static bool relatorio_pendente_ = false;

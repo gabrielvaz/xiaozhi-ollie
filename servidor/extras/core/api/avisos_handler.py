@@ -6,6 +6,8 @@ from core.auth import AuthManager
 from core.utils.idioma import t
 from core.utils.vigia import avisos_desde
 
+_cache_tempo: dict = {}  # ip -> (quando, previsão)
+
 
 class AvisosHandler:
     def __init__(self, config: dict):
@@ -22,28 +24,11 @@ class AvisosHandler:
         if not self._autorizado(request):
             return web.json_response({"erro": "não autorizado"}, status=401)
         import asyncio
-        from core.utils.vigia import ponte_carregada
-        ponte = ponte_carregada()
-        agentes = await asyncio.to_thread(ponte._agentes)
-        # rótulos de situacao ficam em português: o firmware compara o texto para escolher o ícone (app_sessoes.h)
-        rotulos = {"esperando você": "Esperando você", "trabalhando": "Trabalhando", "subagentes rodando": "Subagentes",
-                   "concluiu recentemente": "Concluída", "parada": "Parada"}
-        sessao_padrao = t("Sessão", "Session", "会话", "Sesión")
-        un_min, un_h = t("min", "min", "分钟", "min"), t("h", "h", "小时", "h")
-        sessoes = []
-        for a in agentes:
-            if a["situacao"] == "parada" and len(sessoes) >= 12:
-                continue
-            minutos = a.get("minutos_desde_ultima_atividade")
-            sessoes.append({
-                "id": a["sessao"],
-                "titulo": (a.get("titulo") or a.get("workspace") or a.get("pasta") or sessao_padrao)[:40],
-                "agente": a.get("agente", ""),
-                "situacao": rotulos.get(a["situacao"], a["situacao"]),
-                "ha": "" if minutos is None else (f"{minutos} {un_min}" if minutos < 60 else f"{minutos // 60} {un_h}"),
-                "ultima": (a.get("ultima_fala") or "")[:300],
-            })
-        return web.json_response({"sessoes": sessoes[:20]})
+        from core.utils.vigia import ponte_carregada, sessoes_compactas, sessoes_recentes
+        sessoes = sessoes_recentes()  # o vigia recalcula a cada 10 s: responde na hora
+        if sessoes is None:
+            sessoes = sessoes_compactas(await asyncio.to_thread(ponte_carregada()._agentes))
+        return web.json_response({"sessoes": sessoes})
 
     async def handle_mensagens(self, request: web.Request) -> web.Response:
         """Últimas mensagens (você e o agente) de uma sessão, da mais antiga para a mais nova."""
@@ -71,10 +56,15 @@ class AvisosHandler:
                 msgs = ponte.mensagens_tela(sessao, agente.get("agente") or "")
             while len(msgs) > 1 and sum(len(m["texto"]) for m in msgs) > 5000:
                 msgs.pop(0)
+            try:
+                pergunta = ponte.pergunta_tela(sessao)
+            except Exception:
+                pergunta = None
             return {
                 "titulo": (agente.get("titulo") or agente.get("workspace") or agente.get("pasta") or t("Sessão", "Session", "会话", "Sesión"))[:40],
                 "situacao": rotulos.get(agente["situacao"], agente["situacao"]),
                 "mensagens": msgs,
+                "pergunta": pergunta,  # o Watcher não precisa pedir /pergunta à parte
             }
 
         dados = await asyncio.to_thread(ler)
@@ -149,9 +139,15 @@ class AvisosHandler:
             return web.json_response({"erro": "não autorizado"}, status=401)
         import asyncio
         from plugins_func.functions.previsao_tempo import dados_tempo
+        import time
         ip = (request.headers.get("x-forwarded-for") or request.remote or "").split(",")[0].strip()
+        guardado = _cache_tempo.get(ip)
+        if guardado and time.time() - guardado[0] < 600:
+            return web.json_response(guardado[1])
         try:
-            return web.json_response(await asyncio.to_thread(dados_tempo, ip))
+            dados = await asyncio.to_thread(dados_tempo, ip)
+            _cache_tempo[ip] = (time.time(), dados)
+            return web.json_response(dados)
         except Exception as e:
             return web.json_response({"ok": False, "erro": t("Previsão indisponível", "Forecast unavailable", "天气预报不可用", "Previsión no disponible") + f": {e}"})
 

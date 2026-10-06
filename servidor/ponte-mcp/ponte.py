@@ -784,6 +784,27 @@ def multica_comentar(issue: str, texto: str, confirmado: bool = False) -> str:
 
 
 @mcp.tool()
+def multica_mudar_status(issue: str, status: str, confirmado: bool = False) -> str:
+    """Muda a situação de uma issue do Multica (ex.: 'MDB-1'). status: backlog, todo, in_progress, in_review, done,
+    blocked ou cancelled. Exige confirmado=true."""
+    pend = _confirmar(confirmado, f"mudar a {issue} para {status}")
+    if pend:
+        return pend
+    code, out = _run(["multica", "issue", "status", issue, status])
+    return "Situação alterada." if code == 0 else f"erro: {out[:500]}"
+
+
+@mcp.tool()
+def multica_daemon(ligar: bool, confirmado: bool = False) -> str:
+    """Liga ou desliga o daemon local do Multica (com ele ligado, os agentes deste Mac pegam tarefas). Exige confirmado=true."""
+    pend = _confirmar(confirmado, "ligar o daemon do Multica" if ligar else "desligar o daemon do Multica")
+    if pend:
+        return pend
+    code, out = _run(["multica", "daemon", "start" if ligar else "stop"], 40)
+    return ("Daemon ligado." if ligar else "Daemon desligado.") if code == 0 else f"erro: {out[:500]}"
+
+
+@mcp.tool()
 def multica_autopilot(autopilot: str = "", disparar: bool = False, confirmado: bool = False) -> str:
     """Sem argumentos lista os autopilots do Multica. Com autopilot e disparar=true, executa um agora (exige confirmado=true)."""
     if not disparar:
