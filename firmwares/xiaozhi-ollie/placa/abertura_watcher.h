@@ -4,12 +4,22 @@
 
 #include <lvgl.h>
 
+#include <string>
+
 #include "fontes_watcher.h"
 #include "idioma_watcher.h"
 
 LV_FONT_DECLARE(font_ollie_logo_88);  // fonte/font_ollie_logo_88.c: Inter Black, só as letras de "Ollie"
 
-#define OLLIE_VERSAO "0.1.0"
+// Versão mostrada na abertura e em Configurações > Sobre: a mesma do OTA (PROJECT_VER, que vem de
+// OLLIE_VERSAO_APP em aplicar_patches.py). No simulador não há descrição do app.
+#if __has_include(<esp_app_desc.h>)
+#include <esp_app_desc.h>
+inline const char* OllieVersao() { return esp_app_get_description()->version; }
+#else
+inline const char* OllieVersao() { return "dev"; }
+#endif
+#define OLLIE_BASE_XIAOZHI "2.5.0"  // versão do XiaoZhi baixada por compilar.sh
 
 class AberturaWatcher {
 public:
@@ -61,7 +71,7 @@ public:
         auto frase = Texto(tela, Fontes::Pequena(), 0xC8C8C8, TR("de olho nos seus agentes", "keeps an eye on your agents",
                                                                     "keeps an eye on your agents", "vigila a tus agentes"));
         lv_obj_align(frase, LV_ALIGN_TOP_MID, 0, 284);
-        auto versao = Texto(tela, Fontes::Pequena(), 0x6E6E6E, "v" OLLIE_VERSAO);
+        auto versao = Texto(tela, Fontes::Pequena(), 0x6E6E6E, (std::string("v") + OllieVersao()).c_str());
         lv_obj_align(versao, LV_ALIGN_TOP_MID, 0, 316);
 
         lv_obj_fade_out(tela, 500, kDuracaoMs);

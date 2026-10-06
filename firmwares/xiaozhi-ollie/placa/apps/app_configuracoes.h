@@ -283,9 +283,9 @@ private:
         auto pos = servidor.find("://");
         servidor = servidor.substr(pos == std::string::npos ? 0 : pos + 3);
         servidor = servidor.substr(0, servidor.find('/'));
-        std::string texto = std::string("Ollie v" OLLIE_VERSAO) +
+        std::string texto = std::string("Ollie v") + OllieVersao() +
                             TR(" (base XiaoZhi ", " (based on XiaoZhi ", " (基于 XiaoZhi ", " (base XiaoZhi ") +
-                            std::string(esp_app_get_description()->version) +
+                            OLLIE_BASE_XIAOZHI +
                             ")\nWi-Fi: " + (wifi.IsConnected() ? wifi.GetSsid() : std::string(TR("desconectado", "disconnected", "未连接", "desconectado"))) +
                             "\nIP: " + (wifi.IsConnected() ? wifi.GetIpAddress() : std::string("-")) +
                             "\nMAC: " + SystemInfo::GetMacAddress() + TR("\nServidor: ", "\nServer: ", "\n服务器：", "\nServidor: ") + servidor +

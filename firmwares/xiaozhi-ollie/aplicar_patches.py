@@ -948,7 +948,7 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.5.2"
+OLLIE_VERSAO_APP = "2.5.3"
 OLLIE_POSE_ASSETS = "sem_wifi"
 OLLIE_ARQUIVO_ASSETS = "ollie-assets_2.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
