@@ -339,7 +339,7 @@ public:
 
     void SetChatMessage(const std::string& papel, const std::string& texto_original) {
         std::string texto = texto_original;
-        bool asterisco = papel == "saudacao" && AsteriscoClaude::PrepararTexto(texto);
+        bool asterisco = papel == "saudacao" && asterisco_.PrepararTexto(texto);
         if (texto.empty()) {
             asterisco_.Esconder();
             papel_atual_.clear();

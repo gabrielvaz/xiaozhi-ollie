@@ -274,7 +274,10 @@ trocar(placa, """            lv_obj_set_style_pad_bottom(bottom_bar_, 30, 0);
             std::string texto = content ? content : "";
             CartaoWatcher::Instancia().RegistrarConversa(papel, texto);  // registro local no microSD
             // "* Codando…" (sessão trabalhando): o asterisco animado do Claude Code no lugar do "*"
-            bool asterisco = papel == "saudacao" && AsteriscoClaude::PrepararTexto(texto);
+            bool asterisco = papel == "saudacao" && asterisco_.PrepararTexto(texto);
+            // Progresso da sessão ("* Codando…", sessão, "rodando há") no tamanho do título dos avisos
+            // ("Tarefa concluída", acima do Clawd); saudação e conversa seguem na fonte grande
+            lv_obj_set_style_text_font(chat_message_label_, asterisco ? Fontes::Pequena() : Fontes::Grande(), 0);
             if (texto.empty()) {
                 asterisco_.Esconder();
                 fala_.clear();
@@ -972,7 +975,7 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.5.8"
+OLLIE_VERSAO_APP = "2.5.9"
 OLLIE_POSE_ASSETS = "xingando"
 OLLIE_ARQUIVO_ASSETS = "ollie-assets_3.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
