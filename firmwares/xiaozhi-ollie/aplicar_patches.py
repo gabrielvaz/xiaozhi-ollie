@@ -126,6 +126,9 @@ if env.get("HOST_PUBLICO") and env.get("SEGREDO"):
     placa = json.loads(cfg.read_text(encoding="utf-8"))
     extra = placa["builds"][0]["sdkconfig_append"]
     extra[:] = [l for l in extra if not l.startswith("CONFIG_OTA_URL=")] + [f'CONFIG_OTA_URL="{ota}"']
+    # Diagnóstico: tarefa que trava o processador por 10 s reinicia o aparelho (o motivo e o rastro vão ao Mac)
+    if "CONFIG_ESP_TASK_WDT_PANIC=y" not in extra:
+        extra.append("CONFIG_ESP_TASK_WDT_PANIC=y")
     cfg.write_text(json.dumps(placa, ensure_ascii=False, indent=4) + "\n", encoding="utf-8")
 else:
     problemas.append("servidor/.env sem HOST_PUBLICO/SEGREDO: endereço OTA não embutido")

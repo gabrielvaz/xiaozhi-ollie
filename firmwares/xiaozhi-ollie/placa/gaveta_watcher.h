@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "idioma_watcher.h"
+#include "diagnostico_watcher.h"
 #include "nucleo_apps.h"
 
 class GavetaWatcher {
@@ -36,6 +37,7 @@ public:
                 aberta_ = true;
                 ativo_ = visiveis[i];
                 ultimo_indice_ = i + 1;  // índice no mosaico (o 0 é o Voltar)
+                DiagnosticoWatcher::Marcar("abre %s (%s)", ativo_->Id(), argumento.substr(0, 12).c_str());
                 ativo_->AbrirCom(contexto_, argumento);
                 return;
             }
@@ -127,6 +129,7 @@ public:
         }
         ativo_ = visiveis[i - 1];
         ultimo_indice_ = i;
+        DiagnosticoWatcher::Marcar("abre %s", ativo_->Id());
         ativo_->Abrir(contexto_);
         return true;
     }

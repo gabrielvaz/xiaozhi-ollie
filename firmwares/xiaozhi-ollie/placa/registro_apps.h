@@ -19,11 +19,13 @@
 #include "apps/app_uso_claude.h"
 #include "apps/servico_avisos.h"
 #include "apps/servico_carregador.h"
+#include "apps/servico_diagnostico.h"
 #include "apps/servico_saudacao.h"
 #include "apps/servico_silencio.h"
 #include "gaveta_watcher.h"
 
 inline void RegistrarApps(GavetaWatcher& gaveta) {
+    DiagnosticoWatcher::Iniciar();  // motivo do último reinício e rastro anterior
     gaveta.Registrar(std::make_unique<AppSessoes>());
     gaveta.Registrar(std::make_unique<AppCodex>());
     gaveta.Registrar(std::make_unique<AppAvisos>());
@@ -42,4 +44,5 @@ inline void RegistrarApps(GavetaWatcher& gaveta) {
     gaveta.Registrar(std::make_unique<ServicoSaudacao>());  // sem tela: saudação na espera
     gaveta.Registrar(std::make_unique<ServicoSilencio>());  // sem tela: para de ouvir se ninguém falar
     gaveta.Registrar(std::make_unique<ServicoCarregador>());  // sem tela: choque ao conectar o cabo
+    gaveta.Registrar(std::make_unique<ServicoDiagnostico>());  // sem tela: pulso e rastro de travamentos
 }

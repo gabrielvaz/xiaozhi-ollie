@@ -191,6 +191,7 @@ TROCAS: list[tuple[str, str, str]] = [
                                 web.get("/watcher/tempo", avisos.handle_tempo),
                                 web.post("/watcher/upload", cartao.handle_upload),
                                 web.post("/watcher/backup", cartao.handle_backup),
+                                web.post("/watcher/diagnostico", cartao.handle_diagnostico),
                                 web.get("/watcher/memoria", cartao.handle_memoria),
                                 web.get("/watcher/memoria/audio/{nome}", cartao.handle_audio),
                                 web.get("/watcher/perfil", conversas.handle_perfil),
