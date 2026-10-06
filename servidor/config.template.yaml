@@ -104,6 +104,12 @@ selected_module:
   Memory: nomem
   Intent: function_call
 
+# Silêncio que encerra a fala. O padrão do xiaozhi-server é 200 ms: qualquer respiro já fazia o Ollie
+# responder no meio da frase. Mais alto = pode pausar mais, mas a resposta começa um pouco depois.
+VAD:
+  SileroVAD:
+    min_silence_duration_ms: 1000
+
 Intent:
   function_call:
     type: function_call
