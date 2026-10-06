@@ -373,7 +373,7 @@ def quadro(emocao, f):
     elif emocao == "robot_2":            # iniciando: olhos normais e pontinhos carregando
         olhos(t, "normal"); boca(t, "reta")
         for i in range(3):
-            t.px(7 + i * 3, 16, AMARELO if i == f % 3 else CINZA)
+            t.px(7 + i * 3, 17, AMARELO if i == f % 3 else CINZA)  # 2 px de grade (12 px) abaixo das pernas
     elif emocao == "conectando":         # sinal de Wi-Fi acendendo por partes, olhando para os lados
         olhos(t, "normal", dx=(-1, 0, 1, 0, -1, 0)[f % 6]); boca(t, "reta")
         acesas = f % 5                   # 0..4 partes acesas

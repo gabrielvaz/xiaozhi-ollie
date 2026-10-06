@@ -359,8 +359,10 @@ def sessoes_listar(somente_ativas: bool = False) -> str:
     if not somente_ativas:
         relevantes += [a for a in ag if a["situacao"] == "parada"][:5]
     return json.dumps({
-        "como_relatar": "Diga quantas estão em cada situação. Cite as que esperam você, trabalham ou têm subagentes, "
-                        "e as que concluíram recentemente com o que concluíram (campo ultima_fala, resumido).",
+        "como_relatar": ("Relate CADA sessão que não está parada, pelo título, nesta ordem: primeiro as que esperam "
+                         "você (o que pedem), depois as que estão trabalhando ou com subagentes (no que trabalham), "
+                         "depois as que concluíram recentemente (o que concluíram, pela ultima_fala resumida em uma "
+                         "frase, e há quanto tempo). Das paradas, diga só quantas são. Sem ids."),
         "totais": totais,
         "sessoes": relevantes,
     }, ensure_ascii=False)
