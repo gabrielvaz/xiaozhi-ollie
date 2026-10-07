@@ -82,7 +82,7 @@ Telas:
 4. **Uso**: dois medidores com o horário de reinício.
 5. **Ajustes**: ler respostas em voz alta (liga/desliga), desfazer pareamento, versão.
 
-Complicações (WidgetKit): circular com o uso de 5 h; retangular com "2 trabalhando · 1 esperando". Dados compartilhados por App Group, recarregados quando o app atualiza o estado.
+Complicações (WidgetKit): circular com o uso de 5 h; retangular com "2 trabalhando · 1 esperando". A extensão lê o token num grupo de Keychain compartilhado (App Groups exigiriam configuração manual no portal) e busca o estado no relay; o app pede recarga quando o estado muda.
 
 Idiomas: português (Brasil) e inglês.
 

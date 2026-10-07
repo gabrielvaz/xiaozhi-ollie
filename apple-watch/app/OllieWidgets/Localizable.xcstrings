@@ -1,0 +1,76 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%lld active": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ativas"
+          }
+        }
+      }
+    },
+    "%lld waiting": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld esperando"
+          }
+        }
+      }
+    },
+    "%lld working": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld trabalhando"
+          }
+        }
+      }
+    },
+    "5h %lld%% · %lld active": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5h %lld%% · %lld ativas"
+          }
+        }
+      }
+    },
+    "No active sessions": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma sessão ativa"
+          }
+        }
+      }
+    },
+    "Open to pair": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abra para parear"
+          }
+        }
+      }
+    },
+    "Plan usage and your coding sessions.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uso do plano e suas sessões de código."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

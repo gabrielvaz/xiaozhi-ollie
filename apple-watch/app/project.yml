@@ -1,0 +1,120 @@
+name: Ollie
+options:
+  bundleIdPrefix: com.example.olliewatch
+  deploymentTarget:
+    watchOS: "11.0"
+    iOS: "18.0"
+  developmentLanguage: en
+  knownRegions: [en, pt-BR, Base]
+  createIntermediateGroups: true
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: TEAMID_EXEMPLO
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "2"
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  # Container vazio que a App Store exige para um app só de relógio.
+  Ollie:
+    type: application.watchapp2-container
+    platform: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch
+        PRODUCT_NAME: Ollie
+        INFOPLIST_KEY_CFBundleDisplayName: Ollie
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - target: OllieWatch
+
+  OllieWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: Ollie
+    info:
+      path: Ollie/Info.plist
+      properties:
+        CFBundleDisplayName: Ollie
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        WKApplication: true
+        WKWatchOnly: true
+        ITSAppUsesNonExemptEncryption: false
+        UIBackgroundModes: [remote-notification]
+    entitlements:
+      path: Ollie/Ollie.entitlements
+      properties:
+        aps-environment: development
+        keychain-access-groups: ["$(AppIdentifierPrefix)com.example.olliewatch.shared"]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch.watchkitapp
+        PRODUCT_NAME: Ollie
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SKIP_INSTALL: YES
+    dependencies:
+      - target: OllieWidgets
+
+  OllieWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: OllieWidgets
+      - path: Ollie/Model/Shared.swift
+      - path: Ollie/Model/RelayModels.swift
+      - path: Ollie/Model/RelayClient.swift
+      - path: Ollie/Model/Keychain.swift
+    info:
+      path: OllieWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Ollie
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: OllieWidgets/OllieWidgets.entitlements
+      properties:
+        keychain-access-groups: ["$(AppIdentifierPrefix)com.example.olliewatch.shared"]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch.watchkitapp.widgets
+        PRODUCT_NAME: OllieWidgets
+        SKIP_INSTALL: YES
+
+  OllieTests:
+    type: bundle.unit-test
+    platform: watchOS
+    sources: [OllieTests]
+    dependencies:
+      - target: OllieWatch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch.tests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Ollie.app/Ollie
+
+schemes:
+  Ollie:
+    build:
+      targets:
+        Ollie: all
+        OllieWatch: all
+    archive:
+      config: Release
+  OllieWatch:
+    build:
+      targets:
+        OllieWatch: all
+    test:
+      targets: [OllieTests]

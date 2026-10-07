@@ -1,0 +1,647 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "5-hour window resets": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A janela de 5 horas reinicia"
+          }
+        }
+      }
+    },
+    "After you talk to a session, the watch reads Claude's answer when the turn ends.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depois que você fala com uma sessão, o relógio lê a resposta do Claude quando ela termina."
+          }
+        }
+      }
+    },
+    "Allow": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permitir"
+          }
+        }
+      }
+    },
+    "Ask Claude…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pergunte ao Claude…"
+          }
+        }
+      }
+    },
+    "Browsing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pesquisando"
+          }
+        }
+      }
+    },
+    "Can't reach the relay": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sem conexão com o relay"
+          }
+        }
+      }
+    },
+    "Computers": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Computadores"
+          }
+        }
+      }
+    },
+    "Couldn't send. Check the connection.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não deu para enviar. Confira a conexão."
+          }
+        }
+      }
+    },
+    "Delegating": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delegando"
+          }
+        }
+      }
+    },
+    "Deny": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Negar"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Concluída"
+          }
+        }
+      }
+    },
+    "Editing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editando"
+          }
+        }
+      }
+    },
+    "First time? Install the plugin:": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primeira vez? Instale o plugin:"
+          }
+        }
+      }
+    },
+    "Idle": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parada"
+          }
+        }
+      }
+    },
+    "In Claude Code, run:": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Claude Code, rode:"
+          }
+        }
+      }
+    },
+    "Listen": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvir"
+          }
+        }
+      }
+    },
+    "No active sessions": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma sessão ativa"
+          }
+        }
+      }
+    },
+    "Offline. Showing the last update.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sem conexão. Mostrando a última atualização."
+          }
+        }
+      }
+    },
+    "PUSH_DONE_TITLE": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Concluída: %@"
+          }
+        }
+      }
+    },
+    "PUSH_PERMISSION_TITLE": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ needs permission"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ pede permissão"
+          }
+        }
+      }
+    },
+    "PUSH_WAITING_TITLE": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is waiting for you"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ está esperando você"
+          }
+        }
+      }
+    },
+    "Pair with Claude Code": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parear com o Claude Code"
+          }
+        }
+      }
+    },
+    "Permission": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permissão"
+          }
+        }
+      }
+    },
+    "Plan usage": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uso do plano"
+          }
+        }
+      }
+    },
+    "Plan usage on the watch:": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uso do plano no relógio:"
+          }
+        }
+      }
+    },
+    "Planning": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planejando"
+          }
+        }
+      }
+    },
+    "Read answers aloud": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ler respostas em voz alta"
+          }
+        }
+      }
+    },
+    "Reading": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lendo"
+          }
+        }
+      }
+    },
+    "Remove": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover"
+          }
+        }
+      }
+    },
+    "Running": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rodando"
+          }
+        }
+      }
+    },
+    "Searching": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Procurando"
+          }
+        }
+      }
+    },
+    "Seen %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Visto %@"
+          }
+        }
+      }
+    },
+    "Sent.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviado."
+          }
+        }
+      }
+    },
+    "Sent. I'll read the answer when it's done.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviado. Leio a resposta quando terminar."
+          }
+        }
+      }
+    },
+    "Sessions": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessões"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        }
+      }
+    },
+    "Setup": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configuração"
+          }
+        }
+      }
+    },
+    "Start Claude Code on a paired computer and it shows up here.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abra o Claude Code num computador pareado e a sessão aparece aqui."
+          }
+        }
+      }
+    },
+    "Start Claude Code with the channel:": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abra o Claude Code com o channel:"
+          }
+        }
+      }
+    },
+    "Stop": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar"
+          }
+        }
+      }
+    },
+    "Talk": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falar"
+          }
+        }
+      }
+    },
+    "Talk and approve in parallel with the terminal": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falar e aprovar junto com o terminal"
+          }
+        }
+      }
+    },
+    "The code changes every 10 minutes.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O código muda a cada 10 minutos."
+          }
+        }
+      }
+    },
+    "Thinking…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pensando…"
+          }
+        }
+      }
+    },
+    "This session ended.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta sessão terminou."
+          }
+        }
+      }
+    },
+    "This session has no channel connected.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta sessão não tem channel conectado."
+          }
+        }
+      }
+    },
+    "To talk to this session, start Claude Code with the Ollie Watch channel. See Settings.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para falar com esta sessão, abra o Claude Code com o channel do Ollie Watch. Veja em Ajustes."
+          }
+        }
+      }
+    },
+    "Try again": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tentar de novo"
+          }
+        }
+      }
+    },
+    "Unpair": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desfazer"
+          }
+        }
+      }
+    },
+    "Unpair this watch": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desfazer pareamento"
+          }
+        }
+      }
+    },
+    "Unpair this watch?": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desfazer o pareamento?"
+          }
+        }
+      }
+    },
+    "Updated %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atualizado %@"
+          }
+        }
+      }
+    },
+    "Usage": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uso"
+          }
+        }
+      }
+    },
+    "Usage appears after the first answer in a session, on Pro and Max plans, with plan usage turned on in the plugin.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O uso aparece depois da primeira resposta numa sessão, nos planos Pro e Max, com o uso do plano ligado no plugin."
+          }
+        }
+      }
+    },
+    "Version %@ (%@)": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versão %@ (%@)"
+          }
+        }
+      }
+    },
+    "Waiting for you": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando você"
+          }
+        }
+      }
+    },
+    "Week": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semana"
+          }
+        }
+      }
+    },
+    "Weekly limit resets": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O limite semanal reinicia"
+          }
+        }
+      }
+    },
+    "Working": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trabalhando"
+          }
+        }
+      }
+    },
+    "Writing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escrevendo"
+          }
+        }
+      }
+    },
+    "You": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Você"
+          }
+        }
+      }
+    },
+    "Your computers stop sending sessions to this watch.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seus computadores param de enviar sessões para este relógio."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
