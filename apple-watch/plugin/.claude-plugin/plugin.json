@@ -1,0 +1,18 @@
+{
+  "name": "ollie-watch",
+  "displayName": "Ollie Watch",
+  "version": "1.0.0",
+  "description": "Follow and steer your coding sessions from the Ollie Apple Watch app: progress, alerts, approvals, voice prompts and plan usage.",
+  "author": { "name": "Xiaozhi Ollie" },
+  "homepage": "https://github.com/gabrielvaz/xiaozhi-ollie/tree/main/apple-watch",
+  "repository": "https://github.com/gabrielvaz/xiaozhi-ollie",
+  "license": "MIT",
+  "keywords": ["apple-watch", "notifications", "voice", "remote"],
+  "mcpServers": {
+    "ollie-watch": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/channel.mjs"]
+    }
+  },
+  "channels": [{ "server": "ollie-watch", "displayName": "Ollie Watch" }]
+}

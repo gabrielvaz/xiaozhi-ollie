@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ollie-watch-relay",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "PAIRING", "class_name": "PairingDO" },
+      { "name": "CODES", "class_name": "CodesDO" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PairingDO", "CodesDO"] }],
+  "vars": {
+    "APNS_TOPIC": "com.example.olliewatch.watchkitapp",
+    "APNS_TEAM_ID": "TEAMID_EXEMPLO"
+  }
+  // Segredos (wrangler secret put): APNS_KEY_ID, APNS_KEY_P8
+}

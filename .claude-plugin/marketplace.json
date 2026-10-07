@@ -1,0 +1,15 @@
+{
+  "name": "ollie",
+  "description": "Ollie: keep an eye on your coding agents from a desk companion or an Apple Watch.",
+  "owner": {
+    "name": "Xiaozhi Ollie",
+    "url": "https://github.com/gabrielvaz"
+  },
+  "plugins": [
+    {
+      "name": "ollie-watch",
+      "source": "./apple-watch/plugin",
+      "description": "Follow and steer your coding sessions from the Ollie Apple Watch app: progress, alerts, approvals, voice prompts and plan usage."
+    }
+  ]
+}
