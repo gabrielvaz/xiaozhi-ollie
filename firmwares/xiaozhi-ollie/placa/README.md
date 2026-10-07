@@ -1,6 +1,6 @@
 # Apps da gaveta do Watcher
 
-Três cliques na roda abrem a gaveta. Girar escolhe, clicar abre. Cada app é um arquivo em `apps/`, registrado com uma linha em `registro_apps.h`. O `aplicar_patches.py` copia esta pasta para `main/boards/sensecap-watcher/` a cada compilação.
+Dois cliques na roda abrem a gaveta (configurável em Ajustes > Cliques na roda). Girar escolhe, clicar abre. Cada app é um arquivo em `apps/`, registrado com uma linha em `registro_apps.h`. O `aplicar_patches.py` copia esta pasta para `main/boards/sensecap-watcher/` a cada compilação.
 
 ## Arquivos
 

@@ -1,6 +1,7 @@
 // App "Conversas": todas as conversas com o agente, guardadas no Mac (iCloud Drive/Watcher/Conversas).
-// Lista com título e quando; abrir mostra o resumo e as falas (rolável) e "Ouvir" narra a conversa.
-// Rede e áudio rodam no Tique (fora da trava da gaveta).
+// Lista com título e quando; abrir mostra o resumo e as falas (rolável) e "Ouvir" narra a conversa
+// (com "Parar" durante a narração). Rede e áudio rodam no Tique (fora da trava da gaveta); como gerar
+// o áudio pode levar quase um minuto, um clique em qualquer espera cancela e volta.
 #pragma once
 
 #include <atomic>
@@ -18,15 +19,18 @@ public:
 
     void Abrir(ContextoApps& c) override {
         tela_ = Tela::Lista;
-        c.painel.MostrarStatus(TR("Conversas", "Chats", "对话", "Conversaciones"), PainelWatcher::Status::Carregando, TR("Buscando conversas…", "Loading chats…", "正在加载对话…", "Buscando conversaciones…"));
+        tocando_ = false;
+        c.painel.MostrarStatus(TR("Conversas", "Chats", "对话", "Conversaciones"), PainelWatcher::Status::Carregando,
+                               TR("Buscando conversas…", "Loading chats…", "正在加载对话…", "Buscando conversaciones…"),
+                               {TR("Cancelar", "Cancel", "取消", "Cancelar")});
         pedido_ = Pedido::Lista;
     }
 
     void Girar(ContextoApps& c, int passo) override { c.painel.Mover(passo); }
 
     bool Clicar(ContextoApps& c) override {
-        if (pedido_ != Pedido::Nada) {
-            return true;  // ainda carregando
+        if (pedido_ != Pedido::Nada || ocupado_) {  // carregando: o clique cancela a espera e volta
+            return Cancelar(c);
         }
         int i = c.painel.Selecionado();
         if (tela_ == Tela::Lista) {
@@ -34,21 +38,42 @@ public:
                 return false;
             }
             atual_ = i - 1;
-            c.painel.MostrarStatus(itens_[atual_].titulo, PainelWatcher::Status::Carregando, TR("Abrindo…", "Opening…", "正在打开…", "Abriendo…"), {}, "reading");
+            c.painel.MostrarStatus(itens_[atual_].titulo, PainelWatcher::Status::Carregando,
+                                   TR("Abrindo…", "Opening…", "正在打开…", "Abriendo…"),
+                                   {TR("Cancelar", "Cancel", "取消", "Cancelar")}, "reading");
             pedido_ = Pedido::Conversa;
             return true;
         }
         if (tela_ == Tela::Conversa && i == 0) {
-            c.painel.MostrarStatus(titulo_, PainelWatcher::Status::Carregando, TR("Preparando o áudio…", "Preparing audio…", "正在准备音频…", "Preparando el audio…"), {}, "music");
+            if (tocando_) {  // "Parar": interrompe a narração
+                tocando_ = false;
+                ContextoApps::App().PararSom();
+                MostrarConversa(c, texto_);
+                return true;
+            }
+            c.painel.MostrarStatus(titulo_, PainelWatcher::Status::Carregando,
+                                   TR("Preparando o áudio…", "Preparing audio…", "正在准备音频…", "Preparando el audio…"),
+                                   {TR("Cancelar", "Cancel", "取消", "Cancelar")}, "music");
             pedido_ = Pedido::Audio;
             return true;
+        }
+        if (tocando_) {
+            tocando_ = false;
+            ContextoApps::App().PararSom();
         }
         MostrarLista(c);
         return true;
     }
 
     bool Voltar(ContextoApps& c) override {
+        if (pedido_ != Pedido::Nada || ocupado_) {
+            return Cancelar(c);  // false = cancelou a primeira carga: a gaveta assume
+        }
         if (tela_ == Tela::Conversa) {
+            if (tocando_) {
+                tocando_ = false;
+                ContextoApps::App().PararSom();
+            }
             MostrarLista(c);
             return true;
         }
@@ -56,17 +81,25 @@ public:
     }
 
     void Tique(ContextoApps& c) override {
-        Pedido p = pedido_;
+        Pedido p = pedido_.exchange(Pedido::Nada);
         if (p == Pedido::Nada) {
             return;
         }
+        ocupado_ = true;
+        em_curso_ = p;
+        int g = geracao_;
         std::string corpo;
         if (p == Pedido::Lista) {
-            if (!RedeWatcher::PedirCache("/watcher/conversas", 60, corpo)) {
-                pedido_ = Pedido::Nada;
+            bool ok = RedeWatcher::PedirCache("/watcher/conversas", 60, corpo);
+            if (g != geracao_) {  // cancelado enquanto a rede respondia: descarta
+                ocupado_ = false;
+                return;
+            }
+            if (!ok) {
                 tela_ = Tela::Erro;
                 c.painel.MostrarStatus(TR("Conversas", "Chats", "对话", "Conversaciones"), PainelWatcher::Status::Erro,
                                        TR("Sem conexão com o Mac. Sem internet, o registro fica no microSD.", "Can't reach the Mac. Offline, the log stays on the microSD.", "无法连接 Mac。没有网络时，记录会保存在 microSD 卡上。", "Sin conexión con el Mac. Sin internet, el registro queda en la microSD."), {TR("Voltar", "Back", "返回", "Volver")});
+                ocupado_ = false;
                 return;
             }
             itens_.clear();
@@ -79,11 +112,14 @@ public:
             }
             cJSON_Delete(raiz);
             atual_ = 0;
-            pedido_ = Pedido::Nada;
             MostrarLista(c);
         } else if (p == Pedido::Conversa) {
             const auto& it = itens_[atual_];
             bool ok = RedeWatcher::Pedir("GET", "/watcher/conversas/" + it.id, "", corpo);
+            if (g != geracao_) {
+                ocupado_ = false;
+                return;
+            }
             cJSON* raiz = ok ? cJSON_Parse(corpo.c_str()) : nullptr;
             titulo_ = it.titulo;
             texto_ = raiz ? RedeWatcher::Campo(raiz, "texto") : "";
@@ -91,18 +127,22 @@ public:
             if (texto_.size() > 1500) {
                 texto_ = texto_.substr(0, 1500) + "…";
             }
-            pedido_ = Pedido::Nada;
             MostrarConversa(c, texto_.empty() ? TR("Não consegui abrir esta conversa.", "Couldn't open this chat.", "无法打开这段对话。", "No pude abrir esta conversación.") : texto_);
         } else if (p == Pedido::Audio) {
             som_.clear();
             bool ok = RedeWatcher::Pedir("GET", "/watcher/conversas/" + itens_[atual_].id + "/audio", "", som_) &&
                       som_.rfind("OggS", 0) == 0;
-            pedido_ = Pedido::Nada;
+            if (g != geracao_) {
+                ocupado_ = false;
+                return;
+            }
+            tocando_ = ok;
             MostrarConversa(c, ok ? texto_ : TR("Não consegui gerar o áudio agora.\n\n", "Couldn't create the audio right now.\n\n", "暂时无法生成音频。\n\n", "No pude generar el audio ahora.\n\n") + texto_);
             if (ok) {
                 ContextoApps::App().PlaySound(som_);
             }
         }
+        ocupado_ = false;
     }
 
 private:
@@ -113,10 +153,32 @@ private:
     };
     std::atomic<Tela> tela_{Tela::Lista};
     std::atomic<Pedido> pedido_{Pedido::Nada};
+    std::atomic<Pedido> em_curso_{Pedido::Nada};  // o que o Tique está buscando agora
+    std::atomic<bool> ocupado_{false};            // Tique no meio de um pedido de rede
+    std::atomic<int> geracao_{0};                 // cresce a cada cancelamento: respostas velhas são descartadas
+    std::atomic<bool> tocando_{false};            // narração em andamento ("Parar")
     std::vector<Item> itens_;
     int atual_ = 0;
     std::string titulo_, texto_;
     std::string som_;  // mantido vivo durante a reprodução
+
+    // Clique durante uma espera: descarta a resposta que vier e volta para a tela anterior
+    bool Cancelar(ContextoApps& c) {
+        geracao_++;
+        Pedido cancelado = pedido_.exchange(Pedido::Nada);
+        if (cancelado == Pedido::Nada) {
+            cancelado = em_curso_;
+        }
+        if (cancelado == Pedido::Audio) {
+            MostrarConversa(c, texto_);
+            return true;
+        }
+        if (cancelado == Pedido::Conversa || !itens_.empty()) {
+            MostrarLista(c);
+            return true;
+        }
+        return false;  // cancelou a primeira carga: volta para a gaveta
+    }
 
     void MostrarLista(ContextoApps& c) {
         tela_ = Tela::Lista;
@@ -132,6 +194,8 @@ private:
 
     void MostrarConversa(ContextoApps& c, const std::string& texto) {
         tela_ = Tela::Conversa;
-        c.painel.MostrarTexto(titulo_, texto, {TR("Ouvir", "Listen", "收听", "Escuchar"), TR("Voltar", "Back", "返回", "Volver")});
+        c.painel.MostrarTexto(titulo_, texto,
+                              {tocando_ ? TR("Parar", "Stop", "停止", "Detener") : TR("Ouvir", "Listen", "收听", "Escuchar"),
+                               TR("Voltar", "Back", "返回", "Volver")});
     }
 };

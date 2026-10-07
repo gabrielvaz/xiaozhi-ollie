@@ -157,6 +157,10 @@ struct ContextoApps {
     std::function<void(const std::string& app, const std::string& argumento)> abrir_app;
     // Apps da gaveta como (Id, Nome), na ordem do mosaico (Configurações > Cliques na roda)
     std::function<std::vector<std::pair<std::string, std::string>>()> listar_apps;
+    // Id() do app aberto agora ("" = nenhum): um app sabe se ainda é ele que está na tela
+    std::function<std::string()> app_ativo;
+    // Acende a tela (preenchido pela placa): um aviso não pode tocar som numa tela apagada
+    inline static std::function<void()> acordar_tela;
 
     static int Agora() { return (int)(esp_timer_get_time() / 1000000); }
     static Application& App() { return Application::GetInstance(); }
@@ -169,6 +173,10 @@ struct ContextoApps {
 
     // Aviso na tela principal (som opcional: Lang::Sounds::OGG_POPUP etc.)
     inline static std::atomic<int> ultimo_aviso{-100000};
+    // Por quanto tempo a tela de espera preserva o último aviso (urgente: 10 min; informativo: menos)
+    inline static std::atomic<int> aviso_prende_s{600};
+    // Sessões esperando resposta agora (vem com os avisos; a placa mostra o distintivo laranja)
+    inline static std::atomic<int> esperando_n{0};
     // Sessões do Claude Code trabalhando agora (vem junto com os avisos; a tela de espera mostra o Clawd trabalhando)
     inline static std::atomic<int> atividade_n{0};
     inline static std::string atividade_titulo;  // escrito e lido só pela tarefa da gaveta
@@ -178,11 +186,17 @@ struct ContextoApps {
     inline static std::string sessoes_json;
     inline static int sessoes_quando = -100000;  // Agora() do último aviso (a saudação não o cobre)
 
+    // prende_s: por quanto tempo a tela de espera não cobre este aviso (urgente: 600; informativo: 120)
     static void Avisar(const std::string& titulo, const std::string& texto, const std::string& emocao,
-                       std::string_view som = "") {
+                       std::string_view som = "", int prende_s = 600) {
         ultimo_aviso = Agora();
+        aviso_prende_s = prende_s;
+        if (acordar_tela) {
+            acordar_tela();  // um aviso com a tela apagada tocava o som no escuro
+        }
+        // O título entra na primeira linha do texto: na barra de cima ele dura só até o relógio voltar (~10 s)
         App().Schedule([titulo, texto, emocao, som]() {
-            App().Alert(titulo.c_str(), texto.c_str(), emocao.c_str(), som);
+            App().Alert(titulo.c_str(), (titulo + "\n" + texto).c_str(), emocao.c_str(), som);
         });
     }
 };

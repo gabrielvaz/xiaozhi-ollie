@@ -975,7 +975,7 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.6.1"
+OLLIE_VERSAO_APP = "2.7.0"
 OLLIE_POSE_ASSETS = "xingando"
 OLLIE_ARQUIVO_ASSETS = "ollie-assets_3.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
@@ -1408,6 +1408,82 @@ trocar(placa, """            if (self->gaveta_ != nullptr && self->gaveta_->Clic
                 return;  // painel aberto: o clique escolhe
             }
             self->ExecutarCliques(1);""")
+
+# 32. Avisos que acendem a tela, distintivo de pendências, "Parar" para áudio e contagem do reset --------
+#     - ContextoApps::acordar_tela: um aviso (sessão esperando, timer, lembrete de gravação) acende a tela
+#       em vez de tocar um som no escuro.
+#     - Display::MostrarPendencias(n): pílula laranja na tela de espera com quantas sessões esperam resposta.
+#     - Application::PararSom(): interrompe um PlaySound em andamento (botão "Parar" em Conversas e Memória).
+#     - Reset de fábrica: a partir de 12 s segurando, uma contagem na tela diz o que vai acontecer.
+trocar(placa, """        gaveta_->Contexto().definir_desliga_s = [this](int s) { power_save_timer_->SetSecondsToShutdown(s); };""",
+       """        gaveta_->Contexto().definir_desliga_s = [this](int s) { power_save_timer_->SetSecondsToShutdown(s); };
+        ContextoApps::acordar_tela = [this]() { power_save_timer_->WakeUp(); };  // avisos acendem a tela""")
+trocar(display_h, """    // Atualização do sistema em andamento: a placa pode mostrar um spinner
+    virtual void MostrarAtualizando(bool ativo) {}""",
+       """    // Atualização do sistema em andamento: a placa pode mostrar um spinner
+    virtual void MostrarAtualizando(bool ativo) {}
+    // Sessões esperando uma resposta sua: a placa pode mostrar um distintivo na tela de espera
+    virtual void MostrarPendencias(int n) {}""")
+trocar(placa, """        // Atualização do sistema: spinner no lugar do Clawd, no centro da tela e 10 px acima da caixa do""",
+       """        // Distintivo de pendências: pílula laranja no alto da tela de espera ("2 esperando você");
+        // fica atrás da gaveta (índice 0 da camada de cima), então some quando a gaveta abre
+        lv_obj_t* pendencias_ = nullptr;
+
+        virtual void MostrarPendencias(int n) override {
+            DisplayLockGuard lock(this);
+            if (n <= 0) {
+                if (pendencias_ != nullptr) {
+                    lv_obj_add_flag(pendencias_, LV_OBJ_FLAG_HIDDEN);
+                }
+                return;
+            }
+            if (pendencias_ == nullptr) {
+                pendencias_ = lv_label_create(lv_layer_top());
+                lv_obj_move_to_index(pendencias_, 0);
+                lv_obj_set_style_text_font(pendencias_, Fontes::Pequena(), 0);
+                lv_obj_set_style_text_color(pendencias_, lv_color_hex(0x000000), 0);
+                lv_obj_set_style_bg_color(pendencias_, lv_color_hex(0xD97757), 0);
+                lv_obj_set_style_bg_opa(pendencias_, LV_OPA_COVER, 0);
+                lv_obj_set_style_radius(pendencias_, 12, 0);
+                lv_obj_set_style_pad_hor(pendencias_, 12, 0);
+                lv_obj_set_style_pad_ver(pendencias_, 2, 0);
+                lv_obj_align(pendencias_, LV_ALIGN_TOP_MID, 0, 66);
+            }
+            lv_obj_remove_flag(pendencias_, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text_fmt(pendencias_,
+                                  TR("%d esperando você", "%d waiting for you", "%d 个在等你", "%d esperándote"), n);
+        }
+
+        // Atualização do sistema: spinner no lugar do Clawd, no centro da tela e 10 px acima da caixa do""")
+trocar(app_h, """    void PlaySound(const std::string_view& sound);""",
+       """    void PlaySound(const std::string_view& sound);
+    void PararSom();  // interrompe um PlaySound em andamento (botão "Parar" do Watcher)""")
+trocar(app_cc, """void Application::PlaySound(const std::string_view& sound) { audio_service_.PlaySound(sound); }""",
+       """void Application::PlaySound(const std::string_view& sound) { audio_service_.PlaySound(sound); }
+
+void Application::PararSom() {
+    Schedule([this]() { audio_service_.ResetDecoder(); });  // limpa a fila: a narração para na hora
+}""")
+trocar(placa, """            self->long_press_cnt_++; // 每隔20ms加一
+            // Segurar 20 s restaura as configurações de fábrica: 2 + 0,02 * 900 = 20
+            if (self->long_press_cnt_ > 900) {""",
+       """            self->long_press_cnt_++; // 每隔20ms加一
+            // De 12 s em diante, uma contagem avisa o que está prestes a acontecer (solte para cancelar)
+            if (self->long_press_cnt_ >= 500 && self->long_press_cnt_ % 50 == 0) {
+                self->power_save_timer_->WakeUp();
+                int faltam = (900 - (int)self->long_press_cnt_) / 50 + 1;
+                char aviso[120];
+                snprintf(aviso, sizeof(aviso),
+                         TR("Apagar o Wi-Fi e restaurar tudo em %d s (solte para cancelar)",
+                            "Erasing Wi-Fi and resetting everything in %d s (release to cancel)",
+                            "%d 秒后清除 Wi-Fi 并恢复出厂（松开取消）",
+                            "Borrar el Wi-Fi y restaurar todo en %d s (suelta para cancelar)"),
+                         faltam);
+                self->GetDisplay()->ShowNotification(aviso, 1100);
+            }
+            // Segurar 20 s restaura as configurações de fábrica: 2 + 0,02 * 900 = 20
+            if (self->long_press_cnt_ > 900) {""")
+
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))

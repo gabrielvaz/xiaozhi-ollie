@@ -85,7 +85,11 @@ class ConversasHandler(AvisosHandler):
             return web.json_response({"erro": "não autorizado"}, status=401)
         if request.query.get("agente"):
             perfil.definir_agente(request.query["agente"])
-        return web.json_response({"usuario": perfil.usuario(), "agente": perfil.nome_agente()})
+        from datetime import datetime
+        fuso = datetime.now().astimezone().utcoffset()
+        return web.json_response({"usuario": perfil.usuario(), "agente": perfil.nome_agente(),
+                                  # fuso do Mac em minutos: o relógio mundial do Watcher usa como "casa"
+                                  "utc_off_min": int(fuso.total_seconds() // 60) if fuso is not None else -180})
 
     async def handle_lista(self, request: web.Request) -> web.Response:
         if not self._autorizado(request):

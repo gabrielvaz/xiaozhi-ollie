@@ -42,16 +42,22 @@ public:
                 return false;
             }
             atual_ = i - 1;
-            tela_ = Tela::Item;
-            const auto& m = itens_[atual_];  // item 0 da lista é o Voltar
-            c.painel.MostrarTexto(m.titulo, m.texto.size() > 600 ? m.texto.substr(0, 597) + "…" : m.texto,
-                                  m.audio.empty() ? std::vector<std::string>{TR("Voltar", "Back", "返回", "Volver")}
-                                                  : std::vector<std::string>{TR("Ouvir", "Listen", "收听", "Escuchar"), TR("Voltar", "Back", "返回", "Volver")});
+            tocando_ = false;
+            MostrarItem(c);
             return true;
         }
         if (i == 0 && !itens_[atual_].audio.empty()) {
-            tocar_ = std::string(CartaoWatcher::kPasta) + "/memoria/" + itens_[atual_].audio;
+            if (tocando_) {  // "Parar": interrompe a narração (ou desiste antes de ela começar)
+                tocando_ = false;
+                tocar_.clear();
+                ContextoApps::App().PararSom();
+            } else {
+                tocando_ = true;
+                tocar_ = std::string(CartaoWatcher::kPasta) + "/memoria/" + itens_[atual_].audio;
+            }
+            MostrarItem(c);
         } else {
+            PararSeTocando();
             MostrarLista(c, atual_);
         }
         return true;
@@ -59,6 +65,7 @@ public:
 
     bool Voltar(ContextoApps& c) override {
         if (tela_ == Tela::Item) {
+            PararSeTocando();
             MostrarLista(c, atual_);
             return true;
         }
@@ -73,6 +80,8 @@ public:
         caminho.swap(tocar_);
         if (CartaoWatcher::Ler(caminho, som_)) {
             ContextoApps::App().PlaySound(som_);
+        } else if (tocando_.exchange(false) && tela_ == Tela::Item) {
+            MostrarItem(c);  // o áudio não abriu: o botão volta a "Ouvir"
         }
     }
 
@@ -99,6 +108,24 @@ private:
     int ultima_sincronia_ = -kIntervaloS + 90;  // primeira sincronia ~90 s após ligar
     std::string tocar_;
     std::string som_;  // mantido vivo durante a reprodução
+    std::atomic<bool> tocando_{false};
+
+    void PararSeTocando() {
+        tocar_.clear();
+        if (tocando_.exchange(false)) {
+            ContextoApps::App().PararSom();
+        }
+    }
+
+    void MostrarItem(ContextoApps& c) {
+        tela_ = Tela::Item;
+        const auto& m = itens_[atual_];
+        c.painel.MostrarTexto(m.titulo, m.texto.size() > 600 ? m.texto.substr(0, 597) + "…" : m.texto,
+                              m.audio.empty() ? std::vector<std::string>{TR("Voltar", "Back", "返回", "Volver")}
+                                              : std::vector<std::string>{tocando_ ? TR("Parar", "Stop", "停止", "Detener")
+                                                                                  : TR("Ouvir", "Listen", "收听", "Escuchar"),
+                                                                         TR("Voltar", "Back", "返回", "Volver")});
+    }
 
     static std::string Pasta() { return std::string(CartaoWatcher::kPasta) + "/memoria/"; }
 

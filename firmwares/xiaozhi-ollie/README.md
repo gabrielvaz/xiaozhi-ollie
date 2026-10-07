@@ -19,11 +19,11 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 | Tela inicial | Hora | **Dia da semana, data e hora** ("Seg, 05/10 · 16:20") |
 | Tela apagada | Só apaga a luz | **Economiza bateria**: animações pausadas, processador com frequência automática (40 a 240 MHz), avisos a cada 5 min |
 | Tema | Claro | **Escuro** por padrão (ajustável) |
-| Roda | Volume e conversa | Volume (com **anel branco na borda** do tamanho do volume e o Clawd animado), conversa e **gaveta de apps em mosaico** (2 cliques abrem; 2 cliques voltam; 3 cliques fecham) |
+| Roda | Volume e conversa | Volume (com **anel branco na borda** do tamanho do volume e o Clawd animado), conversa e **gaveta de apps em mosaico** (2 cliques abrem e voltam; 3 fecham; configurável em Ajustes > Cliques na roda) |
 | Sem Wi-Fi | Alerta com engrenagem e a dica numa frase | **Tela própria**: Clawd confuso com o Wi-Fi riscado, a rede **Ollie-XXXX** e o endereço do portal; o portal diz **por que** a rede não conectou (só 2,4 GHz, senha recusada, Wi-Fi corporativo, nome com maiúsculas diferentes) |
 | Reset de fábrica | Segurar 10 s | **Segurar 20 s** |
 | microSD | Não usado | **Registro das conversas, cópia das reuniões e memória offline** |
-| Avisos | — | **Avisos do Mac na tela**: sessão esperando você, tarefa concluída, reunião pronta |
+| Avisos | — | **Avisos do Mac na tela, acendendo-a**: sessão esperando você abre direto a pergunta; tarefa concluída e reunião pronta só aparecem e saem sozinhas. Um **distintivo laranja** na espera conta as sessões esperando resposta |
 
 ## Controles
 
@@ -34,7 +34,7 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 | **3 cliques** | Fecha a gaveta de qualquer tela |
 | Girar | Fora da gaveta: volume. Na gaveta: navega |
 | Segurar 2 s (fora do carregador) | Desliga |
-| Segurar 20 s | Configurações de fábrica |
+| Segurar 20 s | Configurações de fábrica (contagem na tela a partir dos 12 s) |
 
 ## Apps da gaveta
 
@@ -44,14 +44,14 @@ Funciona com o servidor próprio deste repositório (`../../servidor`), não com
 | **Conversas** | Todas as conversas com o agente, com título e resumo; abrir mostra as falas (rolável) e **Ouvir** narra a conversa na voz do agente |
 | **Uso do Claude** | Arcos com o uso das janelas de 5 h e da semana e o tempo até reiniciar (lido no Mac; o token não vem ao aparelho) |
 | **Previsão do tempo** | Tela sem IA: ícones de sol, nuvem, chuva e tempestade; agora, hoje e amanhã (mínima, máxima, chance de chuva); botão **Ollie, fala** |
-| **Reuniões** | Lista as reuniões (quando e duração) e grava uma nova, com pausar e continuar. Áudio vai ao Mac (transcrição, resumo, decisões, próximos passos, nota no Apple Notes); cópia no microSD; se a internet cair, continua gravando no cartão |
+| **Reuniões** | Lista as reuniões (quando e duração) e grava uma nova, com pausar e continuar. A tela diz **para onde o áudio vai** (Mac, cartão ou os dois) e, sem nenhum destino, avisa em vez de fingir que grava. Áudio vai ao Mac (transcrição, resumo, decisões, próximos passos, nota no Apple Notes); cópia no microSD; se a internet cair, continua gravando no cartão. Gravações longas dão um toque a cada 30 min |
 | **Cronômetro** | Com milissegundos; continua correndo com a gaveta fechada |
 | **Contagem regressiva** | Cada passo da roda vale 30 s; alarme com som ao terminar |
-| **Relógio mundial** | Aro com 24 bolinhas, uma por fuso (UTC+0 no topo); girar anda o cursor pelo aro e Brasília tem um anel. Cada fuso tem uma cidade (Londres, Nova York, Tóquio, Auckland...), com horário de verão dos EUA, da Europa, da Austrália e da Nova Zelândia |
+| **Relógio mundial** | Aro com 24 bolinhas, uma por fuso (UTC+0 no topo); girar anda o cursor pelo aro e o **seu fuso** (o do Mac, trazido pelo perfil) tem um anel. Cada fuso tem uma cidade (Londres, Nova York, Tóquio, Auckland...), com horário de verão dos EUA, da Europa, da Austrália e da Nova Zelândia |
 | **Mostrar QR code** | Wi-Fi atual e a lista de `iCloud Drive/Watcher/QR.md` |
 | **Memória offline** | Sessões, últimas reuniões e lembretes, com texto e áudio, guardados no microSD para usar sem internet |
-| **Backup** | Conversas e reuniões do microSD para `iCloud Drive/Watcher/Do cartão` (spinner e confirmação) |
-| **Configurações** | Nome do agente (reinicia para trocar a ativação), **economia de energia** (brilho 30%, sem "Hey Ollie", pulso a cada 150 s, avisos a cada 1 min com a tela acesa e 10 min apagada), ouvir "Hey Ollie" (desligado, o microfone não fica ouvindo; conversa pela roda), tema, fonte (Noto Sans ou JetBrains Mono), tela apaga após, brilho, volume, desligar na bateria, avisos na tela, Sobre |
+| **Backup** | Conversas e reuniões do microSD para `iCloud Drive/Watcher/Do cartão`: mostra o que está pendente, pede confirmação e envia com progresso ("3/12") e Cancelar |
+| **Configurações** | Nome do agente (pergunta se reinicia agora ou depois para trocar a ativação), **economia de energia** (brilho 30%, sem "Hey Ollie", pulso a cada 150 s, avisos a cada 1 min com a tela acesa e 10 min apagada), ouvir "Hey Ollie" (desligado, o microfone não fica ouvindo; conversa pela roda), tema, fonte (Noto Sans ou JetBrains Mono), tela apaga após, brilho, volume, desligar na bateria, avisos na tela, cliques na roda, **rede Wi-Fi** (trocar de rede sem apagar as salvas), atualização, **como usar** e Sobre |
 
 Para criar um app: veja [`placa/README.md`](placa/README.md). Cada app é um arquivo em `placa/apps/` mais uma linha em `placa/registro_apps.h`.
 

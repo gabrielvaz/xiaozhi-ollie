@@ -28,6 +28,10 @@ public:
             }
             return lista;
         };
+        contexto_.app_ativo = [this]() -> std::string {
+            std::lock_guard<std::recursive_mutex> trava(trava_);
+            return (aberta_ && ativo_ != nullptr) ? ativo_->Id() : "";
+        };
     }
 
     ContextoApps& Contexto() { return contexto_; }

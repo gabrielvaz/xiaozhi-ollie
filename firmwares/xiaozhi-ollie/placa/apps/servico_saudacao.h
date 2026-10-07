@@ -12,7 +12,10 @@
 
 #include <esp_random.h>
 
+#include "assets/lang_config.h"
+
 #include "../agente_watcher.h"
+#include "../cliques_watcher.h"
 #include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
@@ -44,13 +47,26 @@ public:
         // Não cobre um aviso que ainda está na tela: só os que chegaram depois de entrar na espera
         // (ao voltar para a espera a tela é limpa, então um aviso anterior já sumiu) e por até 10 min
         int aviso = ContextoApps::ultimo_aviso;
-        if (aviso >= ocioso_desde_ && agora - aviso < 600) {
-            proxima_ = std::max(proxima_, aviso + 600);
+        int prende = ContextoApps::aviso_prende_s;
+        if (aviso >= ocioso_desde_ && agora - aviso < prende) {
+            proxima_ = std::max(proxima_, aviso + prende);
             return;
         }
         // Sessão do Claude Code rodando: Clawd trabalhando e uma frase de progresso no estilo do Claude Code
         if (ContextoApps::atividade_n > 0) {
             trabalhando_ = true;
+            // Rodando há mais de 45 min sem parar: um toque (pode ter travado ou merecer uma olhada)
+            int inicio = ContextoApps::atividade_inicio;
+            if (inicio >= 0 && agora - inicio >= 45 * 60 && inicio != longa_avisada_) {
+                longa_avisada_ = inicio;
+                ContextoApps::Avisar(TR("Ainda trabalhando", "Still working", "仍在工作", "Aún trabajando"),
+                                     ContextoApps::atividade_titulo +
+                                         TR(" roda há mais de 45 min. Vale uma olhada?",
+                                            " has been running for over 45 min. Worth a look?",
+                                            " 已运行超过 45 分钟。要看一眼吗？",
+                                            " lleva más de 45 min. ¿Le echas un vistazo?"),
+                                     "thinking", Lang::Sounds::OGG_POPUP, 180);
+            }
             if (agora >= proxima_trabalho_) {
                 proxima_trabalho_ = agora + 5;
                 MostrarTrabalho(agora >= proxima_pose_);
@@ -89,11 +105,11 @@ private:
     int saudou_desde_ = -2;  // ocioso_desde_ da última saudação (a 1ª frase de cada espera é saudação)
     int proxima_ = 0;
     int perfil_em_ = 0;
-    bool perfil_ok_ = false;
     std::string ultima_frase_;
     int proxima_pose_ = 0;
     int proxima_trabalho_ = 0;
     bool trabalhando_ = false;
+    int longa_avisada_ = -1;  // atividade_inicio da sessão longa já avisada
     int verbo_ = -1;
 
     // "Codando…" + a sessão que está rodando (e quantas mais); troca a pose de trabalho quando pedido
@@ -181,17 +197,18 @@ private:
                 poses.insert(poses.end(), {"sleepy", "sleepy", "relaxed", "coffee"});
             }
         }
-        std::string escolhida = poses[esp_random() % poses.size()];
-        if (escolhida == ultima_pose_) {
-            escolhida = poses[(esp_random() + 1) % poses.size()];
+        size_t i = esp_random() % poses.size();
+        if (poses[i] == ultima_pose_) {
+            i = (i + 1) % poses.size();  // a vizinha é sempre diferente da anterior
         }
-        ultima_pose_ = escolhida;
-        return escolhida;
+        ultima_pose_ = poses[i];
+        return ultima_pose_;
     }
 
-    // Avisa o servidor do nome do agente e pega o nome do usuário (guardado para usar sem internet)
+    // Avisa o servidor do nome do agente e pega o nome do usuário e o fuso do Mac (guardados para usar
+    // sem internet). Repete a cada 6 h: nome e fuso mudados no Mac chegam sem reiniciar.
     void SincronizarPerfil(int agora) {
-        if (perfil_ok_ || agora < perfil_em_ || !RedeWatcher::Online()) {
+        if (agora < perfil_em_ || !RedeWatcher::Online()) {
             return;
         }
         perfil_em_ = agora + 60;
@@ -201,13 +218,35 @@ private:
         }
         cJSON* raiz = cJSON_Parse(corpo.c_str());
         std::string usuario = RedeWatcher::Campo(raiz, "usuario");
+        int fuso = RedeWatcher::Numero(raiz, "utc_off_min", -10000);
         cJSON_Delete(raiz);
         if (!usuario.empty() && usuario != AgenteWatcher::Usuario()) {
             AgenteWatcher::DefinirUsuario(usuario);
             proxima_ = 0;  // já mostra a saudação com o nome
             saudou_desde_ = -2;
         }
-        perfil_ok_ = true;
+        // Fuso do Mac: o relógio mundial usa para saber a "casa" (minutos em relação ao UTC)
+        if (fuso > -1500 && fuso < 1500 && fuso != ConfigWatcher::Int("utc_off_min", -10000)) {
+            ConfigWatcher::SetInt("utc_off_min", fuso);
+        }
+        perfil_em_ = agora + 6 * 3600;
+    }
+
+    // "Dica: 2 cliques na roda abrem os apps.", conforme o gesto configurado em Ajustes
+    static std::string DicaGaveta() {
+        for (int n = 1; n <= CliquesWatcher::kGestos; n++) {
+            if (CliquesWatcher::Acao(n) == "gaveta") {
+                char d[96];
+                snprintf(d, sizeof(d),
+                         TR("Dica: %d clique%s na roda abre%s os apps.", "Tip: %d click%s on the wheel open%s the apps.",
+                            "小提示：滚轮连按 %d 下%s打开应用%s。", "Truco: %d clic%s en la rueda abre%s las apps."),
+                         n, TR(n > 1 ? "s" : "", n > 1 ? "s" : "", "", n > 1 ? "s" : ""),
+                         TR(n > 1 ? "m" : "", n > 1 ? "" : "s", "", n > 1 ? "n" : ""));
+                return d;
+            }
+        }
+        return TR("Os apps ficam na gaveta da roda.", "The apps live in the wheel drawer.",
+                  "应用都在滚轮抽屉里。", "Las apps están en el cajón de la rueda.");
     }
 
     std::string Frase(bool saudacao) {
@@ -227,7 +266,7 @@ private:
             "Did you know? The first computer bug was a real moth.", "Time for a sip of water?",
             "Stretch your back, {}. I'll keep watch.", "Small commits, happy merges.",
             "Your agents are in good hands.", "Ask me about your sessions anytime.",
-            "Tip: three clicks on the wheel open the apps.", "Done is better than perfect.",
+            DicaGaveta(), "Done is better than perfect.",
             "Look away from the screen for 20 seconds.", "One step at a time, {}.",
             "I'm keeping an eye on everything.", "Need a meeting summary? I can record it.",
         };
@@ -244,7 +283,7 @@ private:
             "你知道吗？第一个计算机 bug 是一只真的飞蛾。", "要不要喝口水？",
             "{}，伸个懒腰吧，我帮你盯着。", "小步提交，合并更顺。",
             "你的助手们都很靠谱。", "随时问我会话的进展。",
-            "小提示：滚轮连按三下打开应用。", "完成比完美更重要。",
+            DicaGaveta(), "完成比完美更重要。",
             "让眼睛离开屏幕 20 秒吧。", "{}，一步一步来。",
             "我一直在帮你看着。", "要会议纪要吗？我可以录音。",
         };
@@ -261,7 +300,7 @@ private:
             "¿Sabías? El primer bug fue una polilla de verdad.", "¿Un trago de agua?",
             "Estira la espalda, {}. Yo vigilo.", "Commits pequeños, merges felices.",
             "Tus agentes están en buenas manos.", "Pregúntame por tus sesiones cuando quieras.",
-            "Truco: tres clics en la rueda abren las apps.", "Hecho es mejor que perfecto.",
+            DicaGaveta(), "Hecho es mejor que perfecto.",
             "Mira lejos de la pantalla 20 segundos.", "Paso a paso, {}.",
             "Lo estoy vigilando todo.", "¿Resumen de reunión? Puedo grabarla.",
         };
@@ -278,7 +317,7 @@ private:
             "Sabia? O 1º bug da computação foi uma mariposa.", "Que tal um gole de água?",
             "Estica as costas, {}. Eu fico de olho.", "Commits pequenos, merges felizes.",
             "Seus agentes estão em boas mãos.", "Pergunta das suas sessões quando quiser.",
-            "Dica: três cliques na roda abrem os apps.", "Feito é melhor que perfeito.",
+            DicaGaveta(), "Feito é melhor que perfeito.",
             "Olha para longe da tela por 20 segundos.", "Um passo de cada vez, {}.",
             "Tô de olho em tudo por aqui.", "Precisa de resumo de reunião? Eu gravo.",
         };

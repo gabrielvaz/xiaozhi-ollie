@@ -8,6 +8,8 @@
 #include <cctype>
 #include <vector>
 
+#include "assets/lang_config.h"
+
 #include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
@@ -29,6 +31,17 @@ public:
     void IniciarGravacao(ContextoApps& c) {
         auto& app = ContextoApps::App();
         auto& cartao = CartaoWatcher::Instancia();
+        // Sem cartão e sem conexão não há para onde gravar: dizer isso vale mais que um cronômetro de mentira
+        if (!cartao.Montado() && !RedeWatcher::Online()) {
+            tela_ = Tela::Lista;
+            c.painel.MostrarStatus(TR("Gravador", "Recorder", "录音机", "Grabadora"), PainelWatcher::Status::Erro,
+                                   TR("Sem onde gravar: não há microSD nem conexão com o Mac. Coloque um cartão ou conecte o Wi-Fi.",
+                                      "Nowhere to record: no microSD and no connection to the Mac. Insert a card or connect to Wi-Fi.",
+                                      "无处录音：没有 microSD 卡，也连不上 Mac。请插卡或连接 Wi-Fi。",
+                                      "No hay dónde grabar: sin microSD y sin conexión con el Mac. Pon una tarjeta o conecta el Wi-Fi."),
+                                   {TR("Voltar", "Back", "返回", "Volver")});
+            return;
+        }
         tela_ = Tela::Gravando;
         gravando_ = true;
         pausado_ = false;
@@ -36,6 +49,7 @@ public:
         acumulado_ = 0;
         trecho_inicio_ = ContextoApps::Agora();
         segundos_sem_canal_ = 0;
+        proximo_lembrete_s_ = 30 * 60;  // "ainda gravando" a cada 30 min
         houve_queda_ = !RedeWatcher::Online();
         arquivo_ = cartao.IniciarReuniao();
         if (!arquivo_.empty()) {
@@ -45,7 +59,7 @@ public:
                 }
             });
         }
-        c.painel.MostrarGravacao(0, false, botao_);
+        c.painel.MostrarGravacao(0, false, botao_, Destino());
         app.GravacaoLocal(true);  // microfone ligado mesmo sem conexão
         if (RedeWatcher::Online()) {
             app.StartListening();
@@ -53,10 +67,26 @@ public:
         }
     }
 
+    // Para onde o áudio está indo, mostrado na tela de gravação (muda se a conexão cair no meio)
+    std::string Destino() const {
+        bool cartao = !arquivo_.empty();
+        bool mac = !houve_queda_ && RedeWatcher::Online();
+        if (cartao && mac) {
+            return TR("para o Mac, com cópia no cartão", "to the Mac, with a copy on the card",
+                      "发送到 Mac，并在卡上留副本", "al Mac, con copia en la tarjeta");
+        }
+        if (cartao) {
+            return TR("só no cartão: envio ao Mac depois", "card only: sent to the Mac later",
+                      "仅存卡上：稍后发送到 Mac", "solo en la tarjeta: se envía al Mac después");
+        }
+        return TR("só no Mac: sem microSD", "Mac only: no microSD", "仅发送到 Mac：没有 microSD 卡",
+                  "solo al Mac: sin microSD");
+    }
+
     void Girar(ContextoApps& c, int passo) override {
         if (tela_ == Tela::Gravando) {
             botao_ = passo > 0 ? 1 : 0;
-            c.painel.MostrarGravacao(Segundos(), pausado_, botao_);
+            c.painel.MostrarGravacao(Segundos(), pausado_, botao_, Destino());
         } else {
             c.painel.Mover(passo);
         }
@@ -66,7 +96,7 @@ public:
         if (tela_ == Tela::Gravando) {
             if (botao_ == 0) {
                 AlternarPausa();
-                c.painel.MostrarGravacao(Segundos(), pausado_, botao_);
+                c.painel.MostrarGravacao(Segundos(), pausado_, botao_, Destino());
             } else {
                 Parar(c);
             }
@@ -123,11 +153,16 @@ public:
             mensagem = RedeWatcher::Campo(raiz, "mensagem");
             cJSON_Delete(raiz);
             tela_ = Tela::Item;
+            if (mensagem.empty()) {
+                mensagem = ok ? TR("Transcrição enviada: uma sessão nova do Claude Code vai estruturar a gravação.",
+                                   "Transcript sent: a new Claude Code session will structure the recording.",
+                                   "转写已发送：新的 Claude Code 会话将整理这段录音。",
+                                   "Transcripción enviada: una sesión nueva de Claude Code estructurará la grabación.")
+                              : TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.",
+                                   "现在无法连接 Mac。", "No he podido hablar con el Mac.");
+            }
             c.painel.MostrarStatus("Claude Code", ok ? PainelWatcher::Status::Sucesso : PainelWatcher::Status::Erro,
-                                   mensagem.empty() ? TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.",
-                                                         "现在无法连接 Mac。", "No he podido hablar con el Mac.")
-                                                    : mensagem,
-                                   {TR("Voltar", "Back", "返回", "Volver")});
+                                   mensagem, {TR("Voltar", "Back", "返回", "Volver")});
             return;
         }
         if (tela_ == Tela::Carregando && buscar_detalhe_.exchange(false)) {
@@ -166,7 +201,15 @@ public:
         } else {
             segundos_sem_canal_ = 0;
         }
-        c.painel.MostrarGravacao(Segundos(), pausado_, botao_);
+        c.painel.MostrarGravacao(Segundos(), pausado_, botao_, Destino());
+        // Gravação longa: a cada 30 min, um toque curto e a tela acesa lembram que o microfone segue aberto
+        if (!pausado_ && Segundos() >= proximo_lembrete_s_) {
+            proximo_lembrete_s_ += 30 * 60;
+            if (ContextoApps::acordar_tela) {
+                ContextoApps::acordar_tela();
+            }
+            ContextoApps::App().PlaySound(Lang::Sounds::OGG_POPUP);
+        }
     }
 
 private:
@@ -201,6 +244,7 @@ private:
     int acumulado_ = 0;        // segundos gravados antes da pausa atual
     int trecho_inicio_ = 0;
     int segundos_sem_canal_ = 0;
+    int proximo_lembrete_s_ = 30 * 60;
     int buscar_em_ = 0;
     bool houve_queda_ = false;
     std::string arquivo_;
@@ -238,7 +282,7 @@ private:
         }
         gravando_ = false;
         pausado_ = false;
-        if (houve_queda_) {
+        if (houve_queda_ && !arquivo_.empty()) {
             int minutos = (segundos + 30) / 60;
             ContextoApps::Avisar(TR("Gravação salva", "Recording saved", "录音已保存", "Grabación guardada"),
                                  std::to_string(minutos) +
@@ -247,6 +291,14 @@ private:
                                         " 分钟已存到卡上，联网后发送到 Mac。",
                                         " min en la tarjeta. Se enviará al Mac cuando haya conexión."),
                                  "happy");
+        } else if (houve_queda_) {
+            // A conexão caiu no meio e não havia cartão: o trecho sem conexão se perdeu; melhor avisar
+            ContextoApps::Avisar(TR("Gravação incompleta", "Recording incomplete", "录音不完整", "Grabación incompleta"),
+                                 TR("A conexão caiu e não há microSD: o trecho sem conexão não foi gravado.",
+                                    "The connection dropped and there is no microSD: the offline part was not recorded.",
+                                    "连接中断且没有 microSD 卡：断线期间的部分没有录下来。",
+                                    "Se cayó la conexión y no hay microSD: la parte sin conexión no se grabó."),
+                                 "chateado");
         }
         // Lista das gravações (espera o servidor registrar a que acabou de terminar)
         tela_ = Tela::Carregando;

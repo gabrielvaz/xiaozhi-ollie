@@ -1,7 +1,7 @@
-// App "Câmera": tira uma foto com a câmera do Watcher e mostra o que a IA vê nela. Cada foto fica no microSD,
-// organizada por mês (watcher/fotos/AAAA-MM/AAAA-MM-DD_HH-MM-SS.jpg + .txt com a descrição), e no Mac (com a
-// descrição; vai para o iCloud pelo Backup). A tela redonda
-// não mostra a imagem (sem decodificador de JPEG no firmware); a lista mostra quando e a descrição.
+// App "Câmera": tira uma foto com a câmera do Watcher, mostra a miniatura (o preview RGB da câmera, o mesmo
+// do leitor de QR) e o que a IA vê nela. Cada foto fica no microSD, organizada por mês
+// (watcher/fotos/AAAA-MM/AAAA-MM-DD_HH-MM-SS.jpg + .txt com a descrição), e no Mac (com a
+// descrição; vai para o iCloud pelo Backup). A lista mostra quando e a descrição.
 #pragma once
 
 #include <atomic>
@@ -25,7 +25,8 @@ public:
 
     void Abrir(ContextoApps& c) override {
         tela_ = Tela::Carregando;
-        c.painel.MostrarStatus(Nome(), PainelWatcher::Status::Carregando, TR("Carregando fotos…", "Loading photos…", "正在加载照片…", "Cargando fotos…"));
+        c.painel.MostrarStatus(Nome(), PainelWatcher::Status::Carregando, TR("Carregando fotos…", "Loading photos…", "正在加载照片…", "Cargando fotos…"),
+                               {TR("Cancelar", "Cancel", "取消", "Cancelar")});
         pedido_ = Pedido::Lista;
     }
 
@@ -38,6 +39,14 @@ public:
     bool Clicar(ContextoApps& c) override {
         int i = c.painel.Selecionado();
         if (tela_ == Tela::Carregando) {
+            // Cancela a espera: a resposta que vier é descartada (a foto já tirada ainda vai para o cartão)
+            geracao_++;
+            if (fotos_.empty() && pedido_ == Pedido::Lista) {
+                pedido_ = Pedido::Nada;
+                return false;  // cancelou a primeira carga: volta para a gaveta
+            }
+            pedido_ = Pedido::Nada;
+            MostrarLista(c);
             return true;
         }
         if (tela_ == Tela::Lista) {
@@ -48,7 +57,8 @@ public:
                 tela_ = Tela::Carregando;
                 c.painel.MostrarStatus(Nome(), PainelWatcher::Status::Carregando,
                                        TR("Tirando a foto e perguntando à IA…", "Taking the photo and asking the AI…",
-                                          "正在拍照并询问 AI…", "Haciendo la foto y preguntando a la IA…"), {}, "thinking");
+                                          "正在拍照并询问 AI…", "Haciendo la foto y preguntando a la IA…"),
+                                       {TR("Cancelar", "Cancel", "取消", "Cancelar")}, "thinking");
                 pedido_ = Pedido::Foto;
                 return true;
             }
@@ -63,14 +73,6 @@ public:
         return true;
     }
 
-    bool Voltar(ContextoApps& c) override {
-        if (tela_ == Tela::Texto || tela_ == Tela::Resultado) {
-            MostrarLista(c);
-            return true;
-        }
-        return false;
-    }
-
     void Tique(ContextoApps& c) override {
         Pedido p = pedido_.exchange(Pedido::Nada);
         if (p == Pedido::Lista) {
@@ -78,6 +80,23 @@ public:
         } else if (p == Pedido::Foto) {
             TirarFoto(c);
         }
+    }
+
+    bool Voltar(ContextoApps& c) override {
+        if (tela_ == Tela::Texto || tela_ == Tela::Resultado) {
+            MostrarLista(c);
+            return true;
+        }
+        if (tela_ == Tela::Carregando) {
+            geracao_++;
+            pedido_ = Pedido::Nada;
+            if (fotos_.empty()) {
+                return false;
+            }
+            MostrarLista(c);
+            return true;
+        }
+        return false;
     }
 
 private:
@@ -88,9 +107,11 @@ private:
     };
     std::atomic<Tela> tela_{Tela::Carregando};
     std::atomic<Pedido> pedido_{Pedido::Nada};
+    std::atomic<int> geracao_{0};  // cresce a cada cancelamento: a resposta em voo é descartada
     std::vector<Foto> fotos_;
 
     void BuscarLista(ContextoApps& c) {
+        int g = geracao_;
         fotos_.clear();
         std::string corpo;
         if (RedeWatcher::Pedir("GET", "/watcher/fotos", "", corpo)) {
@@ -101,6 +122,9 @@ private:
                 fotos_.push_back({RedeWatcher::Campo(f, "titulo"), RedeWatcher::Campo(f, "detalhe"), RedeWatcher::Campo(f, "texto")});
             }
             cJSON_Delete(raiz);
+        }
+        if (g != geracao_) {
+            return;  // cancelada: a pessoa já voltou para outra tela
         }
         MostrarLista(c);
     }
@@ -153,11 +177,14 @@ private:
     }
 
     void TirarFoto(ContextoApps& c) {
+        int g = geracao_;
         auto camera = Board::GetInstance().GetCamera();
         std::string descricao;
         bool ok = false;
         std::string arquivo;
+        bool capturada = false;
         if (camera != nullptr && camera->Capture()) {
+            capturada = true;
             arquivo = SalvarNoCartao(static_cast<SscmaCamera*>(camera)->UltimaFotoJpeg());
             const char* pergunta = TR("Descreva em português do Brasil, em até 3 frases, o que aparece nesta foto.",
                                       "Describe in English, in up to 3 sentences, what is in this photo.",
@@ -184,11 +211,20 @@ private:
             CartaoWatcher::Escrever(txt, ok ? descricao + "\n" : std::string("(sem descrição: a IA não respondeu)\n"));
         }
         DiagnosticoWatcher::Marcar("camera foto %s %s", ok ? "ok" : "falhou", arquivo.empty() ? "sem cartao" : "salva");
+        if (g != geracao_) {
+            return;  // cancelada: a foto ficou no cartão, mas a tela já é outra
+        }
         tela_ = Tela::Resultado;
-        c.painel.MostrarStatus(Nome(), ok ? PainelWatcher::Status::Sucesso : PainelWatcher::Status::Erro,
-                               ok ? descricao.substr(0, 300)
-                                  : TR("Não consegui tirar ou analisar a foto agora.", "Couldn't take or analyze the photo now.",
-                                       "暂时无法拍照或分析照片。", "No he podido hacer o analizar la foto ahora."),
-                               {TR("Voltar", "Back", "返回", "Volver")});
+        // Miniatura da foto (preview RGB565 da câmera) com a descrição da IA embaixo
+        int largura = 0, altura = 0;
+        const uint16_t* rgb = nullptr;
+        if (capturada) {
+            rgb = static_cast<SscmaCamera*>(camera)->UltimaImagemRgb(largura, altura);
+        }
+        c.painel.MostrarFoto(Nome(), rgb, largura, altura,
+                             ok ? descricao.substr(0, 600)
+                                : TR("Não consegui tirar ou analisar a foto agora.", "Couldn't take or analyze the photo now.",
+                                     "暂时无法拍照或分析照片。", "No he podido hacer o analizar la foto ahora."),
+                             {TR("Voltar", "Back", "返回", "Volver")});
     }
 };

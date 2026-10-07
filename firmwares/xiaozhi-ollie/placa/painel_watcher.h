@@ -393,9 +393,9 @@ public:
         lv_label_set_text(legenda_, legenda.c_str());
     }
 
-    // Gravação de reunião: bolinha vermelha pulsando (parada e cinza em pausa), tempo gravado e dois botões
-    // escolhidos pela roda: 0 = Pausar/Continuar, 1 = Parar
-    void MostrarGravacao(int segundos, bool pausado = false, int botao = 0) {
+    // Gravação de reunião: bolinha vermelha pulsando (parada e cinza em pausa), tempo gravado, para onde o
+    // áudio vai (destino) e dois botões escolhidos pela roda: 0 = Pausar/Continuar, 1 = Parar
+    void MostrarGravacao(int segundos, bool pausado = false, int botao = 0, const std::string& destino = "") {
         DisplayLockGuard lock(display_);
         if (modo_ != Modo::Gravacao || raiz_ == nullptr) {
             Recriar();
@@ -412,6 +412,12 @@ public:
             lv_obj_set_style_transform_scale(cronometro_, 512, 0);  // 2x
             lv_obj_set_style_transform_pivot_x(cronometro_, LV_PCT(50), 0);
             lv_obj_align(cronometro_, LV_ALIGN_TOP_MID, 0, 200);
+            // Para onde o áudio está indo (Mac, cartão ou os dois): o estado muda se a conexão cair
+            destino_gravacao_ = Rotulo(Fontes::Pequena(), 0x9A9A9A, "");
+            lv_obj_set_size(destino_gravacao_, 280, lv_font_get_line_height(Fontes::Pequena()));
+            lv_label_set_long_mode(destino_gravacao_, LV_LABEL_LONG_DOT);
+            lv_obj_set_style_text_align(destino_gravacao_, LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_align(destino_gravacao_, LV_ALIGN_TOP_MID, 0, 258);
             for (int i = 0; i < 2; i++) {
                 botoes_gravacao_[i] = lv_obj_create(raiz_);
                 lv_obj_set_size(botoes_gravacao_[i], 124, 48);
@@ -457,6 +463,9 @@ public:
             lv_obj_set_style_bg_color(botoes_gravacao_[i], lv_color_hex(sel ? 0xD97757 : 0x2A2A2A), 0);
             lv_obj_set_style_text_color(lv_obj_get_child(botoes_gravacao_[i], 0), lv_color_hex(sel ? 0x000000 : 0xEDEDED), 0);
         }
+        if (destino_gravacao_ != nullptr && destino != lv_label_get_text(destino_gravacao_)) {
+            lv_label_set_text(destino_gravacao_, destino.c_str());
+        }
         char tempo[32];
         if (segundos >= 3600) {
             snprintf(tempo, sizeof(tempo), "%d:%02d:%02d", segundos / 3600, (segundos / 60) % 60, segundos % 60);
@@ -464,6 +473,58 @@ public:
             snprintf(tempo, sizeof(tempo), "%02d:%02d", segundos / 60, segundos % 60);
         }
         lv_label_set_text(cronometro_, tempo);
+    }
+
+    // Foto da câmera (RGB565 do preview, ex.: 640x480) com o texto da IA embaixo (rolável) e botões.
+    // A imagem é reduzida para caber na tela redonda; sem imagem (rgb nulo), vale como MostrarTexto.
+    void MostrarFoto(const std::string& cabecalho, const uint16_t* rgb, int largura, int altura,
+                     const std::string& texto, const std::vector<std::string>& botoes) {
+        DisplayLockGuard lock(display_);
+        Recriar();
+        modo_ = Modo::Texto;
+        botoes_ = botoes;
+        selecionado_ = 0;
+        Cabecalho(cabecalho);
+        int texto_y = 96, texto_h = 186;
+        if (rgb != nullptr && largura > 0 && altura > 0) {
+            const int w = 180, h = altura * 180 / largura;  // ~180x135 na proporção da câmera
+            foto_buf_ = lv_draw_buf_create(w, h, LV_COLOR_FORMAT_RGB565, 0);
+            if (foto_buf_ != nullptr) {
+                auto canvas = lv_canvas_create(raiz_);
+                lv_canvas_set_draw_buf(canvas, foto_buf_);
+                auto* destino = reinterpret_cast<uint16_t*>(foto_buf_->data);
+                int passo_linha = foto_buf_->header.stride / 2;  // o stride pode ter folga de alinhamento
+                for (int y = 0; y < h; y++) {
+                    const uint16_t* origem = rgb + (y * altura / h) * largura;
+                    for (int x = 0; x < w; x++) {
+                        destino[y * passo_linha + x] = origem[x * largura / w];
+                    }
+                }
+                lv_obj_set_style_radius(canvas, 12, 0);
+                lv_obj_set_style_clip_corner(canvas, true, 0);
+                lv_obj_align(canvas, LV_ALIGN_TOP_MID, 0, 88);
+                texto_y = 88 + h + 8;
+                texto_h = (botoes.empty() ? 326 : 282) - texto_y;
+            }
+        }
+        texto_box_ = lv_obj_create(raiz_);
+        lv_obj_set_size(texto_box_, 300, texto_h);
+        lv_obj_set_style_bg_opa(texto_box_, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(texto_box_, 0, 0);
+        lv_obj_set_style_pad_all(texto_box_, 0, 0);
+        lv_obj_set_scroll_dir(texto_box_, LV_DIR_VER);
+        lv_obj_set_scrollbar_mode(texto_box_, LV_SCROLLBAR_MODE_ACTIVE);
+        lv_obj_set_style_bg_color(texto_box_, lv_color_hex(0xD97757), LV_PART_SCROLLBAR);
+        lv_obj_align(texto_box_, LV_ALIGN_TOP_MID, 0, texto_y);
+        auto rotulo = lv_label_create(texto_box_);
+        lv_obj_set_width(rotulo, 288);
+        lv_label_set_long_mode(rotulo, LV_LABEL_LONG_WRAP);
+        lv_obj_set_style_text_font(rotulo, Fontes::Pequena(), 0);
+        lv_obj_set_style_text_color(rotulo, lv_color_hex(0xEDEDED), 0);
+        lv_obj_set_style_text_align(rotulo, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(rotulo, texto.c_str());
+        lv_obj_align(rotulo, LV_ALIGN_TOP_MID, 0, 0);
+        DesenharBotoes();
     }
 
     void Mover(int delta) {
@@ -518,6 +579,7 @@ public:
         cronometro_ = nullptr;
         ponto_ = nullptr;
         titulo_gravacao_ = nullptr;
+        destino_gravacao_ = nullptr;
         botoes_gravacao_[0] = botoes_gravacao_[1] = nullptr;
         valor_ = nullptr;
         legenda_ = nullptr;
@@ -551,11 +613,13 @@ private:
     lv_obj_t* cronometro_ = nullptr;
     lv_obj_t* ponto_ = nullptr;             // gravação: bolinha vermelha
     lv_obj_t* titulo_gravacao_ = nullptr;
+    lv_obj_t* destino_gravacao_ = nullptr;
     lv_obj_t* botoes_gravacao_[2] = {nullptr, nullptr};
     bool pausado_desenhado_ = false;
     lv_obj_t* valor_ = nullptr;
     lv_obj_t* legenda_ = nullptr;
     lv_draw_buf_t* qr_buf_ = nullptr;  // imagem do QR (liberada ao trocar de tela)
+    lv_draw_buf_t* foto_buf_ = nullptr;  // miniatura da foto da câmera (idem)
     lv_obj_t* texto_box_ = nullptr;
     int botoes_y_ = 292;
     lv_timer_t* rapido_ = nullptr;
@@ -694,6 +758,10 @@ private:
         if (qr_buf_ != nullptr) {
             lv_draw_buf_destroy(qr_buf_);
             qr_buf_ = nullptr;
+        }
+        if (foto_buf_ != nullptr) {
+            lv_draw_buf_destroy(foto_buf_);
+            foto_buf_ = nullptr;
         }
     }
 

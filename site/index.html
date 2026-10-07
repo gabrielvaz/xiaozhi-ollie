@@ -419,8 +419,8 @@ footer p { color: var(--muted); font-size: 14px; max-width: 80ch; }
     </div>
     <div class="gestures">
       <div class="gesture"><div class="clicks"><i></i></div><span class="g">1 click</span><p>Talk. Click again to interrupt the answer.</p></div>
-      <div class="gesture"><div class="clicks"><i></i><i></i></div><span class="g">2 clicks</span><p>Back: the previous screen of the app, then the drawer, then close.</p></div>
-      <div class="gesture"><div class="clicks"><i></i><i></i><i></i></div><span class="g">3 clicks</span><p>Opens and closes the app drawer.</p></div>
+      <div class="gesture"><div class="clicks"><i></i><i></i></div><span class="g">2 clicks</span><p>Opens the app drawer; with it open, goes back one screen.</p></div>
+      <div class="gesture"><div class="clicks"><i></i><i></i><i></i></div><span class="g">3 clicks</span><p>Closes the drawer from any screen. Clicks are configurable in Settings.</p></div>
       <div class="gesture"><div class="clicks"><span class="turn">↺ ↻</span></div><span class="g">Turn</span><p>Volume on the home screen. Navigation in the drawer and inside apps.</p></div>
       <div class="gesture"><div class="clicks"><i class="hold"></i></div><span class="g">Hold 2 s</span><p>Powers off when the Watcher is not charging.</p></div>
       <div class="gesture"><div class="clicks"><i class="long"></i></div><span class="g">Hold 20 s</span><p>Factory reset. The original firmware used 10 s, which was too easy to trigger by accident.</p></div>
@@ -433,7 +433,7 @@ footer p { color: var(--muted); font-size: 14px; max-width: 80ch; }
     <div class="band-head">
       <span class="label">App drawer</span>
       <h2>Apps on the wheel.</h2>
-      <p class="lede">Click three times to open the drawer. Each app is one file in <code>placa/apps/</code> plus one line in the registry, so adding your own is quick.</p>
+      <p class="lede">Click twice to open the drawer. Each app is one file in <code>placa/apps/</code> plus one line in the registry, so adding your own is quick.</p>
     </div>
     <div class="apps" id="appsGrid"></div>
   </div>

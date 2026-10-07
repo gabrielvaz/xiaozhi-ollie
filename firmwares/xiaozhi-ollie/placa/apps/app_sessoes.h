@@ -8,6 +8,7 @@
 #include <cctype>
 #include <vector>
 
+#include "../agente_watcher.h"
 #include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
@@ -20,6 +21,7 @@ public:
 
     void Abrir(ContextoApps& c) override {
         ir_para_.clear();
+        ir_titulo_.clear();
         tela_ = Tela::Carregando;
         c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Carregando,
                                TR("Carregando sessões…", "Loading sessions…", "正在加载会话…", "Cargando sesiones…"));
@@ -61,6 +63,18 @@ public:
         if (tela_ != Tela::Carregando && tela_ != Tela::Erro) {
             c.painel.Mover(passo);
         }
+    }
+
+    bool Voltar(ContextoApps& c) override {
+        if (tela_ == Tela::Pergunta || tela_ == Tela::Resultado) {
+            MostrarDetalhe(c);
+            return true;
+        }
+        if (tela_ == Tela::Detalhe || tela_ == Tela::NaoAchei) {
+            MostrarLista(c, tela_ == Tela::Detalhe ? atual_ : 0);
+            return true;
+        }
+        return false;
     }
 
     bool Clicar(ContextoApps& c) override {
@@ -165,18 +179,13 @@ public:
             case Tela::Resultado:
                 MostrarDetalhe(c);
                 return true;
-        }
-        return false;
-    }
-
-    bool Voltar(ContextoApps& c) override {
-        if (tela_ == Tela::Pergunta || tela_ == Tela::Resultado) {
-            MostrarDetalhe(c);
-            return true;
-        }
-        if (tela_ == Tela::Detalhe) {
-            MostrarLista(c, atual_);
-            return true;
+            case Tela::NaoAchei:
+                if (i == 0) {
+                    MostrarLista(c, 0);
+                } else {
+                    c.fechar();
+                }
+                return true;
         }
         return false;
     }
@@ -189,6 +198,33 @@ public:
             LerSessao(c);
         } else if (p == Pedido::Responder) {
             EnviarResposta(c);
+        } else if (refrescar_) {
+            // A lista veio do cache: busca a fresca e redesenha sem piscar, mantendo a seleção
+            refrescar_ = false;
+            std::string corpo;
+            if (tela_ != Tela::Lista || !RedeWatcher::Pedir("GET", "/watcher/sessoes", "", corpo)) {
+                return;
+            }
+            std::vector<Sessao> novas;
+            cJSON* raiz = cJSON_Parse(corpo.c_str());
+            cJSON* lista = raiz ? cJSON_GetObjectItem(raiz, "sessoes") : nullptr;
+            cJSON* item = nullptr;
+            cJSON_ArrayForEach(item, lista) {
+                novas.push_back({RedeWatcher::Campo(item, "id"), RedeWatcher::Campo(item, "titulo"),
+                                 RedeWatcher::Campo(item, "situacao"), RedeWatcher::Campo(item, "ha"),
+                                 RedeWatcher::Campo(item, "ultima")});
+            }
+            cJSON_Delete(raiz);
+            bool mudou = novas.size() != sessoes_.size();
+            for (size_t k = 0; !mudou && k < novas.size(); k++) {
+                mudou = novas[k].id != sessoes_[k].id || novas[k].situacao != sessoes_[k].situacao ||
+                        novas[k].ha != sessoes_[k].ha;
+            }
+            if (mudou && tela_ == Tela::Lista) {
+                sessoes_ = std::move(novas);
+                int sel = std::max(0, std::min(c.painel.Selecionado() - 3, (int)sessoes_.size() - 1));
+                MostrarLista(c, sel);
+            }
         }
     }
 
@@ -211,7 +247,7 @@ public:
     }
 
 private:
-    enum class Tela { Carregando, Erro, Aviso, Lista, Detalhe, Pergunta, Resultado };
+    enum class Tela { Carregando, Erro, Aviso, Lista, Detalhe, Pergunta, Resultado, NaoAchei };
     enum class Pedido { Nada, Lista, Sessao, Responder };
     struct Sessao {
         std::string id, titulo, situacao, ha, ultima;
@@ -228,6 +264,7 @@ private:
     };
     std::atomic<Tela> tela_{Tela::Carregando};
     std::atomic<Pedido> pedido_{Pedido::Nada};
+    std::atomic<bool> refrescar_{false};
     std::vector<Sessao> sessoes_;
     int atual_ = 0;
     std::string ir_para_;
@@ -260,6 +297,7 @@ private:
         sessoes_atualizar_ = false;
         if (do_cache) {
             corpo = ContextoApps::sessoes_json;
+            refrescar_ = true;  // mostra o cache já e busca a lista fresca por trás
         } else if (!RedeWatcher::Pedir("GET", "/watcher/sessoes", "", corpo)) {
             tela_ = Tela::Erro;
             c.painel.MostrarStatus("Claude Code", PainelWatcher::Status::Erro, TR("Não consegui falar com o Mac agora.", "Couldn't reach the Mac right now.", "现在无法连接 Mac。", "No he podido hablar con el Mac."),
@@ -276,7 +314,7 @@ private:
                                 RedeWatcher::Campo(item, "ultima")});
         }
         cJSON_Delete(raiz);
-        if (!ir_para_.empty()) {  // veio de um aviso: abre direto a sessão
+        if (!ir_para_.empty() || !ir_titulo_.empty()) {  // veio de um aviso: abre direto a sessão
             std::string alvo, titulo;
             alvo.swap(ir_para_);
             titulo.swap(ir_titulo_);
@@ -294,6 +332,16 @@ private:
                     return;
                 }
             }
+            // A sessão do aviso não existe mais: diz isso em vez de largar a pessoa na lista sem explicação
+            tela_ = Tela::NaoAchei;
+            c.painel.MostrarStatus(titulo.empty() ? "Claude Code" : titulo, PainelWatcher::Status::Erro,
+                                   TR("Essa sessão não está mais na lista. Ela pode ter sido encerrada.",
+                                      "That session is no longer in the list. It may have been closed.",
+                                      "该会话已不在列表中，可能已被关闭。",
+                                      "Esa sesión ya no está en la lista. Puede haber sido cerrada."),
+                                   {TR("Ver sessões", "See sessions", "查看会话", "Ver sesiones"),
+                                    TR("Fechar", "Close", "关闭", "Cerrar")});
+            return;
         }
         MostrarLista(c, 0);
     }
@@ -373,8 +421,9 @@ private:
         tela_ = Tela::Lista;
         std::vector<PainelWatcher::Item> itens = {{TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK},
                                                   {TR("Resumir todas", "Summarize all", "全部汇总", "Resumir todas"),
-                                                   TR("O Ollie fala o estado de cada sessão", "Ollie reads each session's status",
-                                                      "Ollie 播报每个会话的状态", "Ollie dice el estado de cada sesión"),
+                                                   TR("O ", "", "", "El ") + AgenteWatcher::Nome() +
+                                                       TR(" fala o estado de cada sessão", " reads each session's status",
+                                                          " 播报每个会话的状态", " dice el estado de cada sesión"),
                                                    MATERIAL_SYMBOLS_HEADPHONES},
                                                   {TR("Nova sessão", "New session", "新会话", "Nueva sesión"),
                                                    TR("Diga o projeto e o que pedir", "Say the project and the request",
@@ -405,7 +454,8 @@ private:
         std::vector<PainelWatcher::Item> itens = {
             {TR("Voltar", "Back", "返回", "Volver"), "", MATERIAL_SYMBOLS_ARROW_BACK},
             {TR("Ouvir e responder", "Listen and answer", "收听并回答", "Escuchar y responder"),
-             TR("O Ollie lê as opções", "Ollie reads the options", "Ollie 朗读选项", "Ollie lee las opciones"),
+             TR("O ", "", "", "El ") + AgenteWatcher::Nome() +
+                 TR(" lê as opções", " reads the options", " 朗读选项", " lee las opciones"),
              MATERIAL_SYMBOLS_HEADPHONES}};
         for (const auto& op : pergunta_.opcoes) {
             const char* icone = !pergunta_.multipla ? MATERIAL_SYMBOLS_ARROW_FORWARD

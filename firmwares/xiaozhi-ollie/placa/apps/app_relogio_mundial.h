@@ -1,9 +1,9 @@
 // App "Relógio mundial": 24 bolinhas no aro, uma por fuso de hora cheia (UTC+0 no topo, leste no sentido
 // horário); girar anda o cursor um fuso, clique volta. Cada fuso tem uma cidade, e a hora mostrada é a dela
 // (com horário de verão). Lembra o último fuso.
-// O relógio do aparelho guarda a hora de Brasília como se fosse UTC (o servidor ajusta assim),
-// então o UTC real = hora do aparelho + 3 h. Horário de verão: regras dos EUA, da Europa, da Austrália
-// e da Nova Zelândia.
+// O relógio do aparelho guarda a hora local do Mac como se fosse UTC (o servidor ajusta assim); o fuso do
+// Mac vem no perfil (utc_off_min, guardado pela saudação) e diz onde fica a "casa" no aro.
+// Horário de verão: regras dos EUA, da Europa, da Austrália e da Nova Zelândia.
 #pragma once
 
 #include <ctime>
@@ -27,17 +27,23 @@ public:
     void Girar(ContextoApps& c, int passo) override {
         int n = Cidades().size();
         atual_ = ((atual_ + passo) % n + n) % n;
-        ConfigWatcher::SetInt("relogio_fuso", atual_);
+        salvar_em_ = ContextoApps::Agora() + 2;  // grava na memória 2 s depois do último giro (não a cada passo)
         Desenhar(c);
     }
 
-    bool Clicar(ContextoApps& c) override { return false; }
+    bool Clicar(ContextoApps& c) override {
+        SalvarSePreciso(true);  // saindo do app: guarda o fuso escolhido
+        return false;
+    }
 
     void Tique(ContextoApps& c) override {
+        SalvarSePreciso(false);
         if (++tiques_ % 10 == 0) {  // a cada 5 s: com a tela aberta, MostrarAro só troca os textos
             Desenhar(c);
         }
     }
+
+    void Fundo(ContextoApps& c) override { SalvarSePreciso(false); }
 
 private:
     enum class Verao { Nenhum, EUA, Europa, Australia, NovaZelandia };
@@ -49,6 +55,25 @@ private:
 
     int atual_ = 0;
     int tiques_ = 0;
+    int salvar_em_ = 0;  // Agora() em que o fuso escolhido vai para a memória (0 = nada a gravar)
+
+    void SalvarSePreciso(bool agora_mesmo) {
+        if (salvar_em_ != 0 && (agora_mesmo || ContextoApps::Agora() >= salvar_em_)) {
+            salvar_em_ = 0;
+            if (ConfigWatcher::Int("relogio_fuso", kPadrao) != atual_) {
+                ConfigWatcher::SetInt("relogio_fuso", atual_);
+            }
+        }
+    }
+
+    // Fuso do Mac (minutos em relação ao UTC), trazido pelo perfil; sem ele, Brasília (UTC-3)
+    static int CasaMin() { return ConfigWatcher::Int("utc_off_min", -180); }
+
+    // Posição no aro do fuso de casa (hora cheia mais próxima)
+    static int CasaPosicao() {
+        int h = (CasaMin() >= 0 ? CasaMin() + 30 : CasaMin() - 30) / 60;  // arredonda para a hora cheia
+        return ((h % kPosicoes) + kPosicoes) % kPosicoes;
+    }
 
     // Posição i do aro = UTC+i (i <= 12) ou UTC+i-24 (i > 12); o deslocamento é o da hora padrão
     static const std::vector<Cidade>& Cidades() {
@@ -81,11 +106,12 @@ private:
         return c;
     }
 
-    static constexpr int kBrasilia = 21;  // posição de São Paulo (UTC−3) no aro
+    static constexpr int kPosicoes = 24;
+    static constexpr int kPadrao = 21;  // posição de São Paulo (UTC-3), o padrão sem perfil
 
     static int Indice() {
-        int i = ConfigWatcher::Int("relogio_fuso", kBrasilia);
-        return (i >= 0 && i < (int)Cidades().size()) ? i : kBrasilia;
+        int i = ConfigWatcher::Int("relogio_fuso", CasaPosicao());
+        return (i >= 0 && i < (int)Cidades().size()) ? i : CasaPosicao();
     }
 
     // Dia do mês do n-ésimo domingo (n = -1: último) de um mês (0 = jan)
@@ -147,7 +173,7 @@ private:
             TR("sábado", "Saturday", "周六", "sábado"),
         };
         const auto& cidade = Cidades()[atual_];
-        time_t utc = time(nullptr) + 3 * 3600;  // relógio do aparelho = Brasília
+        time_t utc = time(nullptr) - CasaMin() * 60;  // relógio do aparelho = hora local do Mac
         int deslocamento = cidade.deslocamento_min + (EmVerao(cidade, utc) ? 60 : 0);
         time_t local = utc + deslocamento * 60;
         struct tm t;
@@ -160,13 +186,13 @@ private:
         } else {
             snprintf(utc_txt, sizeof(utc_txt), "UTC%+d", deslocamento / 60);
         }
-        int dif = deslocamento + 180;  // diferença para Brasília, em minutos
+        int dif = deslocamento - CasaMin();  // diferença para a sua hora, em minutos
         char dif_txt[48];
         if (dif == 0) {
-            snprintf(dif_txt, sizeof(dif_txt), TR("hora de Brasília", "Brasília time", "巴西利亚时间", "hora de Brasilia"));
+            snprintf(dif_txt, sizeof(dif_txt), TR("a sua hora", "your local time", "你的本地时间", "tu hora local"));
         } else {
             snprintf(dif_txt, sizeof(dif_txt),
-                     TR("%+d h de Brasília", "%+d h from Brasília", "与巴西利亚相差 %+d 小时", "%+d h respecto a Brasilia"),
+                     TR("%+d h de você", "%+d h from you", "与你相差 %+d 小时", "%+d h respecto a ti"),
                      dif / 60);
         }
         // data no formato de cada idioma: dd/mm (pt, es), mm/dd (en), m月d日 (zh)
@@ -176,6 +202,6 @@ private:
         snprintf(legenda, sizeof(legenda), TR("%s · %s\n%s, %s", "%s · %s\n%s, %s", "%s · %s\n%s %s", "%s · %s\n%s, %s"),
                  utc_txt, dif_txt, TR(dias[t.tm_wday], dias[t.tm_wday], data, dias[t.tm_wday]),
                  TR(data, data, dias[t.tm_wday], data));
-        c.painel.MostrarAro(atual_, kBrasilia, cidade.nome, hora, legenda);
+        c.painel.MostrarAro(atual_, CasaPosicao(), cidade.nome, hora, legenda);
     }
 };

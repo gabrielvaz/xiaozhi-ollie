@@ -5,6 +5,7 @@
 #include <atomic>
 #include <vector>
 
+#include "../agente_watcher.h"
 #include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
 
@@ -66,7 +67,7 @@ public:
                               RedeWatcher::Campo(raiz, "categoria"), cJSON_IsTrue(cJSON_GetObjectItem(raiz, "noite")),
                               RedeWatcher::Campo(raiz, "descricao"), RedeWatcher::Numero(raiz, "sensacao"),
                               RedeWatcher::Numero(raiz, "umidade"), dias,
-                              {TR("Ollie, fala", "Ollie, read it", "Ollie，读一下", "Ollie, léelo"), TR("Voltar", "Back", "返回", "Volver")});
+                              {AgenteWatcher::Nome() + TR(", fala", ", read it", "，读一下", ", léelo"), TR("Voltar", "Back", "返回", "Volver")});
         pronto_ = true;
         cJSON_Delete(raiz);
     }

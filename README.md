@@ -25,27 +25,29 @@ It talks to a small server that you run on your own Mac, not to the xiaozhi.me c
 | “Open a Codex session on the docs repo” | Starts a new session in herdr |
 | “How much of my Claude plan have I used?” | 5-hour and weekly usage, and when each resets |
 | “Remember that…” | Saves a reminder to iCloud Drive and to the offline memory on the microSD card |
-| Click the wheel three times | Opens the app drawer |
+| Click the wheel twice | Opens the app drawer |
 
 **On the device**
 
 - **App drawer** on the wheel: Claude Code sessions, conversations, Claude usage, weather, meeting recorder, stopwatch, countdown, world clock, QR codes, offline memory, card backup and settings.
-- **Alerts** on screen when a session is waiting for you, a task finishes or a meeting summary is ready.
+- **Alerts** that wake the screen: a session waiting for you opens its question directly; a finished task or a ready meeting summary just shows up and clears itself. An orange badge on the home screen counts sessions waiting for you.
 - **Clawd** reacts to everything: emotions picked by the model, device states (listening, thinking, talking) and poses (working, running, deploying, celebrating).
-- **Meeting recorder**: audio goes to the Mac for a transcript, summary, decisions and next steps in Apple Notes. Offline, it keeps recording to the microSD card.
+- **Meeting recorder**: audio goes to the Mac for a transcript, summary, decisions and next steps in Apple Notes. Offline, it keeps recording to the microSD card. The screen always says where the audio is going, and long recordings chime every 30 min.
 - **Offline memory**: sessions, recent meetings and reminders, with audio, stored on the card for when there is no internet.
-- **Settings**: agent name and wake word (Ollie, Clawd, Jarvis, Nova, Atlas, Luna, Max or Iris), theme, font (Noto Sans or JetBrains Mono), brightness, volume, alerts.
+- **Settings**: agent name and wake word (Ollie, Clawd, Jarvis, Nova, Atlas, Luna, Max or Iris), wheel clicks, Wi-Fi network switching, theme, font (Noto Sans or JetBrains Mono), brightness, volume, alerts, how-to-use.
 
 **Wheel controls**
 
 | Gesture | Result |
 |---|---|
 | 1 click | Talk (click again to interrupt). With the screen off, the first click only wakes the screen |
-| 2 clicks | Back |
-| 3 clicks | Open or close the app drawer |
+| 2 clicks | Open the app drawer; with it open, go back one screen |
+| 3 clicks | Close the drawer from any screen |
 | Turn | Volume on the home screen; navigation in the drawer |
 | Hold 2 s (on battery) | Power off |
-| Hold 20 s | Factory reset (erases saved Wi-Fi) |
+| Hold 20 s | Factory reset (erases saved Wi-Fi), with an on-screen countdown from 12 s |
+
+What 1, 2 and 3 clicks do outside the drawer is configurable in Settings > Wheel clicks; the table shows the defaults. A "How to use" screen in Settings recaps the gestures.
 
 ## How it works
 

@@ -11,6 +11,7 @@
 
 #include "lvgl_theme.h"
 #include "ota.h"
+#include "wifi_board.h"
 #include "../abertura_watcher.h"
 #include "../agente_watcher.h"
 #include "../cliques_watcher.h"
@@ -28,6 +29,9 @@ public:
     void Abrir(ContextoApps& c) override {
         sobre_ = false;
         cliques_ = false;
+        rede_ = false;
+        como_usar_ = false;
+        agente_confirma_ = false;
         ota_ = EstadoOta::Nada;
         Desenhar(c, 0);
     }
@@ -42,6 +46,21 @@ public:
         if (sobre_) {
             sobre_ = false;
             Desenhar(c, kSobre);
+            return true;
+        }
+        if (como_usar_) {
+            como_usar_ = false;
+            Desenhar(c, kComoUsar);
+            return true;
+        }
+        if (rede_) {
+            rede_ = false;
+            Desenhar(c, kRede);
+            return true;
+        }
+        if (agente_confirma_) {
+            agente_confirma_ = false;
+            Desenhar(c, kAgente);
             return true;
         }
         if (ota_ != EstadoOta::Nada) {
@@ -61,6 +80,33 @@ public:
         if (sobre_) {
             sobre_ = false;
             Desenhar(c, kSobre);
+            return true;
+        }
+        if (como_usar_) {
+            como_usar_ = false;
+            Desenhar(c, kComoUsar);
+            return true;
+        }
+        if (agente_confirma_) {
+            agente_confirma_ = false;
+            if (c.painel.Selecionado() == 0) {  // "Reiniciar agora"
+                ReiniciarParaAtivacao(c);
+            } else {  // "Depois": o nome novo vale na próxima vez que ligar
+                avisar_servidor_nome_ = true;
+                Desenhar(c, kAgente);
+            }
+            return true;
+        }
+        if (rede_) {
+            rede_ = false;
+            if (c.painel.Selecionado() == 0) {  // abre o portal de configuração (as redes salvas ficam)
+                if (c.fechar) {
+                    c.fechar();
+                }
+                static_cast<WifiBoard&>(Board::GetInstance()).EnterWifiConfigMode();
+            } else {
+                Desenhar(c, kRede);
+            }
             return true;
         }
         if (ota_ == EstadoOta::Buscando) {
@@ -107,8 +153,8 @@ public:
         int i = c.painel.Selecionado();
         switch (i) {
             case kAgente: {
-                // Troca o nome; a palavra de ativação só muda ao reiniciar, então reinicia 8 s depois
-                // do último clique (dá para girar pela lista de nomes antes)
+                // Troca o nome; a palavra de ativação só muda ao reiniciar. 8 s depois do último clique
+                // aparece a pergunta "reiniciar agora ou depois?" (dá para girar pela lista antes)
                 AgenteWatcher::Definir(AgenteWatcher::Proximo(AgenteWatcher::Nome()));
                 reiniciar_em_ = ContextoApps::Agora() + 8;
                 break;
@@ -179,6 +225,12 @@ public:
                 break;
             }
             case kAtivacao: {  // microfone sempre ouvindo a palavra de ativação (desligado: só pela roda)
+                if (ConfigWatcher::Int("economia", 0)) {
+                    aviso_ativacao_ = true;  // a economia de energia manda aqui: explica em vez de mudar escondido
+                    Desenhar(c, kAtivacao);
+                    aviso_ativacao_ = false;
+                    return true;
+                }
                 ConfigWatcher::SetInt("ativacao", ConfigWatcher::Int("ativacao", 1) ? 0 : 1);
                 ContextoApps::App().AplicarAtivacao();
                 break;
@@ -190,6 +242,32 @@ public:
                 cliques_ = true;
                 aviso_gaveta_ = 0;
                 DesenharCliques(c, 0);
+                return true;
+            case kRede: {
+                rede_ = true;
+                auto& wifi = WifiManager::GetInstance();
+                std::string atual = wifi.IsConnected()
+                                        ? TR("Conectado a ", "Connected to ", "已连接 ", "Conectado a ") + wifi.GetSsid()
+                                        : std::string(TR("Sem conexão agora", "Not connected right now", "当前未连接", "Sin conexión ahora"));
+                c.painel.MostrarTexto(TR("Rede Wi-Fi", "Wi-Fi network", "Wi-Fi 网络", "Red Wi-Fi"),
+                                      atual + TR(".\n\nAbrir o modo de configuração para trocar de rede? "
+                                                 "As redes salvas continuam guardadas; o Watcher cria a rede "
+                                                 "Ollie-XXXX para você configurar pelo celular.",
+                                                 ".\n\nOpen configuration mode to switch networks? "
+                                                 "Saved networks are kept; the Watcher creates the Ollie-XXXX "
+                                                 "network so you can set it up from your phone.",
+                                                 "。\n\n进入配置模式换一个网络？已保存的网络会保留；"
+                                                 "Watcher 会开启 Ollie-XXXX 热点，用手机即可配置。",
+                                                 ".\n\n¿Abrir el modo de configuración para cambiar de red? "
+                                                 "Las redes guardadas se conservan; el Watcher crea la red "
+                                                 "Ollie-XXXX para configurar desde el móvil."),
+                                      {TR("Trocar de rede", "Switch network", "更换网络", "Cambiar de red"),
+                                       TR("Voltar", "Back", "返回", "Volver")});
+                return true;
+            }
+            case kComoUsar:
+                como_usar_ = true;
+                MostrarComoUsar(c);
                 return true;
             case kAtualizar:
                 ota_ = EstadoOta::Buscando;
@@ -210,8 +288,14 @@ public:
 
 private:
     static constexpr int kBrilhoEconomia = 30;  // % ao ligar a economia de energia
-    enum { kAgente, kVoz, kEconomia, kAtivacao, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kCliques, kAtualizar, kSobre };
+    enum { kAgente, kVoz, kEconomia, kAtivacao, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kCliques, kRede,
+           kAtualizar, kComoUsar, kSobre };
     bool cliques_ = false;  // na tela "Cliques na roda"
+    bool rede_ = false;         // na confirmação "Trocar de rede"
+    bool como_usar_ = false;    // na tela "Como usar"
+    bool agente_confirma_ = false;  // na pergunta "reiniciar agora?" da troca de nome
+    bool aviso_ativacao_ = false;   // o clique na ativação sob economia mostra o porquê
+    bool avisar_servidor_nome_ = false;  // nome trocado sem reiniciar: avisa o servidor no Fundo
     int aviso_gaveta_ = 0;  // gesto que tentou deixar de abrir a gaveta sendo o único
     // Atualização: Buscando (consulta no Fundo), Pronta (versão nova, botões), Resultado (já na mais nova ou erro)
     enum class EstadoOta { Nada, Buscando, Pronta, Resultado };
@@ -245,7 +329,7 @@ private:
         c.painel.MostrarLista(
             TR("Configurações", "Settings", "设置", "Ajustes"),
             {{TR("Nome do agente", "Agent name", "助手名称", "Nombre del agente"), "Hey " + AgenteWatcher::Nome() +
-                                    (reiniciar_em_ ? TR(" · reinicia em instantes", " · restarting soon", " · 即将重启", " · se reinicia pronto") : "")},
+                                    (reiniciar_em_ ? TR(" · vale após reiniciar", " · applies after restart", " · 重启后生效", " · vale tras reiniciar") : "")},
              {TR("Respostas faladas", "Spoken replies", "语音回复", "Respuestas habladas"),
               ConfigWatcher::Int("voz", 1) ? TR("Ligadas", "On", "开启", "Activadas")
                                            : TR("Só texto na tela", "Text only", "仅屏幕文字", "Solo texto")},
@@ -256,7 +340,8 @@ private:
                                                      "Activado: brillo 30%, sin \"Hey\", avisos cada 1 min")
                                                 : TR("Desligada", "Off", "关闭", "Desactivado")},
              {TR("Ouvir \"Hey ", "Listen for \"Hey ", "聆听 \"Hey ", "Escuchar \"Hey ") + AgenteWatcher::Nome() + "\"",
-              ConfigWatcher::Int("economia", 0) ? TR("Desligado pela economia de energia", "Off (battery saver)", "关闭（省电模式）", "Desactivado (ahorro de energía)")
+              aviso_ativacao_ ? TR("Desligue a economia de energia para mudar", "Turn off battery saver to change this", "请先关闭省电模式再更改", "Desactiva el ahorro de energía para cambiarlo")
+              : ConfigWatcher::Int("economia", 0) ? TR("Desligado pela economia de energia", "Off (battery saver)", "关闭（省电模式）", "Desactivado (ahorro de energía)")
               : ConfigWatcher::Int("ativacao", 1) ? TR("Ligado (gasta mais bateria)", "On (uses more battery)", "开启（更耗电）", "Activado (gasta más batería)")
                                                   : TR("Desligado: só pela roda", "Off: wheel only", "关闭：仅用滚轮", "Desactivado: solo la rueda")},
              {TR("Tema", "Theme", "主题", "Tema"), ConfigWatcher::Texto("tema", "dark") == "dark" ? TR("Escuro", "Dark", "深色", "Oscuro") : TR("Claro", "Light", "浅色", "Claro")},
@@ -267,9 +352,14 @@ private:
              {TR("Desliga na bateria após", "Battery off after", "电池关机时间", "Apagar con batería"), Tempo(ConfigWatcher::Int("desliga_s", 300))},
              {TR("Avisos na tela", "On-screen alerts", "屏幕提醒", "Avisos en pantalla"), ConfigWatcher::Int("avisos", 1) ? TR("Ligados", "On", "开启", "Activados") : TR("Desligados", "Off", "关闭", "Desactivados")},
              {TR("Cliques na roda", "Wheel clicks", "滚轮点击", "Clics de la rueda"), ResumoCliques(c)},
+             {TR("Rede Wi-Fi", "Wi-Fi network", "Wi-Fi 网络", "Red Wi-Fi"),
+              WifiManager::GetInstance().IsConnected() ? WifiManager::GetInstance().GetSsid() + TR(" · trocar de rede", " · switch network", " · 更换网络", " · cambiar de red")
+                                                       : TR("Sem conexão · configurar", "Not connected · set up", "未连接 · 去配置", "Sin conexión · configurar")},
              {TR("Atualização", "Update", "更新", "Actualización"),
               TR("Versão ", "Version ", "版本 ", "Versión ") + std::string(esp_app_get_description()->version) +
                   TR(" · procurar nova", " · check for new", " · 检查新版本", " · buscar nueva")},
+             {TR("Como usar", "How to use", "使用说明", "Cómo se usa"),
+              TR("Cliques, roda e gestos", "Clicks, wheel and gestures", "点击、滚轮与手势", "Clics, rueda y gestos")},
              {TR("Sobre o Watcher", "About Watcher", "关于 Watcher", "Acerca de Watcher"), TR("Versão, rede e cartão", "Version, network, SD card", "版本、网络和存储卡", "Versión, red y tarjeta")},
              {TR("Voltar", "Back", "返回", "Volver"), ""}},
             selecionado);
@@ -393,24 +483,83 @@ private:
         }
     }
 
-    // Reinício depois de trocar o nome do agente: avisa o servidor e reinicia para a nova ativação
+    // Troca de nome do agente: 8 s depois do último clique, pergunta se reinicia agora (a ativação nova
+    // só vale depois do reinício) ou deixa para a próxima vez que ligar. Nada de reiniciar sozinho.
     void Fundo(ContextoApps& c) override {
         if (ota_ == EstadoOta::Buscando) {
             BuscarAtualizacao(c);
+        }
+        if (avisar_servidor_nome_ && RedeWatcher::Online()) {
+            avisar_servidor_nome_ = false;  // "Depois": o servidor já passa a se apresentar com o nome novo
+            std::string corpo;
+            RedeWatcher::Pedir("GET", "/watcher/perfil?agente=" + AgenteWatcher::Nome(), "", corpo);
         }
         int quando = reiniciar_em_;
         if (quando == 0 || ContextoApps::Agora() < quando) {
             return;
         }
         reiniciar_em_ = 0;
+        // Só pergunta se a pessoa ainda está nos Ajustes; senão, o nome vale no próximo boot
+        if (!c.app_ativo || c.app_ativo() != Id()) {
+            avisar_servidor_nome_ = true;
+            return;
+        }
+        agente_confirma_ = true;
+        c.painel.MostrarTexto(TR("Nome do agente", "Agent name", "助手名称", "Nombre del agente"),
+                              TR("Agora é ", "Now it's ", "现在叫 ", "Ahora es ") + AgenteWatcher::Nome() +
+                                  TR(". Para a ativação \"Hey ", ". For the \"Hey ", "。要用 \"Hey ", ". Para que \"Hey ") +
+                                  AgenteWatcher::Nome() +
+                                  TR("\" valer, o Watcher precisa reiniciar (uns 20 s).",
+                                     "\" wake word to work, the Watcher needs to restart (about 20 s).",
+                                     "\" 唤醒，Watcher 需要重启（约 20 秒）。",
+                                     "\" funcione, el Watcher debe reiniciarse (unos 20 s)."),
+                              {TR("Reiniciar agora", "Restart now", "立即重启", "Reiniciar ahora"),
+                               TR("Depois", "Later", "以后再说", "Después")});
+    }
+
+    // Reinício escolhido pela pessoa: avisa o servidor, mostra o status e reinicia
+    void ReiniciarParaAtivacao(ContextoApps& c) {
         std::string corpo;
         RedeWatcher::Pedir("GET", "/watcher/perfil?agente=" + AgenteWatcher::Nome(), "", corpo);
         c.painel.MostrarStatus(TR("Nome do agente", "Agent name", "助手名称", "Nombre del agente"), PainelWatcher::Status::Sucesso,
-                               TR("Agora é ", "Now it's ", "现在叫 ", "Ahora es ") + AgenteWatcher::Nome() +
-                                   TR(". Diga “Hey ", ". Say “Hey ", "。请说“Hey ", ". Di “Hey ") + AgenteWatcher::Nome() +
+                               TR("Diga “Hey ", "Say “Hey ", "请说“Hey ", "Di “Hey ") + AgenteWatcher::Nome() +
                                    TR("”. Reiniciando…", "”. Restarting…", "”。正在重启…", "”. Reiniciando…"));
         vTaskDelay(pdMS_TO_TICKS(2500));
         esp_restart();
+    }
+
+    // "Como usar": os gestos da roda, com as ações configuradas agora
+    void MostrarComoUsar(ContextoApps& c) {
+        std::string texto;
+        static const char* const kGestos[] = {TR("1 clique", "1 click", "单击", "1 clic"), TR("2 cliques", "2 clicks", "双击", "2 clics"),
+                                              TR("3 cliques", "3 clicks", "三击", "3 clics")};
+        for (int n = 1; n <= CliquesWatcher::kGestos; n++) {
+            std::string acao = NomeAcao(c, CliquesWatcher::Acao(n));
+            texto += std::string(kGestos[n - 1]) + ": " + acao + "\n";
+        }
+        texto += TR("Girar: volume (na gaveta, navega)\n"
+                    "Na gaveta: 1 clique escolhe, 2 voltam, 3 fecham\n"
+                    "Segurar 2 s (na bateria): desliga\n"
+                    "Segurar 20 s: apaga o Wi-Fi e restaura tudo\n"
+                    "Falar \"Hey ", 
+                    "Turn: volume (in the drawer, navigate)\n"
+                    "In the drawer: 1 click picks, 2 go back, 3 close\n"
+                    "Hold 2 s (on battery): power off\n"
+                    "Hold 20 s: erases Wi-Fi and resets everything\n"
+                    "Say \"Hey ",
+                    "旋转：音量（抽屉内为导航）\n"
+                    "抽屉内：单击选择，双击返回，三击关闭\n"
+                    "按住 2 秒（电池供电）：关机\n"
+                    "按住 20 秒：清除 Wi-Fi 并恢复出厂\n"
+                    "说 \"Hey ",
+                    "Girar: volumen (en el cajón, navegar)\n"
+                    "En el cajón: 1 clic elige, 2 vuelven, 3 cierran\n"
+                    "Mantener 2 s (con batería): apagar\n"
+                    "Mantener 20 s: borra el Wi-Fi y restaura todo\n"
+                    "Decir \"Hey ") + AgenteWatcher::Nome() +
+                 TR("\": conversar", "\": talk", "\"：对话", "\": hablar");
+        c.painel.MostrarTexto(TR("Como usar", "How to use", "使用说明", "Cómo se usa"), texto,
+                              {TR("Voltar", "Back", "返回", "Volver")});
     }
 
     void MostrarSobre(ContextoApps& c) {

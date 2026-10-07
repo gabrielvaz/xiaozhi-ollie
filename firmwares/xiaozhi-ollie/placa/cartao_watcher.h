@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "agente_watcher.h"
 #include "idioma_watcher.h"
 
 class CartaoWatcher {
@@ -67,8 +68,9 @@ public:
         localtime_r(&agora, &t);
         char hora[16];
         strftime(hora, sizeof(hora), "%H:%M:%S", &t);
-        const char* quem = papel == "user" ? TR("Você", "You", "你", "Tú")
-                                           : (papel == "assistant" ? "Ollie" : TR("Aviso", "Notice", "提示", "Aviso"));
+        std::string quem = papel == "user" ? std::string(TR("Você", "You", "你", "Tú"))
+                                           : (papel == "assistant" ? AgenteWatcher::Nome()
+                                                                   : std::string(TR("Aviso", "Notice", "提示", "Aviso")));
         std::lock_guard<std::mutex> trava(trava_);
         pendente_ += std::string(hora) + " " + quem + ": " + texto + "\n";
     }
