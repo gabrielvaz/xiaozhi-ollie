@@ -2,7 +2,7 @@ name: Ollie
 options:
   bundleIdPrefix: com.example.olliewatch
   deploymentTarget:
-    watchOS: "11.0"
+    watchOS: "26.0"
     iOS: "18.0"
   developmentLanguage: en
   knownRegions: [en, pt-BR, Base]
@@ -12,7 +12,7 @@ settings:
   base:
     DEVELOPMENT_TEAM: TEAMID_EXEMPLO
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "3"
+    CURRENT_PROJECT_VERSION: "4"
     SWIFT_VERSION: "6.0"
     CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: NO
