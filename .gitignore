@@ -35,3 +35,4 @@ firmwares/xiaozhi-ollie/local.env
 # Simulador da tela (compilação e imagens geradas)
 firmwares/xiaozhi-ollie/simulador/build/
 firmwares/xiaozhi-ollie/simulador/saida/
+firmwares/xiaozhi-ollie/quirc/

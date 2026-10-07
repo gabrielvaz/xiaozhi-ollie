@@ -20,6 +20,8 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "application.h"
 #include "board.h"
@@ -153,6 +155,8 @@ struct ContextoApps {
     std::function<bool()> gaveta_aberta;  // serviços evitam mexer na tela com a gaveta aberta
     // Abre a gaveta direto num app (pelo Id()) com um argumento, ex.: um aviso abrindo uma sessão
     std::function<void(const std::string& app, const std::string& argumento)> abrir_app;
+    // Apps da gaveta como (Id, Nome), na ordem do mosaico (Configurações > Cliques na roda)
+    std::function<std::vector<std::pair<std::string, std::string>>()> listar_apps;
 
     static int Agora() { return (int)(esp_timer_get_time() / 1000000); }
     static Application& App() { return Application::GetInstance(); }

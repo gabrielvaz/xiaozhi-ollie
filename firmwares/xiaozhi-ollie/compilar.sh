@@ -39,6 +39,11 @@ if [[ ! -d "$AQUI/esp-wifi-connect" ]]; then
   git clone -q https://github.com/78/esp-wifi-connect.git "$AQUI/esp-wifi-connect"
   git -C "$AQUI/esp-wifi-connect" checkout -q cc103899ea8199b0fbf18c9b6e65152d9a92091e   # v3.3.1
 fi
+# quirc (ISC): leitura de QR code pela câmera (app Wi-Fi por QR)
+if [[ ! -d "$AQUI/quirc" ]]; then
+  git clone -q https://github.com/dlbeer/quirc.git "$AQUI/quirc"
+  git -C "$AQUI/quirc" checkout -q 927d680904dc95fdff4cd9d022eb374b438ff8f2   # 2025-05-20
+fi
 [[ -f "$AQUI/fonte/NotoSans-Regular.ttf" ]] || curl -sSL -o "$AQUI/fonte/NotoSans-Regular.ttf" \
   https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf
 

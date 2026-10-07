@@ -975,7 +975,7 @@ void WifiConfigurationAp::Save(const std::string &ssid, const std::string &passw
 #     Os desenhos do Clawd ficam na partição de assets: se falta a pose mais nova (OLLIE_POSE_ASSETS),
 #     o aparelho baixa a partição do mesmo servidor (data/bin/OLLIE_ARQUIVO_ASSETS), pelo download de
 #     assets do próprio XiaoZhi. Ao mudar os GIFs, troque a pose e o nome do arquivo aqui.
-OLLIE_VERSAO_APP = "2.6.0"
+OLLIE_VERSAO_APP = "2.6.1"
 OLLIE_POSE_ASSETS = "xingando"
 OLLIE_ARQUIVO_ASSETS = "ollie-assets_3.bin"
 trocar(XZ / "CMakeLists.txt", 'set(PROJECT_VER "2.5.0")', f'set(PROJECT_VER "{OLLIE_VERSAO_APP}")')
@@ -1187,6 +1187,227 @@ trocar(placa, """        // Modo de configuração de Wi-Fi: tela própria (plac
         }
 
         // Modo de configuração de Wi-Fi: tela própria (placa/tela_sem_wifi.h) no lugar do alerta do XiaoZhi""")
+
+# 29. Cliques na roda configuráveis (Configurações > Cliques na roda, placa/cliques_watcher.h) -------------
+#     Fora da gaveta, 1, 2 e 3 cliques fazem a ação escolhida (conversar, abrir a gaveta, abrir um app ou
+#     nada); dentro dela continuam fixos (1 escolhe, 2 voltam, 3 fecham). Com o agente ouvindo ou falando,
+#     1 clique sempre interrompe, como antes.
+trocar(placa, """#include "asterisco_claude.h"  // asterisco animado do Claude Code\n""",
+       """#include "asterisco_claude.h"  // asterisco animado do Claude Code\n#include "cliques_watcher.h"    // ação de 1, 2 e 3 cliques fora da gaveta\n""")
+trocar(placa, """    void OnKnobRotate(bool clockwise) {
+        power_save_timer_->WakeUp();  // girar a roda acorda a tela""", """    // Cliques fora da gaveta: a ação escolhida em Configurações > Cliques na roda
+    void ExecutarCliques(int cliques) {
+        auto& app = Application::GetInstance();
+        auto estado = app.GetDeviceState();
+        if (cliques == 1 && (estado == kDeviceStateListening || estado == kDeviceStateSpeaking ||
+                             estado == kDeviceStateConnecting)) {
+            app.ToggleChatState();  // conversa em andamento: 1 clique interrompe
+            return;
+        }
+        std::string acao = CliquesWatcher::Acao(cliques);
+        if (acao == "agente") {
+            app.ToggleChatState();
+        } else if (acao == "gaveta") {
+            if (gaveta_ != nullptr) {
+                gaveta_->AbrirOuVoltar();
+            }
+        } else if (acao.rfind("app:", 0) == 0) {
+            if (gaveta_ != nullptr) {
+                gaveta_->AbrirApp(acao.substr(4), "");
+            }
+        }
+    }
+
+    void OnKnobRotate(bool clockwise) {
+        power_save_timer_->WakeUp();  // girar a roda acorda a tela""")
+trocar(placa, """            if (self->gaveta_ != nullptr && self->gaveta_->Clicar()) {
+                return;  // painel aberto: o clique escolhe
+            }
+            app.ToggleChatState();""", """            if (self->gaveta_ != nullptr && self->gaveta_->Clicar()) {
+                return;  // painel aberto: o clique escolhe
+            }
+            self->ExecutarCliques(1);""")
+trocar(placa, """        // Três cliques: fecha a gaveta de qualquer tela
+        static button_event_args_t tres_cliques = {};
+        tres_cliques.multiple_clicks.clicks = 3;
+        iot_button_register_cb(btns, BUTTON_MULTIPLE_CLICK, &tres_cliques, [](void* button_handle, void* usr_data) {
+            auto self = static_cast<SensecapWatcher*>(usr_data);
+            self->power_save_timer_->WakeUp();
+            if (self->gaveta_ != nullptr) {
+                self->gaveta_->Fechar();
+            }
+        }, this);
+
+        // Dois cliques: abre a gaveta; com ela aberta, volta (tela anterior do app, gaveta, ou fecha)
+        iot_button_register_cb(btns, BUTTON_DOUBLE_CLICK, nullptr, [](void* button_handle, void* usr_data) {
+            auto self = static_cast<SensecapWatcher*>(usr_data);
+            self->power_save_timer_->WakeUp();
+            if (self->gaveta_ != nullptr) {
+                self->gaveta_->AbrirOuVoltar();
+            }
+        }, this);""", """        // Três cliques: com a gaveta aberta, fecha de qualquer tela; fechada, a ação escolhida
+        static button_event_args_t tres_cliques = {};
+        tres_cliques.multiple_clicks.clicks = 3;
+        iot_button_register_cb(btns, BUTTON_MULTIPLE_CLICK, &tres_cliques, [](void* button_handle, void* usr_data) {
+            auto self = static_cast<SensecapWatcher*>(usr_data);
+            self->power_save_timer_->WakeUp();
+            if (self->gaveta_ != nullptr && self->gaveta_->Aberta()) {
+                self->gaveta_->Fechar();
+            } else {
+                self->ExecutarCliques(3);
+            }
+        }, this);
+
+        // Dois cliques: com a gaveta aberta, volta (tela anterior do app, gaveta, ou fecha); fechada, a ação escolhida
+        iot_button_register_cb(btns, BUTTON_DOUBLE_CLICK, nullptr, [](void* button_handle, void* usr_data) {
+            auto self = static_cast<SensecapWatcher*>(usr_data);
+            self->power_save_timer_->WakeUp();
+            if (self->gaveta_ != nullptr && self->gaveta_->Aberta()) {
+                self->gaveta_->Voltar();
+            } else {
+                self->ExecutarCliques(2);
+            }
+        }, this);""")
+
+# 30. Sem Wi-Fi com QR code e entrada automática no modo de configuração --------------------------------
+#     - A tela sem Wi-Fi (placa/tela_sem_wifi.h) tem páginas: Clawd e instruções, QR da rede do Ollie e QR do
+#       portal; a roda troca a página.
+#     - O XiaoZhi só entra sozinho no modo de configuração no boot (1 min sem conectar). Aqui também quando o
+#       Wi-Fi cai com o aparelho ligado e não volta em 1 min (no meio de uma conversa, espera mais 1 min).
+#     - Se entrou sozinho e uma rede salva reaparece (o roteador voltou), sem ninguém configurando pelo
+#       celular, reinicia para conectar nela.
+trocar(display_h, """    virtual void EsconderSemWifi() {}""", """    virtual void EsconderSemWifi() {}
+    // Roda girando no modo de configuração de Wi-Fi: a placa troca a página da tela (QR code)
+    virtual bool GirarSemWifi(bool horario) { return false; }""")
+trocar(placa, """        virtual void EsconderSemWifi() override {""", """        virtual bool GirarSemWifi(bool horario) override {
+            DisplayLockGuard lock(this);
+            return sem_wifi_ != nullptr && sem_wifi_->Girar(horario);
+        }
+
+        virtual void EsconderSemWifi() override {""")
+trocar(placa, """    void OnKnobRotate(bool clockwise) {
+        power_save_timer_->WakeUp();  // girar a roda acorda a tela
+""", """    void OnKnobRotate(bool clockwise) {
+        power_save_timer_->WakeUp();  // girar a roda acorda a tela
+        if (GetDisplay()->GirarSemWifi(clockwise)) {
+            return;  // modo de configuração de Wi-Fi: a roda troca a página (QR code)
+        }
+""")
+wifi_mgr_h = WIFI / "include/wifi_manager.h"
+wifi_mgr_cc = WIFI / "wifi_manager.cc"
+trocar(wifi_mgr_h, """    std::string GetApWebUrl() const;""", """    std::string GetApWebUrl() const;
+    // Ollie: nomes das redes vistas pela busca do portal (só no modo de configuração)
+    std::vector<std::string> RedesVistas();""")
+trocar(wifi_mgr_h, """#include <string>\n""", """#include <string>\n#include <vector>\n""")
+texto = wifi_mgr_cc.read_text(encoding="utf-8")
+if "WifiManager::RedesVistas" not in texto:
+    wifi_mgr_cc.write_text(texto + """
+std::vector<std::string> WifiManager::RedesVistas() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::string> nomes;
+    if (config_ap_) {
+        for (const auto& rec : config_ap_->GetAccessPoints()) {
+            nomes.emplace_back(reinterpret_cast<const char*>(rec.ssid));
+        }
+    }
+    return nomes;
+}
+""", encoding="utf-8")
+trocar(wifi_board, """#include <ssid_manager.h>\n""", """#include <ssid_manager.h>\n#include <esp_wifi.h>\n""")
+trocar(wifi_board, """static constexpr int CONNECT_TIMEOUT_SEC = 60;""", """static constexpr int CONNECT_TIMEOUT_SEC = 60;
+
+// Ollie: o modo de configuração entrou sozinho (1 min sem Wi-Fi)? Então, se uma rede salva reaparecer e
+// ninguém estiver no portal pelo celular, reinicia para conectar nela (conferido a cada minuto)
+static bool ollie_config_automatica = false;
+static void OllieVigiarRedeSalva(void*) {
+    auto& wifi = WifiManager::GetInstance();
+    if (!wifi.IsConfigMode()) {
+        return;
+    }
+    wifi_sta_list_t celulares = {};
+    if (esp_wifi_ap_get_sta_list(&celulares) == ESP_OK && celulares.num > 0) {
+        return;  // alguém configurando pelo celular
+    }
+    auto vistas = wifi.RedesVistas();
+    for (const auto& salva : SsidManager::GetInstance().GetSsidList()) {
+        for (const auto& vista : vistas) {
+            if (vista == salva.ssid) {
+                ESP_LOGW(TAG, "Rede salva %s voltou: reiniciando para conectar", vista.c_str());
+                esp_restart();
+            }
+        }
+    }
+}""")
+trocar(wifi_board, """        case NetworkEvent::Disconnected:
+            ESP_LOGW(TAG, "WiFi disconnected");""", """        case NetworkEvent::Disconnected:
+            ESP_LOGW(TAG, "WiFi disconnected");
+            if (!in_config_mode_) {
+                // Ollie: se não voltar em 1 min, entra no modo de configuração (se já está contando, segue)
+                esp_timer_start_once(connect_timer_, CONNECT_TIMEOUT_SEC * 1000000ULL);
+            }""")
+trocar(wifi_board, """    auto* board = static_cast<WifiBoard*>(arg);
+    ESP_LOGW(TAG, "WiFi connection timeout, entering config mode");""", """    auto* board = static_cast<WifiBoard*>(arg);
+    if (board->in_config_mode_ || WifiManager::GetInstance().IsConnected()) {
+        return;  // Ollie: já no modo de configuração, ou o Wi-Fi voltou
+    }
+    // Ollie: no meio de uma conversa o estado não permite o modo de configuração: tenta de novo em 1 min
+    auto estado = Application::GetInstance().GetDeviceState();
+    if (estado == kDeviceStateListening || estado == kDeviceStateSpeaking || estado == kDeviceStateConnecting ||
+        estado == kDeviceStateUpgrading) {
+        esp_timer_start_once(board->connect_timer_, CONNECT_TIMEOUT_SEC * 1000000ULL);
+        return;
+    }
+    ollie_config_automatica = true;
+    ESP_LOGW(TAG, "WiFi connection timeout, entering config mode");""")
+trocar(wifi_board, """void WifiBoard::StartWifiConfigMode() {
+    in_config_mode_ = true;""", """void WifiBoard::StartWifiConfigMode() {
+    in_config_mode_ = true;
+    if (ollie_config_automatica) {
+        static esp_timer_handle_t vigia = nullptr;
+        if (vigia == nullptr) {
+            esp_timer_create_args_t args = {};
+            args.callback = OllieVigiarRedeSalva;
+            args.dispatch_method = ESP_TIMER_TASK;
+            args.name = "ollie_rede_salva";
+            esp_timer_create(&args, &vigia);
+        }
+        esp_timer_stop(vigia);
+        esp_timer_start_periodic(vigia, 60 * 1000000ULL);
+    }""")
+
+# 31. App "Wi-Fi por QR": a câmera lê o QR code de uma rede e o Watcher conecta nela -------------------------
+#     Leitor: quirc (ISC, baixado pelo compilar.sh em quirc/), copiado para a pasta da placa (o CMake da
+#     placa compila os .c dela), em float (o ESP32-S3 tem FPU de precisão simples).
+quirc_dir = AQUI / "quirc" / "lib"
+if quirc_dir.is_dir():
+    for arq in list(quirc_dir.glob("*.c")) + list(quirc_dir.glob("*.h")):
+        texto = arq.read_text(encoding="utf-8")
+        if arq.name == "quirc_internal.h":
+            texto = "#define QUIRC_FLOAT_TYPE float\n#define QUIRC_USE_TGMATH 1\n" + texto
+        (placa_dir / arq.name).write_text(texto, encoding="utf-8")
+else:
+    problemas.append("quirc/ não encontrado: rode compilar.sh (ele baixa o quirc)")
+# A foto decodificada (RGB565, 640x480) para o leitor de QR
+trocar(XZ / "main/boards/sensecap-watcher/sscma_camera.h",
+       """    std::string UltimaFotoJpeg() const {""",
+       """    const uint16_t* UltimaImagemRgb(int& largura, int& altura) const {
+        largura = preview_image_.header.w;
+        altura = preview_image_.header.h;
+        return reinterpret_cast<const uint16_t*>(preview_image_.data);
+    }
+    std::string UltimaFotoJpeg() const {""")
+# No modo de configuração de Wi-Fi, 1 clique abre o app já lendo o QR (a tela sem Wi-Fi diz isso)
+trocar(placa, """            if (self->gaveta_ != nullptr && self->gaveta_->Clicar()) {
+                return;  // painel aberto: o clique escolhe
+            }
+            self->ExecutarCliques(1);""", """            if (self->gaveta_ != nullptr && !self->gaveta_->Aberta() && WifiManager::GetInstance().IsConfigMode()) {
+                self->gaveta_->AbrirApp("wifi_qr", "ler");  // sem Wi-Fi: lê o QR da rede com a câmera
+                return;
+            }
+            if (self->gaveta_ != nullptr && self->gaveta_->Clicar()) {
+                return;  // painel aberto: o clique escolhe
+            }
+            self->ExecutarCliques(1);""")
 
 if problemas:
     print("Problemas:\n  " + "\n  ".join(problemas))

@@ -634,6 +634,19 @@ int main() {
                         {"Enviar pedido", "Voltar"});
     Avancar(300);
     SalvarPng("24-sessao-detalhe-sucesso");  // "-sucesso": sem Clawd, o medir.py não mede
+    // Configurações > Cliques na roda (os textos que o app monta)
+    painel.MostrarLista("Cliques na roda",
+                        {{"1 clique", "Conversar com Ollie"}, {"2 cliques", "Abrir a gaveta"},
+                         {"3 cliques", "Abrir Sessões do Claude Code"}, {"Voltar", ""}},
+                        2);
+    Avancar(200);
+    SalvarPng("25-cliques-sucesso");
+    painel.MostrarLista("Configurações",
+                        {{"Avisos na tela", "Ligados"}, {"Cliques na roda", "Conversar · Gaveta · Sessões"},
+                         {"Atualização", "Versão 2.6.1 · procurar nova"}},
+                        1);
+    Avancar(200);
+    SalvarPng("26-configuracoes-sucesso");
     painel.Fechar();
 
     // Modo de configuração de Wi-Fi (o firmware chama MostrarSemWifi com a rede e o endereço do portal)
@@ -641,6 +654,12 @@ int main() {
     sem_wifi.Mostrar("Ollie-AC40", "http://192.168.4.1");
     Avancar(1100);  // quadro com o Wi-Fi riscado
     SalvarPng("20-sem-wifi");
+    sem_wifi.Girar(true);
+    Avancar(200);
+    SalvarPng("20b-sem-wifi-qr-rede-sucesso");  // "-sucesso": tela sem Clawd, o medir.py não mede
+    sem_wifi.Girar(true);
+    Avancar(200);
+    SalvarPng("20c-sem-wifi-qr-portal-sucesso");
     sem_wifi.Esconder();
     g_painel_aberto = false;
     Avancar(100);

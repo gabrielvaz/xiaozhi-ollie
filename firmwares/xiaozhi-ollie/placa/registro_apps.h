@@ -19,6 +19,7 @@
 #include "apps/app_sessoes.h"
 #include "apps/app_tempo.h"
 #include "apps/app_uso_claude.h"
+#include "apps/app_wifi_qr.h"
 #include "apps/servico_avisos.h"
 #include "apps/servico_carregador.h"
 #include "apps/servico_diagnostico.h"
@@ -71,6 +72,7 @@ inline void RegistrarApps(GavetaWatcher& gaveta) {
     gaveta.Registrar(std::make_unique<AppContagem>());
     gaveta.Registrar(std::make_unique<AppRelogioMundial>());
     gaveta.Registrar(std::make_unique<AppQrCode>());
+    gaveta.Registrar(std::make_unique<AppWifiQr>());
     gaveta.Registrar(std::make_unique<AppMemoria>());
     gaveta.Registrar(std::make_unique<AppCartao>());
     gaveta.Registrar(std::make_unique<AppConfiguracoes>());

@@ -19,16 +19,10 @@
 #include "clawd_animado.h"
 #include "spinner_watcher.h"
 #include "layout_mascote.h"
+#include "qr_watcher.h"
 #include "idioma_watcher.h"
 #include "material_symbols.h"
 
-// qrcodegen (Nayuki, MIT) já vem no componente esp_emote_gfx; ativar o lv_qrcode duplicaria os símbolos
-extern "C" {
-bool qrcodegen_encodeText(const char* text, uint8_t tempBuffer[], uint8_t qrcode[], int ecl, int minVersion,
-                          int maxVersion, int mask, bool boostEcl);
-int qrcodegen_getSize(const uint8_t qrcode[]);
-bool qrcodegen_getModule(const uint8_t qrcode[], int x, int y);
-}
 
 LV_FONT_DECLARE(font_material_symbols_30_4);
 
@@ -163,32 +157,7 @@ public:
         lv_obj_set_style_pad_all(fundo, 0, 0);
         lv_obj_remove_flag(fundo, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_align(fundo, LV_ALIGN_CENTER, 0, 6);
-        // Gera o QR (até versão 10 = 57x57 módulos) e desenha num canvas com módulos inteiros
-        static uint8_t qr[((10 * 4 + 17) * (10 * 4 + 17) + 7) / 8 + 1];
-        static uint8_t temporario[sizeof(qr)];
-        if (qrcodegen_encodeText(conteudo.c_str(), temporario, qr, 1 /* Ecc MEDIUM */, 1, 10, -1 /* máscara auto */, true)) {
-            int n = qrcodegen_getSize(qr);
-            int escala = std::max(1, 212 / (n + 4));  // borda de 2 módulos de cada lado
-            int lado = (n + 4) * escala;
-            if (qr_buf_ != nullptr) {
-                lv_draw_buf_destroy(qr_buf_);
-            }
-            qr_buf_ = lv_draw_buf_create(lado, lado, LV_COLOR_FORMAT_RGB565, 0);
-            auto canvas = lv_canvas_create(fundo);
-            lv_canvas_set_draw_buf(canvas, qr_buf_);
-            lv_canvas_fill_bg(canvas, lv_color_white(), LV_OPA_COVER);
-            for (int y = 0; y < n; y++) {
-                for (int x = 0; x < n; x++) {
-                    if (!qrcodegen_getModule(qr, x, y)) {
-                        continue;
-                    }
-                    for (int dy = 0; dy < escala; dy++) {
-                        for (int dx = 0; dx < escala; dx++) {
-                            lv_canvas_set_px(canvas, (x + 2) * escala + dx, (y + 2) * escala + dy, lv_color_black(), LV_OPA_COVER);
-                        }
-                    }
-                }
-            }
+        if (auto canvas = DesenharQr(fundo, conteudo, 212, qr_buf_)) {
             lv_obj_center(canvas);
         } else {
             auto erro = Rotulo(Fontes::Pequena(), 0x000000, TR("Texto longo demais para QR", "Text too long for QR", "文本太长，无法生成二维码", "Texto demasiado largo para QR"), fundo);

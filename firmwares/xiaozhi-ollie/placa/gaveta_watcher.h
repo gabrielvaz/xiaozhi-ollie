@@ -21,9 +21,17 @@ public:
           contexto_{painel_, [this]() { VoltarGaveta(); }, [this]() { FecharTudo(); }, nullptr, nullptr,
                     [this]() { return aberta_.load(); }} {
         contexto_.abrir_app = [this](const std::string& nome, const std::string& argumento) { AbrirApp(nome, argumento); };
+        contexto_.listar_apps = [this]() {
+            std::vector<std::pair<std::string, std::string>> lista;
+            for (auto* a : Visiveis()) {
+                lista.emplace_back(a->Id(), a->Nome());
+            }
+            return lista;
+        };
     }
 
     ContextoApps& Contexto() { return contexto_; }
+    bool Aberta() const { return aberta_; }
 
     // Abre a gaveta direto num app (ex.: aviso de sessão esperando você -> app Sessões)
     void AbrirApp(const std::string& nome, const std::string& argumento) {

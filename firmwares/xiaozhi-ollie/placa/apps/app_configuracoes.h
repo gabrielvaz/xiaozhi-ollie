@@ -1,4 +1,5 @@
 // App "Configurações": a roda escolhe o item, o clique troca para a próxima opção (aplica e salva na hora).
+// "Cliques na roda" escolhe o que 1, 2 e 3 cliques fazem fora da gaveta (placa/cliques_watcher.h).
 // "Atualização" consulta o servidor do OTA e, se houver versão nova, baixa e instala (o aparelho reinicia).
 #pragma once
 
@@ -12,6 +13,7 @@
 #include "ota.h"
 #include "../abertura_watcher.h"
 #include "../agente_watcher.h"
+#include "../cliques_watcher.h"
 #include "../fontes_watcher.h"
 #include "../idioma_watcher.h"
 #include "../nucleo_apps.h"
@@ -25,6 +27,7 @@ public:
 
     void Abrir(ContextoApps& c) override {
         sobre_ = false;
+        cliques_ = false;
         ota_ = EstadoOta::Nada;
         Desenhar(c, 0);
     }
@@ -46,6 +49,11 @@ public:
             Desenhar(c, kAtualizar);
             return true;
         }
+        if (cliques_) {
+            cliques_ = false;
+            Desenhar(c, kCliques);
+            return true;
+        }
         return false;
     }
 
@@ -56,6 +64,16 @@ public:
             return true;
         }
         if (ota_ == EstadoOta::Buscando) {
+            return true;
+        }
+        if (cliques_) {
+            int gesto = c.painel.Selecionado() + 1;  // linhas: 1, 2 e 3 cliques; depois o Voltar
+            if (gesto > CliquesWatcher::kGestos) {
+                cliques_ = false;
+                Desenhar(c, kCliques);
+                return true;
+            }
+            TrocarAcao(c, gesto);
             return true;
         }
         if (ota_ == EstadoOta::Pronta) {
@@ -168,6 +186,11 @@ public:
             case kAvisos:
                 ConfigWatcher::SetInt("avisos", ConfigWatcher::Int("avisos", 1) ? 0 : 1);
                 break;
+            case kCliques:
+                cliques_ = true;
+                aviso_gaveta_ = 0;
+                DesenharCliques(c, 0);
+                return true;
             case kAtualizar:
                 ota_ = EstadoOta::Buscando;
                 c.painel.MostrarStatus(TR("Atualização", "Update", "更新", "Actualización"), PainelWatcher::Status::Carregando,
@@ -187,7 +210,9 @@ public:
 
 private:
     static constexpr int kBrilhoEconomia = 30;  // % ao ligar a economia de energia
-    enum { kAgente, kVoz, kEconomia, kAtivacao, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kAtualizar, kSobre };
+    enum { kAgente, kVoz, kEconomia, kAtivacao, kTema, kFonte, kTela, kBrilho, kVolume, kDesliga, kAvisos, kCliques, kAtualizar, kSobre };
+    bool cliques_ = false;  // na tela "Cliques na roda"
+    int aviso_gaveta_ = 0;  // gesto que tentou deixar de abrir a gaveta sendo o único
     // Atualização: Buscando (consulta no Fundo), Pronta (versão nova, botões), Resultado (já na mais nova ou erro)
     enum class EstadoOta { Nada, Buscando, Pronta, Resultado };
     std::atomic<EstadoOta> ota_{EstadoOta::Nada};
@@ -241,12 +266,92 @@ private:
              {TR("Volume", "Volume", "音量", "Volumen"), std::to_string(board.GetAudioCodec()->output_volume()) + "%"},
              {TR("Desliga na bateria após", "Battery off after", "电池关机时间", "Apagar con batería"), Tempo(ConfigWatcher::Int("desliga_s", 300))},
              {TR("Avisos na tela", "On-screen alerts", "屏幕提醒", "Avisos en pantalla"), ConfigWatcher::Int("avisos", 1) ? TR("Ligados", "On", "开启", "Activados") : TR("Desligados", "Off", "关闭", "Desactivados")},
+             {TR("Cliques na roda", "Wheel clicks", "滚轮点击", "Clics de la rueda"), ResumoCliques(c)},
              {TR("Atualização", "Update", "更新", "Actualización"),
               TR("Versão ", "Version ", "版本 ", "Versión ") + std::string(esp_app_get_description()->version) +
                   TR(" · procurar nova", " · check for new", " · 检查新版本", " · buscar nueva")},
              {TR("Sobre o Watcher", "About Watcher", "关于 Watcher", "Acerca de Watcher"), TR("Versão, rede e cartão", "Version, network, SD card", "版本、网络和存储卡", "Versión, red y tarjeta")},
              {TR("Voltar", "Back", "返回", "Volver"), ""}},
             selecionado);
+    }
+
+    // Nome de uma ação dos cliques, para a lista
+    static std::string NomeAcao(ContextoApps& c, const std::string& acao) {
+        if (acao == "agente") {
+            return TR("Conversar com ", "Talk to ", "和 ", "Hablar con ") + AgenteWatcher::Nome() + TR("", "", " 对话", "");
+        }
+        if (acao == "gaveta") {
+            return TR("Abrir a gaveta", "Open the drawer", "打开应用抽屉", "Abrir el cajón");
+        }
+        if (acao.rfind("app:", 0) == 0 && c.listar_apps) {
+            for (auto& [id, nome] : c.listar_apps()) {
+                if (id == acao.substr(4)) {
+                    return TR("Abrir ", "Open ", "打开 ", "Abrir ") + nome;
+                }
+            }
+        }
+        return TR("Nada", "Nothing", "无", "Nada");
+    }
+
+    // Uma linha na lista principal, na ordem 1, 2 e 3 cliques: "Conversar · Gaveta · Nada"
+    static std::string ResumoCliques(ContextoApps& c) {
+        std::string r;
+        for (int n = 1; n <= CliquesWatcher::kGestos; n++) {
+            std::string acao = CliquesWatcher::Acao(n);
+            std::string curto;
+            if (acao == "agente") {
+                curto = TR("Conversar", "Talk", "对话", "Hablar");
+            } else if (acao == "gaveta") {
+                curto = TR("Gaveta", "Drawer", "抽屉", "Cajón");
+            } else if (acao == "nada") {
+                curto = TR("Nada", "Nothing", "无", "Nada");
+            } else {
+                curto = NomeAcao(c, acao);
+                curto = curto.substr(curto.find(' ') + 1);  // sem o "Abrir"
+            }
+            r += (n > 1 ? " · " : "") + curto;
+        }
+        return r;
+    }
+
+    void DesenharCliques(ContextoApps& c, int selecionado) {
+        static const char* const kNomesGestos[] = {TR("1 clique", "1 click", "单击", "1 clic"), TR("2 cliques", "2 clicks", "双击", "2 clics"),
+                                                   TR("3 cliques", "3 clicks", "三击", "3 clics")};
+        std::vector<PainelWatcher::Item> itens;
+        for (int n = 1; n <= CliquesWatcher::kGestos; n++) {
+            std::string detalhe = NomeAcao(c, CliquesWatcher::Acao(n));
+            if (aviso_gaveta_ == n) {
+                detalhe = TR("Único que abre a gaveta: troque outro antes", "Only one opening the drawer: change another first",
+                             "唯一打开抽屉的手势：请先修改其他", "Único que abre el cajón: cambia otro antes");
+            }
+            itens.push_back({kNomesGestos[n - 1], detalhe});
+        }
+        itens.push_back({TR("Voltar", "Back", "返回", "Volver"), ""});
+        c.painel.MostrarLista(TR("Cliques na roda", "Wheel clicks", "滚轮点击", "Clics de la rueda"), itens, selecionado);
+    }
+
+    // Próxima ação do gesto: conversar, gaveta, cada app da gaveta, nada (e de volta ao começo)
+    void TrocarAcao(ContextoApps& c, int gesto) {
+        std::string atual = CliquesWatcher::Acao(gesto);
+        aviso_gaveta_ = 0;
+        if (atual == "gaveta" && !CliquesWatcher::OutroAbreGaveta(gesto)) {
+            aviso_gaveta_ = gesto;
+            DesenharCliques(c, gesto - 1);
+            return;
+        }
+        std::vector<std::string> opcoes = {"agente", "gaveta"};
+        if (c.listar_apps) {
+            for (auto& [id, nome] : c.listar_apps()) {
+                opcoes.push_back("app:" + id);
+            }
+        }
+        opcoes.push_back("nada");
+        size_t i = 0;
+        while (i < opcoes.size() && opcoes[i] != atual) {
+            i++;
+        }
+        CliquesWatcher::Definir(gesto, opcoes[(i + 1) % opcoes.size()]);  // ação desconhecida: volta ao começo
+        DesenharCliques(c, gesto - 1);
     }
 
     // Consulta ao servidor do OTA (rede: fica fora do clique, que roda com a tela travada)
