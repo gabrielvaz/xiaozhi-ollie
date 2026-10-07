@@ -29,6 +29,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch
         PRODUCT_NAME: Ollie
         INFOPLIST_KEY_CFBundleDisplayName: Ollie
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
     dependencies:
