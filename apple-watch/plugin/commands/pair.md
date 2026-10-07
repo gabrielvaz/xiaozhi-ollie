@@ -1,6 +1,6 @@
 ---
 description: Pair this computer with the Ollie app on your Apple Watch
-argument-hint: <code> | --statusline | --status | --unpair
+argument-hint: <code> | --relay <url> | --statusline | --status | --unpair
 allowed-tools: Bash(node:*)
 ---
 

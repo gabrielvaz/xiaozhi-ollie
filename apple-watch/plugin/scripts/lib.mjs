@@ -4,7 +4,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 
-export const DEFAULT_RELAY = "https://ollie-watch-relay.example.workers.dev";
+// Your relay (your own Cloudflare Workers deployment): saved by /ollie-watch:pair --relay <url>, or OLLIE_WATCH_RELAY
+export const DEFAULT_RELAY = "";
 export const CONFIG_DIR = process.env.OLLIE_WATCH_HOME || join(homedir(), ".config", "ollie-watch");
 export const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 export const RUN_DIR = join(CONFIG_DIR, "run");
@@ -29,6 +30,7 @@ export function relayUrl(config) {
 
 /** JSON request to the relay. Never throws: returns { status, body } or { status: 0 }. */
 export async function relay(config, method, path, body, timeoutMs = 4000) {
+  if (!relayUrl(config)) return { status: 0, noRelay: true };
   try {
     const res = await fetch(relayUrl(config) + path, {
       method,

@@ -25,5 +25,11 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>OllieKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)$(OLLIE_BUNDLE_PREFIX).shared</string>
+	<key>OllieKeychainService</key>
+	<string>$(OLLIE_BUNDLE_PREFIX)</string>
+	<key>OllieRelayURL</key>
+	<string>$(OLLIE_RELAY_URL)</string>
 </dict>
 </plist>

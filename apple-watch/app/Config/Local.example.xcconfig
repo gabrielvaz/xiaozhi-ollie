@@ -1,0 +1,4 @@
+// Copie para Config/Local.xcconfig (fica fora do git) com os seus valores.
+OLLIE_TEAM_ID = ABCDE12345
+OLLIE_BUNDLE_PREFIX = com.seudominio.olliewatch
+OLLIE_RELAY_URL = https:/$()/ollie-watch-relay.SEU-SUBDOMINIO.workers.dev

@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const DIR = process.env.OLLIE_WATCH_HOME || join(homedir(), ".config", "ollie-watch");
-const DEFAULT_RELAY = "https://ollie-watch-relay.example.workers.dev";
+const DEFAULT_RELAY = ""; // the relay comes from config.json (/ollie-watch:pair --relay <url>)
 
 const chunks = [];
 for await (const c of process.stdin) chunks.push(c);
@@ -48,7 +48,7 @@ if (config?.token && limits && (limits.five_hour || limits.seven_day)) {
     mkdirSync(DIR, { recursive: true });
     writeFileSync(stamp, JSON.stringify({ at: Date.now(), body }));
     const relay = (process.env.OLLIE_WATCH_RELAY || config.relay || DEFAULT_RELAY).replace(/\/+$/, "");
-    try {
+    if (relay) try {
       await fetch(`${relay}/v1/usage`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${config.token}` },

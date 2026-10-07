@@ -1,0 +1,8 @@
+// Identidade do app e endereço do relay. Estes são valores de exemplo; os seus ficam em Config/Local.xcconfig,
+// fora do git (copie Config/Local.example.xcconfig e preencha). O project.yml e o Info.plist leem daqui.
+OLLIE_TEAM_ID =
+OLLIE_BUNDLE_PREFIX = com.example.olliewatch
+// "//" começaria um comentário no xcconfig: $() separa as barras
+OLLIE_RELAY_URL = https:/$()/ollie-watch-relay.example.workers.dev
+
+#include? "Local.xcconfig"

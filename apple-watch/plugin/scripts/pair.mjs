@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// /ollie-watch:pair --relay <URL> sets the address of your relay (do this once, before pairing)
 // /ollie-watch:pair <CODE>        pairs this computer with the watch showing CODE
 // /ollie-watch:pair --statusline  sends plan usage to the watch through the status line
 // /ollie-watch:pair --status      shows the current pairing
@@ -17,6 +18,20 @@ const STATUS_COMMAND = `node "${STATUS_SCRIPT}"`;
 
 const say = (s) => process.stdout.write(s + "\n");
 
+const NO_RELAY =
+  "Set your relay first: /ollie-watch:pair --relay https://ollie-watch-relay.<your-subdomain>.workers.dev";
+
+if (arg.startsWith("--relay")) {
+  const url = arg.slice("--relay".length).trim().replace(/\/+$/, "");
+  if (!/^https:\/\/[^\s/]+/.test(url)) {
+    say("Use: /ollie-watch:pair --relay https://ollie-watch-relay.<your-subdomain>.workers.dev");
+    process.exit(1);
+  }
+  saveConfig({ ...(loadConfig() ?? {}), relay: url });
+  say(`Relay set to ${url}. Now open Ollie on your Apple Watch and run /ollie-watch:pair <code>.`);
+  process.exit(0);
+}
+
 if (!arg || arg === "--status") {
   const config = loadConfig();
   if (!config?.token) {
@@ -24,7 +39,8 @@ if (!arg || arg === "--status") {
     process.exit(0);
   }
   const r = await relay(config, "GET", "/v1/whoami");
-  if (r.status === 200) say(`Paired as "${config.host}" with ${relayUrl(config)}.`);
+  if (r.noRelay) say(NO_RELAY);
+  else if (r.status === 200) say(`Paired as "${config.host}" with ${relayUrl(config)}.`);
   else if (r.status === 401) say("This pairing was removed on the watch. Run /ollie-watch:pair <code> again.");
   else say(`Paired, but the relay did not answer (${r.status || "offline"}).`);
   say(`Plan usage on the watch: ${statuslineEnabled() ? "on" : "off (run /ollie-watch:pair --statusline)"}.`);
@@ -52,6 +68,10 @@ if (code.length !== 6) {
 const previous = loadConfig() ?? {};
 const host = hostname().replace(/\.local$/, "");
 const r = await relay(previous, "POST", "/v1/pair/claim", { code, host });
+if (r.noRelay) {
+  say(NO_RELAY);
+  process.exit(1);
+}
 if (r.status !== 200 || !r.body?.token) {
   say(r.status === 404 ? "That code is wrong or expired. The watch shows a new one after 10 minutes." : `Could not reach the relay (${r.status || "offline"}).`);
   process.exit(1);

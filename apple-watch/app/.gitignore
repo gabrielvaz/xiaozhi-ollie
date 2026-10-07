@@ -1,3 +1,4 @@
 build/
 Ollie.xcodeproj/
 *.xcuserstate
+Config/Local.xcconfig

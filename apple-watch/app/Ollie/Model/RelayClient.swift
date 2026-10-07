@@ -10,7 +10,11 @@ enum RelayError: Error, Equatable {
 
 /// Fala com o relay por HTTPS comum. (No watchOS, WebSocket só é permitido com áudio tocando.)
 struct RelayClient: Sendable {
-    static let defaultBase = URL(string: "https://ollie-watch-relay.example.workers.dev")!
+    /// Endereço do relay, do Info.plist (OllieRelayURL), que vem de Config/*.xcconfig
+    static let defaultBase: URL = {
+        let texto = Bundle.main.object(forInfoDictionaryKey: "OllieRelayURL") as? String ?? ""
+        return URL(string: texto) ?? URL(string: "https://ollie-watch-relay.example.workers.dev")!
+    }()
 
     var base: URL = RelayClient.defaultBase
     var token: String?

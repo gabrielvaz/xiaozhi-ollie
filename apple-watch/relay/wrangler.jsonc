@@ -10,10 +10,8 @@
       { "name": "CODES", "class_name": "CodesDO" }
     ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PairingDO", "CodesDO"] }],
-  "vars": {
-    "APNS_TOPIC": "com.example.olliewatch.watchkitapp",
-    "APNS_TEAM_ID": "TEAMID_EXEMPLO"
-  }
-  // Segredos (wrangler secret put): APNS_KEY_ID, APNS_KEY_P8
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PairingDO", "CodesDO"] }]
+  // Segredos da sua conta (npx wrangler secret put <NOME>), fora do git:
+  //   APNS_TEAM_ID (o seu Team ID da Apple), APNS_TOPIC (o bundle do app do relógio, <prefixo>.watchkitapp),
+  //   APNS_KEY_ID e APNS_KEY_P8. Para o wrangler dev, os mesmos nomes em .dev.vars
 }

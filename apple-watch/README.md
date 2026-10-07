@@ -23,15 +23,19 @@ Your Claude login never leaves Claude Code. Anthropic does not allow third-party
 
 ## Set up
 
-1. Install **Ollie: Agent Watch** on your Apple Watch and open it. It shows a code like `K7Q-42M`.
-2. In Claude Code:
+1. Deploy your own relay (`relay/`, a Cloudflare Worker; see Development) and build the app with your own
+   identity: copy `app/Config/Local.example.xcconfig` to `app/Config/Local.xcconfig` (kept out of git) and fill in
+   your Team ID, bundle ID prefix and relay URL.
+2. Install the app on your Apple Watch and open it. It shows a code like `K7Q-42M`.
+3. In Claude Code:
    ```
    /plugin marketplace add gabrielvaz/xiaozhi-ollie
    /plugin install ollie-watch@ollie
+   /ollie-watch:pair --relay https://ollie-watch-relay.<your-subdomain>.workers.dev
    /ollie-watch:pair K7Q-42M
    ```
-3. Optional, plan usage on the watch: `/ollie-watch:pair --statusline` (keeps your current status line).
-4. Optional, talk to sessions and approve in parallel with the terminal: start Claude Code with the channel. Channels are a research preview, so custom ones need the development flag:
+4. Optional, plan usage on the watch: `/ollie-watch:pair --statusline` (keeps your current status line).
+5. Optional, talk to sessions and approve in parallel with the terminal: start Claude Code with the channel. Channels are a research preview, so custom ones need the development flag:
    ```
    claude --dangerously-load-development-channels plugin:ollie-watch@ollie
    ```
@@ -43,9 +47,9 @@ Pair more computers with the same watch by running `/ollie-watch:pair` with a ne
 
 | Part | Commands |
 |---|---|
-| Relay | `cd relay && npm install && npm test` (runs against `wrangler dev`) · `npx wrangler deploy` · push needs `wrangler secret put APNS_KEY_ID` and `APNS_KEY_P8` |
+| Relay | `cd relay && npm install && npm test` (runs against `wrangler dev`) · `npx wrangler deploy` · push needs `npx wrangler secret put` for `APNS_TEAM_ID`, `APNS_TOPIC` (`<bundle prefix>.watchkitapp`), `APNS_KEY_ID` and `APNS_KEY_P8` (same names in `.dev.vars` for `wrangler dev`) |
 | Plugin | `claude --plugin-dir apple-watch/plugin` · `claude plugin validate apple-watch/plugin` · `OLLIE_WATCH_HOME` and `OLLIE_WATCH_RELAY` point it at a test config and relay |
-| App | `cd app && xcodegen generate`, then the `OllieWatch` scheme (tests included). Debug builds accept `-OllieSkipPushPrompt YES` and `-OllieOpenRoute usage\|settings\|session:<id>` for screenshots |
+| App | Team ID, bundle IDs and relay URL come from `app/Config/Ollie.xcconfig` (examples) and your `app/Config/Local.xcconfig`. `cd app && xcodegen generate`, then the `OllieWatch` scheme (tests included). Debug builds accept `-OllieSkipPushPrompt YES` and `-OllieOpenRoute usage\|settings\|session:<id>` for screenshots |
 
 Release: archive the `Ollie` scheme for `generic/platform=iOS` (the empty container the App Store needs for a watch-only app) and export with `app/ExportOptions.plist`.
 

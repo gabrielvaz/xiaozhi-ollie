@@ -1,6 +1,6 @@
 name: Ollie
 options:
-  bundleIdPrefix: com.example.olliewatch
+  bundleIdPrefix: com.example.olliewatch  # os IDs reais vêm de OLLIE_BUNDLE_PREFIX (Config/)
   deploymentTarget:
     watchOS: "26.0"
     iOS: "18.0"
@@ -8,9 +8,14 @@ options:
   knownRegions: [en, pt-BR, Base]
   createIntermediateGroups: true
 
+# Team ID, bundle IDs e relay: Config/Ollie.xcconfig (exemplo) + Config/Local.xcconfig (os seus, fora do git)
+configFiles:
+  Debug: Config/Ollie.xcconfig
+  Release: Config/Ollie.xcconfig
+
 settings:
   base:
-    DEVELOPMENT_TEAM: TEAMID_EXEMPLO
+    DEVELOPMENT_TEAM: $(OLLIE_TEAM_ID)
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "4"
     SWIFT_VERSION: "6.0"
@@ -26,7 +31,7 @@ targets:
     platform: iOS
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch
+        PRODUCT_BUNDLE_IDENTIFIER: $(OLLIE_BUNDLE_PREFIX)
         PRODUCT_NAME: Ollie
         INFOPLIST_KEY_CFBundleDisplayName: Ollie
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
@@ -47,6 +52,9 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         WKApplication: true
+        OllieRelayURL: $(OLLIE_RELAY_URL)
+        OllieKeychainGroup: $(AppIdentifierPrefix)$(OLLIE_BUNDLE_PREFIX).shared
+        OllieKeychainService: $(OLLIE_BUNDLE_PREFIX)
         WKWatchOnly: true
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes: [remote-notification]
@@ -54,10 +62,10 @@ targets:
       path: Ollie/Ollie.entitlements
       properties:
         aps-environment: development
-        keychain-access-groups: ["$(AppIdentifierPrefix)com.example.olliewatch.shared"]
+        keychain-access-groups: ["$(AppIdentifierPrefix)$(OLLIE_BUNDLE_PREFIX).shared"]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: $(OLLIE_BUNDLE_PREFIX).watchkitapp
         PRODUCT_NAME: Ollie
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -80,15 +88,18 @@ targets:
         CFBundleDisplayName: Ollie
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        OllieRelayURL: $(OLLIE_RELAY_URL)
+        OllieKeychainGroup: $(AppIdentifierPrefix)$(OLLIE_BUNDLE_PREFIX).shared
+        OllieKeychainService: $(OLLIE_BUNDLE_PREFIX)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
       path: OllieWidgets/OllieWidgets.entitlements
       properties:
-        keychain-access-groups: ["$(AppIdentifierPrefix)com.example.olliewatch.shared"]
+        keychain-access-groups: ["$(AppIdentifierPrefix)$(OLLIE_BUNDLE_PREFIX).shared"]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch.watchkitapp.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: $(OLLIE_BUNDLE_PREFIX).watchkitapp.widgets
         PRODUCT_NAME: OllieWidgets
         SKIP_INSTALL: YES
 
@@ -100,7 +111,7 @@ targets:
       - target: OllieWatch
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.olliewatch.tests
+        PRODUCT_BUNDLE_IDENTIFIER: $(OLLIE_BUNDLE_PREFIX).tests
         GENERATE_INFOPLIST_FILE: YES
         BUNDLE_LOADER: $(TEST_HOST)
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Ollie.app/Ollie
